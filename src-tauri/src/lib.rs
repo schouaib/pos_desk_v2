@@ -422,11 +422,21 @@ fn get_stored_activation_key(app: tauri::AppHandle) -> Result<String, String> {
 
 // ─── Server management ──────────────────────────────────────────────
 
-fn get_db_path(app: &tauri::AppHandle) -> String {
-    let data_dir = app.path().app_data_dir().expect("failed to get app data dir");
-    let db_path = data_dir.join(obfstr!("db"));
-    fs::create_dir_all(&db_path).expect("failed to create db directory");
-    db_path.to_string_lossy().to_string()
+fn get_db_path(app: &tauri::AppHandle) -> Result<String, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let db_path = data_dir.join("db");
+    fs::create_dir_all(&db_path).map_err(|e| format!("Failed to create db directory: {}", e))?;
+
+    // Use forward slashes — mongod on Windows handles them fine and avoids escaping issues
+    let path_str = db_path.to_string_lossy().replace('\\', "/");
+    Ok(path_str)
+}
+
+/// Get the log path for mongod (helps debug startup failures)
+fn get_mongod_log_path(app: &tauri::AppHandle) -> Result<String, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let log_path = data_dir.join("mongod.log");
+    Ok(log_path.to_string_lossy().replace('\\', "/"))
 }
 
 #[tauri::command]
@@ -438,12 +448,20 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
         }
     }
 
-    let db_path = get_db_path(&app);
+    let db_path = get_db_path(&app)?;
+    let log_path = get_mongod_log_path(&app)?;
 
     let mongod = app.shell()
         .sidecar("mongod")
         .map_err(|e| format!("mongod binary not found: {}", e))?
-        .args(["--dbpath", &db_path, "--port", "27017", "--bind_ip", "127.0.0.1", "--quiet", "--wiredTigerCacheSizeGB", "0.45"])
+        .args([
+            "--dbpath", &db_path,
+            "--port", "27017",
+            "--bind_ip", "127.0.0.1",
+            "--wiredTigerCacheSizeGB", "0.45",
+            "--logpath", &log_path,
+            "--logappend",
+        ])
         .spawn()
         .map_err(|e| format!("failed to start mongod: {}", e))?;
 
@@ -457,7 +475,7 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
     std::thread::spawn({
         let app = app.clone();
         move || {
-            std::thread::sleep(std::time::Duration::from_secs(2));
+            std::thread::sleep(std::time::Duration::from_secs(3));
             if let Ok(server) = app.shell()
                 .sidecar("server")
                 .and_then(|cmd| cmd.spawn())
@@ -472,6 +490,18 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
     });
 
     Ok("started".to_string())
+}
+
+/// Read mongod log for debugging startup failures
+#[tauri::command]
+fn get_mongod_log(app: tauri::AppHandle) -> Result<String, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let log_path = data_dir.join("mongod.log");
+    let content = std::fs::read_to_string(&log_path).unwrap_or_default();
+    // Return last 50 lines
+    let lines: Vec<&str> = content.lines().collect();
+    let start = if lines.len() > 50 { lines.len() - 50 } else { 0 };
+    Ok(lines[start..].join("\n"))
 }
 
 #[tauri::command]
@@ -703,6 +733,7 @@ pub fn run() {
             get_stored_activation_key,
             start_server,
             stop_server,
+            get_mongod_log,
             list_printers,
             print_raw,
         ])

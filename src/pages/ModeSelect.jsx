@@ -39,7 +39,16 @@ export default function ModeSelect({ onReady }) {
           await new Promise(r => setTimeout(r, 500))
         }
       }
-      setError(t('serverStartFailed') || 'Server failed to start. Make sure MongoDB is running.')
+      // Fetch mongod log for debugging
+      let logHint = ''
+      if (window.__TAURI_INTERNALS__) {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core')
+          const log = await invoke('get_mongod_log')
+          if (log) logHint = '\n\nMongoDB log:\n' + log.slice(-300)
+        } catch {}
+      }
+      setError((t('serverStartFailed') || 'Server failed to start.') + logHint)
     } catch (err) {
       setError(err.message || 'Failed to start server')
     } finally {
