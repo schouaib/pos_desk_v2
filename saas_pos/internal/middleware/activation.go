@@ -58,9 +58,13 @@ func cacheVerified(machineID string) {
 // an activated desktop app — browser access is blocked.
 func RequireActivation() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Allow health check endpoints without activation
+		// Allow health check and setup endpoints without activation
 		path := c.Path()
-		if path == "/healthz" || path == "/readyz" || strings.HasPrefix(path, "/uploads/") {
+		if path == "/healthz" || path == "/readyz" || strings.HasPrefix(path, "/uploads/") ||
+			path == "/api/super-admin/setup-status" || path == "/api/super-admin/setup" ||
+			path == "/api/super-admin/login" ||
+			path == "/api/plans" || path == "/api/signup" ||
+			path == "/api/tenant/auth/login" {
 			return c.Next()
 		}
 

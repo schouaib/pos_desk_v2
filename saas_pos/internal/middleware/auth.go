@@ -23,9 +23,11 @@ func Auth() fiber.Handler {
 		if err != nil {
 			return response.Unauthorized(c)
 		}
-		stored, err := rdb.Get("session:" + claims.ID)
-		if err != nil || stored != claims.SessionToken {
-			return response.Error(c, fiber.StatusUnauthorized, "session_replaced")
+		if rdb.Available() {
+			stored, err := rdb.Get("session:" + claims.ID)
+			if err != nil || stored != claims.SessionToken {
+				return response.Error(c, fiber.StatusUnauthorized, "session_replaced")
+			}
 		}
 		c.Locals(LocalsClaims, claims)
 		return c.Next()

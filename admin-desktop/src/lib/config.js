@@ -80,7 +80,7 @@ export async function resetConfig() {
 }
 
 export function getServerUrl() {
-  return serverUrl.value || 'https://localhost:3000'
+  return serverUrl.value || 'http://localhost:3000'
 }
 
 export { validateUrl }

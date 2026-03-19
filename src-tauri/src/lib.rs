@@ -425,6 +425,49 @@ fn get_db_path(app: &tauri::AppHandle) -> Result<String, String> {
     Ok(path_str)
 }
 
+/// Clean up stale mongod.lock before starting mongod.
+/// If the app was force-closed or crashed, mongod.lock may still exist and block startup.
+fn cleanup_stale_lock(db_path: &str) {
+    let lock_path = std::path::Path::new(db_path).join("mongod.lock");
+    if lock_path.exists() {
+        // Try to read the lock file — if it contains a PID, check if that process is still running
+        if let Ok(content) = fs::read_to_string(&lock_path) {
+            let pid_str = content.trim();
+            if pid_str.is_empty() {
+                return; // Empty lock file means clean shutdown, nothing to do
+            }
+            // Check if the process is still alive
+            #[cfg(target_os = "windows")]
+            {
+                let still_running = std::process::Command::new("tasklist")
+                    .args(["/FI", &format!("PID eq {}", pid_str), "/NH"])
+                    .output()
+                    .map(|o| {
+                        let out = String::from_utf8_lossy(&o.stdout);
+                        out.contains(pid_str) && out.to_lowercase().contains("mongod")
+                    })
+                    .unwrap_or(false);
+
+                if !still_running {
+                    log::info!("Removing stale mongod.lock (PID {} is no longer running)", pid_str);
+                    let _ = fs::remove_file(&lock_path);
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                if let Ok(pid) = pid_str.parse::<i32>() {
+                    // Signal 0 checks if process exists without sending a signal
+                    let still_running = unsafe { libc::kill(pid, 0) == 0 };
+                    if !still_running {
+                        log::info!("Removing stale mongod.lock (PID {} is no longer running)", pid);
+                        let _ = fs::remove_file(&lock_path);
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Get the log path for mongod (helps debug startup failures)
 fn get_mongod_log_path(app: &tauri::AppHandle) -> Result<String, String> {
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
@@ -443,6 +486,9 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
 
     let db_path = get_db_path(&app)?;
     let log_path = get_mongod_log_path(&app)?;
+
+    // Clean up stale lock file from previous unclean shutdown
+    cleanup_stale_lock(&db_path);
 
     let mongod = app.shell()
         .sidecar("mongod")

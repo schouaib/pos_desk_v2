@@ -2,7 +2,7 @@ import Router, { route } from 'preact-router'
 import { useEffect, useState, lazy, Suspense } from 'preact/compat'
 import { isLoggedIn, clearAuth } from './lib/auth'
 import { loadConfig, serverUrl } from './lib/config'
-import { api } from './lib/api'
+import { api, setActivationHeaders } from './lib/api'
 
 const Activation = lazy(() => import('./pages/Activation'))
 const ServerSetup = lazy(() => import('./pages/ServerSetup'))
@@ -62,6 +62,7 @@ export function App() {
   const [checking, setChecking] = useState(true)
   const [sessionReplaced, setSessionReplaced] = useState(false)
   const [needsServerSetup, setNeedsServerSetup] = useState(false)
+  const [needsFirstAdmin, setNeedsFirstAdmin] = useState(false)
 
   // Step 1: Block browser, check activation
   useEffect(() => {
@@ -88,10 +89,22 @@ export function App() {
     return () => window.removeEventListener('session-replaced', onSessionReplaced)
   }, [])
 
-  // Step 3: Load config + check setup (only after activation)
+  // Step 3: Load activation headers + config + check setup (only after activation)
   useEffect(() => {
     if (!activated) return
-    loadConfig().then(() => {
+    async function init() {
+      // Set activation headers for all API calls
+      if (window.__TAURI_INTERNALS__) {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core')
+          const [id, key] = await Promise.all([
+            invoke('get_machine_id'),
+            invoke('get_stored_activation_key'),
+          ])
+          setActivationHeaders(id, key)
+        } catch {}
+      }
+      await loadConfig()
       if (!serverUrl.value) {
         setNeedsServerSetup(true)
         setLoading(false)
@@ -100,14 +113,15 @@ export function App() {
         setLoading(false)
         checkSetup()
       }
-    })
+    }
+    init()
   }, [activated])
 
   function checkSetup() {
     setChecking(true)
     api.setupStatus()
       .then(({ needs_setup }) => {
-        if (needs_setup) route('/setup', true)
+        if (needs_setup) setNeedsFirstAdmin(true)
       })
       .catch(() => {})
       .finally(() => setChecking(false))
@@ -160,6 +174,14 @@ export function App() {
   }
 
   if (checking) return <Spinner />
+
+  if (needsFirstAdmin) {
+    return (
+      <Suspense fallback={<Spinner />}>
+        <Setup onDone={() => { setNeedsFirstAdmin(false); route('/login', true) }} />
+      </Suspense>
+    )
+  }
 
   return (
     <Suspense fallback={<Spinner />}>

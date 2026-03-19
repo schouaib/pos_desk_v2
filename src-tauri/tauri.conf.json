@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "CiPOSdz",
-  "version": "1.0.0+3",
+  "version": "1.0.0+4",
   "identifier": "com.ciposdz.pos-desktop",
   "build": {
     "frontendDist": "../dist",
