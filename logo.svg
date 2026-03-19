@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed"/>
+      <stop offset="50%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.15)"/>
+      <stop offset="50%" style="stop-color:rgba(255,255,255,0)"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="rgba(0,0,0,0.3)"/>
+    </filter>
+    <filter id="innerGlow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="blur"/>
+      <feOffset dx="0" dy="2" result="offsetBlur"/>
+      <feFlood flood-color="rgba(255,255,255,0.2)" result="color"/>
+      <feComposite in="color" in2="offsetBlur" operator="in" result="shadow"/>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="108" ry="108" fill="url(#bg)"/>
+
+  <!-- Subtle shine overlay -->
+  <rect width="512" height="512" rx="108" ry="108" fill="url(#shine)"/>
+
+  <!-- Decorative ring behind C -->
+  <circle cx="248" cy="240" r="150" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="32"/>
+
+  <!-- Small accent dot -->
+  <circle cx="368" cy="120" r="24" fill="rgba(255,255,255,0.12)"/>
+  <circle cx="388" cy="148" r="10" fill="rgba(255,255,255,0.08)"/>
+
+  <!-- Letter C with shadow -->
+  <text x="248" y="310" text-anchor="middle" font-family="'SF Pro Display', 'Segoe UI', Arial, sans-serif" font-weight="900" font-size="300" fill="rgba(0,0,0,0.15)" letter-spacing="-8">C</text>
+  <text x="246" y="306" text-anchor="middle" font-family="'SF Pro Display', 'Segoe UI', Arial, sans-serif" font-weight="900" font-size="300" fill="white" letter-spacing="-8" filter="url(#innerGlow)">C</text>
+
+  <!-- Divider line -->
+  <rect x="170" y="345" width="172" height="2.5" rx="1.25" fill="rgba(255,255,255,0.3)"/>
+
+  <!-- POS text -->
+  <text x="256" y="400" text-anchor="middle" font-family="'SF Pro Display', 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="64" fill="rgba(255,255,255,0.9)" letter-spacing="14">POS</text>
+
+  <!-- Subtle dz badge -->
+  <rect x="326" y="405" width="52" height="24" rx="6" fill="rgba(255,255,255,0.15)"/>
+  <text x="352" y="423" text-anchor="middle" font-family="'SF Pro Display', 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="16" fill="rgba(255,255,255,0.7)">dz</text>
+
+  <!-- Bottom accent bar -->
+  <rect x="176" y="450" width="160" height="4" rx="2" fill="rgba(255,255,255,0.12)"/>
+</svg>
