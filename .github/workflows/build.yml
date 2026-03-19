@@ -1,0 +1,133 @@
+name: Build Kerty POS
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            go_os: darwin
+            go_arch: arm64
+            rust_target: aarch64-apple-darwin
+            mongo_url: https://fastdl.mongodb.org/osx/mongodb-macos-arm64-8.0.4.tgz
+            mongod_name: mongod-aarch64-apple-darwin
+            server_name: server-aarch64-apple-darwin
+          - platform: macos-13
+            go_os: darwin
+            go_arch: amd64
+            rust_target: x86_64-apple-darwin
+            mongo_url: https://fastdl.mongodb.org/osx/mongodb-macos-x86_64-8.0.4.tgz
+            mongod_name: mongod-x86_64-apple-darwin
+            server_name: server-x86_64-apple-darwin
+          - platform: windows-latest
+            go_os: windows
+            go_arch: amd64
+            rust_target: x86_64-pc-windows-msvc
+            # MongoDB 4.4.29 is the last version supporting Windows 7
+            mongo_url: https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-4.4.29.zip
+            mongod_name: mongod-x86_64-pc-windows-msvc.exe
+            server_name: server-x86_64-pc-windows-msvc.exe
+          - platform: ubuntu-22.04
+            go_os: linux
+            go_arch: amd64
+            rust_target: x86_64-unknown-linux-gnu
+            mongo_url: https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-8.0.4.tgz
+            mongod_name: mongod-x86_64-unknown-linux-gnu
+            server_name: server-x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      # Checkout the saas_pos repo for Go server source
+      - uses: actions/checkout@v4
+        with:
+          repository: schouaib/saas_pos
+          path: saas_pos
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Install Linux dependencies
+        if: contains(matrix.platform, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      # Build Go server
+      - name: Build Go server
+        env:
+          GOOS: ${{ matrix.go_os }}
+          GOARCH: ${{ matrix.go_arch }}
+          CGO_ENABLED: 0
+        run: |
+          cd saas_pos
+          go build -o ../src-tauri/binaries/${{ matrix.server_name }} ./cmd/server
+
+      # Download MongoDB
+      - name: Download MongoDB (Unix)
+        if: "!contains(matrix.platform, 'windows')"
+        run: |
+          curl -L -o /tmp/mongo.tgz "${{ matrix.mongo_url }}"
+          mkdir -p /tmp/mongo-extract
+          tar -xzf /tmp/mongo.tgz -C /tmp/mongo-extract --strip-components=1
+          cp /tmp/mongo-extract/bin/mongod src-tauri/binaries/${{ matrix.mongod_name }}
+
+      - name: Download MongoDB (Windows)
+        if: contains(matrix.platform, 'windows')
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "${{ matrix.mongo_url }}" -OutFile "$env:TEMP\mongo.zip"
+          Expand-Archive -Path "$env:TEMP\mongo.zip" -DestinationPath "$env:TEMP\mongo-extract"
+          $mongod = Get-ChildItem -Path "$env:TEMP\mongo-extract" -Recurse -Filter "mongod.exe" | Select-Object -First 1
+          Copy-Item $mongod.FullName -Destination "src-tauri\binaries\${{ matrix.mongod_name }}"
+
+      # Also need the other arch binary for macOS universal builds
+      - name: Add macOS secondary arch binaries
+        if: contains(matrix.platform, 'macos')
+        run: |
+          # Create dummy for the other arch (Tauri needs both, but only bundles current)
+          if [ "${{ matrix.go_arch }}" = "arm64" ]; then
+            cp src-tauri/binaries/${{ matrix.server_name }} src-tauri/binaries/server-x86_64-apple-darwin
+            cp src-tauri/binaries/${{ matrix.mongod_name }} src-tauri/binaries/mongod-x86_64-apple-darwin
+          else
+            cp src-tauri/binaries/${{ matrix.server_name }} src-tauri/binaries/server-aarch64-apple-darwin
+            cp src-tauri/binaries/${{ matrix.mongod_name }} src-tauri/binaries/mongod-aarch64-apple-darwin
+          fi
+
+      - name: Build Tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Kerty POS ${{ github.ref_name }}'
+          releaseBody: 'Desktop POS application'
+          releaseDraft: true
+          prerelease: false

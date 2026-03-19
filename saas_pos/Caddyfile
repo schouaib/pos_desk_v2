@@ -1,0 +1,29 @@
+{$DOMAIN::80} {
+    handle /hooks/* {
+        reverse_proxy host.docker.internal:9000
+    }
+    handle /api/* {
+        reverse_proxy app:3000
+    }
+    handle /uploads/* {
+        reverse_proxy app:3000
+    }
+    handle /admin/* {
+        uri strip_prefix /admin
+        root * /srv/admin
+        try_files {path} /index.html
+        file_server
+    }
+    handle /tenant/* {
+        uri strip_prefix /tenant
+        root * /srv/tenant
+        try_files {path} /index.html
+        file_server
+    }
+    handle /* {
+        root * /srv/landing
+        try_files {path} /index.html
+        file_server
+    }
+    encode gzip zstd
+}

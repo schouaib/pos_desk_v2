@@ -1,0 +1,11 @@
+node_modules/
+dist/
+release/
+build/*.ico
+build/*.icns
+build/*.png
+.DS_Store
+*.log
+src-tauri/target/
+src-tauri/binaries/mongod-*
+src-tauri/binaries/server-*

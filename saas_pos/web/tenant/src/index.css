@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom thin scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(var(--bc) / 0.18);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(var(--bc) / 0.32);
+}
+
+/* Table row hover transition */
+.table tbody tr {
+  transition: background-color 0.1s ease;
+}
+
+/* Smooth modal shadow */
+.modal-box {
+  box-shadow: 0 25px 60px -12px rgb(0 0 0 / 0.22);
+}
+
+/* Badge refinement */
+.badge {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* Card hover (applied via Tailwind hover:shadow-md on individual cards) */
+.card {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+/* Smooth sidebar transitions */
+aside {
+  transition: transform 0.2s ease-in-out;
+}
+
+/* Focus ring polish */
+.input:focus-within,
+.select:focus,
+.textarea:focus {
+  outline-offset: 0;
+}
+
+/* Ensure tooltips always appear above table headers, modals, and overflow containers */
+.tooltip::before,
+.tooltip::after {
+  z-index: 9999;
+}

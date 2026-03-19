@@ -1,0 +1,45 @@
+services:
+  caddy:
+    build:
+      context: .
+      target: caddy
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      target: app
+    env_file: .env
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      - mongo
+      - redis
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    command: mongod --wiredTigerCacheSizeGB 0.5
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  uploads:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,11 @@
+[Unit]
+Description=GitHub Deploy Webhook
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/webhook -hooks /opt/deploy/hooks.json -port 9000 -verbose
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target

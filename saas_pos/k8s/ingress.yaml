@@ -1,0 +1,69 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: saas-pos-ingress
+  namespace: saas-pos
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+spec:
+  tls:
+    - hosts:
+        - saas-pos.duckdns.org
+      secretName: saas-pos-tls
+  rules:
+    - host: saas-pos.duckdns.org
+      http:
+        paths:
+          - path: /hooks
+            pathType: Prefix
+            backend:
+              service:
+                name: webhook-svc
+                port:
+                  number: 9000
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: app-svc
+                port:
+                  number: 3000
+          - path: /uploads
+            pathType: Prefix
+            backend:
+              service:
+                name: app-svc
+                port:
+                  number: 3000
+          - path: /healthz
+            pathType: Exact
+            backend:
+              service:
+                name: app-svc
+                port:
+                  number: 3000
+          - path: /readyz
+            pathType: Exact
+            backend:
+              service:
+                name: app-svc
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: caddy-svc
+                port:
+                  number: 80

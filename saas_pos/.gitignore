@@ -1,0 +1,6 @@
+.env
+uploads/
+node_modules/
+deploy.log
+web/admin/dist/
+web/tenant/dist/
