@@ -4,7 +4,7 @@
   "description": "Desktop POS Client with Activation Key",
   "private": true,
   "scripts": {
-    "dev": "vite --port 5180",
+    "dev": "vite --port 5180 --host",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",

@@ -38,7 +38,7 @@ func Load() {
 		JWTExpiresIn:    dur,
 		TurnstileSecret: getEnv("TURNSTILE_SECRET", ""),
 		RedisURI:        getEnv("REDIS_URI", "redis://localhost:6379"),
-		CORSOrigins:     getEnv("CORS_ORIGINS", "tauri://localhost,http://localhost:5180,http://localhost:5181"),
+		CORSOrigins:     getEnv("CORS_ORIGINS", "tauri://localhost,http://tauri.localhost,https://tauri.localhost,http://localhost:5180,http://localhost:5181"),
 	}
 }
 

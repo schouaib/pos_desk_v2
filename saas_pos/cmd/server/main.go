@@ -103,6 +103,11 @@ func main() {
 	})
 
 	app.Use(recover.New())
+	// Private Network Access: must be before CORS so preflight responses include it
+	app.Use(func(c *fiber.Ctx) error {
+		c.Set("Access-Control-Allow-Private-Network", "true")
+		return c.Next()
+	})
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     config.App.CORSOrigins,
 		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
@@ -110,11 +115,11 @@ func main() {
 		AllowCredentials: false,
 		ExposeHeaders:    "Access-Control-Allow-Private-Network",
 	}))
-	// Private Network Access: allow Tauri/WebView2 to reach LAN servers
-	app.Use(func(c *fiber.Ctx) error {
-		c.Set("Access-Control-Allow-Private-Network", "true")
-		return c.Next()
+	// Serve uploaded files before rate limiter (no directory listing)
+	app.Static("/uploads", "./uploads", fiber.Static{
+		Browse: false,
 	})
+
 	app.Use(logger.New(logger.Config{
 		Format: "${time} ${method} ${path} ${status} ${latency}\n",
 	}))
@@ -148,11 +153,6 @@ func main() {
 			return c.Status(503).SendString("redis down")
 		}
 		return c.SendStatus(200)
-	})
-
-	// Serve uploaded files (no directory listing)
-	app.Static("/uploads", "./uploads", fiber.Static{
-		Browse: false,
 	})
 
 	registerRoutes(app)
