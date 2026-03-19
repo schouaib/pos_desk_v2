@@ -37,7 +37,7 @@ export function Layout({ children, currentPath }) {
     <div class={`min-h-screen flex bg-base-200 ${lang === 'ar' ? 'flex-row-reverse' : ''}`}>
       <aside class={`w-56 bg-base-100 flex flex-col ${lang === 'ar' ? 'border-l' : 'border-r'} border-base-300`}>
         <div class="p-4 border-b border-base-300">
-          <h1 class="text-lg font-bold text-primary">Kerty Admin</h1>
+          <h1 class="text-lg font-bold text-primary">CiPOSdz Admin</h1>
           <p class="text-xs text-base-content/60">{t('superAdmin')}</p>
         </div>
 

@@ -89,7 +89,7 @@ export default function ModeSelect({ onReady }) {
                   </svg>
                 </div>
                 <div>
-                  <h1 class="text-2xl font-bold">Kerty POS</h1>
+                  <h1 class="text-2xl font-bold">CiPOSdz</h1>
                   <p class="text-xs text-base-content/40">v1.0.0</p>
                 </div>
               </div>

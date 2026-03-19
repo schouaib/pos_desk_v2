@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Kerty POS",
+  "productName": "CiPOSdz",
   "version": "1.0.0+3",
-  "identifier": "com.kerty.pos-desktop",
+  "identifier": "com.ciposdz.pos-desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5180",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Kerty POS",
+        "title": "CiPOSdz",
         "width": 1280,
         "height": 800,
         "minWidth": 1024,

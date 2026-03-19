@@ -1,4 +1,4 @@
-name: Build Kerty POS
+name: Build CiPOSdz
 
 on:
   push:
@@ -127,7 +127,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Kerty POS ${{ github.ref_name }}'
+          releaseName: 'CiPOSdz ${{ github.ref_name }}'
           releaseBody: 'Desktop POS application'
           releaseDraft: true
           prerelease: false

@@ -134,7 +134,7 @@ export function App() {
             </svg>
           </div>
           <h2 class="text-xl font-bold">Desktop Only</h2>
-          <p class="text-base-content/60 text-sm mt-2">This application requires the Kerty Admin desktop app. Browser access is not allowed.</p>
+          <p class="text-base-content/60 text-sm mt-2">This application requires the CiPOSdz Admin desktop app. Browser access is not allowed.</p>
         </div>
       </div>
     </div>

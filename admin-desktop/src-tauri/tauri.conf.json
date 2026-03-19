@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Kerty Admin",
+  "productName": "CiPOSdz Admin",
   "version": "1.0.0+1",
-  "identifier": "com.kerty.admin-desktop",
+  "identifier": "com.ciposdz.admin-desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5181",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Kerty Admin",
+        "title": "CiPOSdz Admin",
         "width": 1280,
         "height": 800,
         "minWidth": 1024,
