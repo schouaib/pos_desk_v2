@@ -85,22 +85,15 @@ fn get_hardware_uuid() -> String {
 
 #[cfg(target_os = "windows")]
 fn get_mac_address() -> String {
+    // Use BIOS serial number as stable identifier — registry NetworkCards
+    // enumeration order is non-deterministic and changes across reboots,
+    // which caused the machine ID (and thus activation) to become invalid.
     use winreg::enums::HKEY_LOCAL_MACHINE;
     use winreg::RegKey;
-    let net_key = RegKey::predef(HKEY_LOCAL_MACHINE)
-        .open_subkey(obfstr!(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkCards"));
-    if let Ok(key) = net_key {
-        for name in key.enum_keys().filter_map(|k| k.ok()) {
-            if let Ok(sub) = key.open_subkey(&name) {
-                if let Ok(desc) = sub.get_value::<String, _>(obfstr!("Description")) {
-                    if !desc.is_empty() {
-                        return desc;
-                    }
-                }
-            }
-        }
-    }
-    String::new()
+    RegKey::predef(HKEY_LOCAL_MACHINE)
+        .open_subkey(obfstr!(r"HARDWARE\DESCRIPTION\System\BIOS"))
+        .and_then(|key| key.get_value::<String, _>(obfstr!("BaseBoardProduct")))
+        .unwrap_or_default()
 }
 
 #[cfg(target_os = "windows")]
