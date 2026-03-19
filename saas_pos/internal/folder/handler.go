@@ -1,14 +1,11 @@
 package folder
 
 import (
-	"saas_pos/internal/config"
 	"saas_pos/internal/database"
 	"saas_pos/internal/middleware"
 	"saas_pos/pkg/jwt"
-	rdb "saas_pos/pkg/redis"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"saas_pos/pkg/features"
@@ -92,13 +89,7 @@ func HandleSwitch(c *fiber.Ctx) error {
 	}
 	database.Col("tenants").FindOne(ctx, bson.M{"_id": targetOID}).Decode(&t)
 
-	// Create new session
-	sessionToken := uuid.New().String()
-	if err := rdb.Set("session:"+u.ID.Hex(), sessionToken, config.App.JWTExpiresIn); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "failed to create session")
-	}
-
-	token, err := jwt.Generate(u.ID.Hex(), u.Email, u.Role, body.FolderID, sessionToken, u.Permissions, t.Features)
+	token, err := jwt.Generate(u.ID.Hex(), u.Email, u.Role, body.FolderID, "", u.Permissions, t.Features)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, err.Error())
 	}

@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"saas_pos/pkg/jwt"
-	rdb "saas_pos/pkg/redis"
 	"saas_pos/pkg/response"
 
 	"github.com/gofiber/fiber/v2"
@@ -12,7 +11,7 @@ import (
 
 const LocalsClaims = "claims"
 
-// Auth validates the JWT, then verifies the session token against Redis.
+// Auth validates the JWT.
 func Auth() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		header := c.Get("Authorization")
@@ -22,12 +21,6 @@ func Auth() fiber.Handler {
 		claims, err := jwt.Parse(strings.TrimPrefix(header, "Bearer "))
 		if err != nil {
 			return response.Unauthorized(c)
-		}
-		if rdb.Available() {
-			stored, err := rdb.Get("session:" + claims.ID)
-			if err != nil || stored != claims.SessionToken {
-				return response.Error(c, fiber.StatusUnauthorized, "session_replaced")
-			}
 		}
 		c.Locals(LocalsClaims, claims)
 		return c.Next()

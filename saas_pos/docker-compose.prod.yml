@@ -24,7 +24,6 @@ services:
       - uploads:/app/uploads
     depends_on:
       - mongo
-      - redis
     restart: unless-stopped
 
   mongo:
@@ -32,10 +31,6 @@ services:
     command: mongod --wiredTigerCacheSizeGB 0.5
     volumes:
       - mongo_data:/data/db
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
     restart: unless-stopped
 
 volumes:

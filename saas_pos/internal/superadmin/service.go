@@ -5,14 +5,11 @@ import (
 	"errors"
 	"time"
 
-	"saas_pos/internal/config"
 	"saas_pos/internal/database"
 	"saas_pos/pkg/features"
 	"saas_pos/pkg/jwt"
-	rdb "saas_pos/pkg/redis"
 	"saas_pos/pkg/validate"
 
-	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -73,12 +70,7 @@ func Login(input LoginInput) (string, *SuperAdmin, error) {
 		return "", nil, errors.New("invalid credentials")
 	}
 
-	sessionToken := uuid.New().String()
-	if err := rdb.Set("session:"+admin.ID.Hex(), sessionToken, config.App.JWTExpiresIn); err != nil {
-		return "", nil, errors.New("failed to create session")
-	}
-
-	token, err := jwt.Generate(admin.ID.Hex(), admin.Email, RoleSuperAdmin, "", sessionToken, jwt.Permissions{}, features.PlanFeatures{})
+	token, err := jwt.Generate(admin.ID.Hex(), admin.Email, RoleSuperAdmin, "", "", jwt.Permissions{}, features.PlanFeatures{})
 	if err != nil {
 		return "", nil, err
 	}
@@ -86,7 +78,7 @@ func Login(input LoginInput) (string, *SuperAdmin, error) {
 }
 
 func Logout(adminID string) {
-	_ = rdb.Del("session:" + adminID)
+	// no-op: session storage removed
 }
 
 func List(page, limit int) (*ListResult, error) {

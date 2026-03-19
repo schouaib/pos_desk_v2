@@ -155,27 +155,20 @@ Tag images before deploy, keep one previous version. Rollback script restores pr
 
 These aren't urgent but prepare for growth beyond a single VPS:
 
-### 4.1 Add Redis for Caching
-- Tenant status cache (replace in-memory)
-- Session management
-- Rate limiting state (distributed)
-- Plans/categories/brands cache
-
-### 4.2 CDN for Static Assets
+### 4.1 CDN for Static Assets
 - Move frontend assets to Cloudflare CDN or similar
 - Reduces VPS bandwidth, improves global latency
 
-### 4.3 MongoDB Replica Set
+### 4.2 MongoDB Replica Set
 - Read replicas for stats/reporting queries
 - Automatic failover
 - Point-in-time backup
 
-### 4.4 Horizontal Scaling
+### 4.3 Horizontal Scaling
 - Multiple app containers behind Caddy load balancer
-- Requires Redis for shared state (sessions, rate limits)
 - MongoDB connection pool tuning
 
-### 4.5 Background Job Queue
+### 4.4 Background Job Queue
 - Replace goroutine-based plan expiry with a proper job queue
 - Enable async processing for bulk imports, report generation
 

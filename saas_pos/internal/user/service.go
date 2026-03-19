@@ -5,14 +5,11 @@ import (
 	"errors"
 	"time"
 
-	"saas_pos/internal/config"
 	"saas_pos/internal/database"
 	"saas_pos/pkg/features"
 	"saas_pos/pkg/jwt"
-	rdb "saas_pos/pkg/redis"
 	"saas_pos/pkg/validate"
 
-	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -244,12 +241,7 @@ func Login(input LoginInput) (string, *User, error) {
 		return "", nil, errors.New("plan expired")
 	}
 
-	sessionToken := uuid.New().String()
-	if err := rdb.Set("session:"+u.ID.Hex(), sessionToken, config.App.JWTExpiresIn); err != nil {
-		return "", nil, errors.New("failed to create session")
-	}
-
-	token, err := jwt.Generate(u.ID.Hex(), u.Email, u.Role, u.TenantID.Hex(), sessionToken, u.Permissions, t.Features)
+	token, err := jwt.Generate(u.ID.Hex(), u.Email, u.Role, u.TenantID.Hex(), "", u.Permissions, t.Features)
 	if err != nil {
 		return "", nil, err
 	}
@@ -311,5 +303,5 @@ func GetLinkedTenants(tenantID primitive.ObjectID) []LinkedTenantInfo {
 }
 
 func Logout(userID string) {
-	_ = rdb.Del("session:" + userID)
+	// no-op: session storage removed
 }

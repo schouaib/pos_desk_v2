@@ -11,10 +11,8 @@ services:
       MONGO_DB: saas_pos
       JWT_SECRET: change_this_secret
       JWT_EXPIRES_IN: 4h
-      REDIS_URI: redis://redis:6379
     depends_on:
       - mongo
-      - redis
     restart: unless-stopped
 
   mongo:
@@ -23,10 +21,6 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
     restart: unless-stopped
 
 volumes:

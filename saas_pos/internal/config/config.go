@@ -15,7 +15,6 @@ type Config struct {
 	JWTSecret       string
 	JWTExpiresIn    time.Duration
 	TurnstileSecret string
-	RedisURI        string
 	CORSOrigins     string
 }
 
@@ -37,7 +36,6 @@ func Load() {
 		JWTSecret:       getEnv("JWT_SECRET", "kerty-pos-desktop-secret"),
 		JWTExpiresIn:    dur,
 		TurnstileSecret: getEnv("TURNSTILE_SECRET", ""),
-		RedisURI:        getEnv("REDIS_URI", "redis://localhost:6379"),
 		CORSOrigins:     getEnv("CORS_ORIGINS", "tauri://localhost,http://tauri.localhost,https://tauri.localhost,http://localhost:5180,http://localhost:5181"),
 	}
 }

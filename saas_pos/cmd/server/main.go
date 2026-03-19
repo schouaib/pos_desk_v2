@@ -12,7 +12,6 @@ import (
 	"saas_pos/internal/database"
 	"saas_pos/internal/metrics"
 	"saas_pos/internal/middleware"
-	rdb "saas_pos/pkg/redis"
 	"saas_pos/internal/activation"
 	"saas_pos/internal/adjustment"
 	"saas_pos/internal/batch"
@@ -89,7 +88,6 @@ func main() {
 	config.Load()
 	database.Connect()
 	database.EnsureIndexes()
-	rdb.Connect()
 	done := make(chan struct{})
 	metrics.Init(done)
 	startPlanExpiryJob(done)
@@ -148,9 +146,6 @@ func main() {
 		defer cancel()
 		if err := database.Client.Ping(ctx, nil); err != nil {
 			return c.Status(503).SendString("mongo down")
-		}
-		if err := rdb.Ping(); err != nil {
-			return c.Status(503).SendString("redis down")
 		}
 		return c.SendStatus(200)
 	})
