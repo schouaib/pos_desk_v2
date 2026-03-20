@@ -12,22 +12,27 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// Ed25519 public key — same as embedded in Tauri apps (verify-only)
-const activationPubKeyHex = "3e3ce7e1af68e01eadbb9af7f45cee360efefa84deb7da65eb47049d0c26b283"
+// Ed25519 public keys — same as embedded in Tauri apps (verify-only)
+var activationPubKeyHexList = []string{
+	"3e3ce7e1af68e01eadbb9af7f45cee360efefa84deb7da65eb47049d0c26b283",
+	"f14c96fad2e14455c9994d1b7d4b1d96b6623afd50fa79d2938f6254594726a8",
+}
 
 var (
-	pubKey     ed25519.PublicKey
-	pubKeyOnce sync.Once
+	pubKeys     []ed25519.PublicKey
+	pubKeysOnce sync.Once
 )
 
-func getActivationPubKey() ed25519.PublicKey {
-	pubKeyOnce.Do(func() {
-		b, err := hex.DecodeString(activationPubKeyHex)
-		if err == nil {
-			pubKey = ed25519.PublicKey(b)
+func getActivationPubKeys() []ed25519.PublicKey {
+	pubKeysOnce.Do(func() {
+		for _, h := range activationPubKeyHexList {
+			b, err := hex.DecodeString(h)
+			if err == nil {
+				pubKeys = append(pubKeys, ed25519.PublicKey(b))
+			}
 		}
 	})
-	return pubKey
+	return pubKeys
 }
 
 // Cache verified machine IDs to avoid repeated Ed25519 verification
@@ -64,7 +69,8 @@ func RequireActivation() fiber.Handler {
 			path == "/api/super-admin/setup-status" || path == "/api/super-admin/setup" ||
 			path == "/api/super-admin/login" ||
 			path == "/api/plans" || path == "/api/signup" ||
-			path == "/api/tenant/auth/login" {
+			path == "/api/tenant/auth/login" ||
+			strings.HasPrefix(path, "/api/activation/") {
 			return c.Next()
 		}
 
@@ -83,8 +89,8 @@ func RequireActivation() fiber.Handler {
 		}
 
 		// Verify Ed25519 signature
-		pk := getActivationPubKey()
-		if pk == nil {
+		pks := getActivationPubKeys()
+		if len(pks) == 0 {
 			return response.Error(c, fiber.StatusInternalServerError, "activation verification unavailable")
 		}
 
@@ -94,7 +100,14 @@ func RequireActivation() fiber.Handler {
 			return response.Error(c, fiber.StatusForbidden, "invalid activation")
 		}
 
-		if !ed25519.Verify(pk, []byte(machineID), sigBytes) {
+		verified := false
+		for _, pk := range pks {
+			if ed25519.Verify(pk, []byte(machineID), sigBytes) {
+				verified = true
+				break
+			}
+		}
+		if !verified {
 			return response.Error(c, fiber.StatusForbidden, "invalid activation")
 		}
 

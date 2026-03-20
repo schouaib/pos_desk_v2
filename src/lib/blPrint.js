@@ -550,14 +550,27 @@ export function printBL({ store = {}, sale = {}, labels = {}, client = null, lan
   <div class="bottom-bar"></div>
 
 </div>
-<script>window.onload = function() { window.print(); }<\/script>
 </body>
 </html>`
 
-  const blob = new Blob([html], { type: 'text/html' })
-  const url  = URL.createObjectURL(blob)
-  const win  = window.open(url, '_blank')
-  if (!win) console.warn('Popup blocked — allow popups to print the BL')
-  // Revoke immediately — the browser has already loaded the URL into the new tab
-  URL.revokeObjectURL(url)
+  printViaIframe(html)
+}
+
+/** Print HTML content using a hidden iframe (works in Tauri WebView) */
+function printViaIframe(html) {
+  let iframe = document.getElementById('__print_frame')
+  if (iframe) iframe.remove()
+  iframe = document.createElement('iframe')
+  iframe.id = '__print_frame'
+  iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;border:none;'
+  document.body.appendChild(iframe)
+  const doc = iframe.contentDocument || iframe.contentWindow.document
+  doc.open()
+  doc.write(html)
+  doc.close()
+  iframe.contentWindow.focus()
+  setTimeout(() => {
+    iframe.contentWindow.print()
+    setTimeout(() => iframe.remove(), 1000)
+  }, 300)
 }

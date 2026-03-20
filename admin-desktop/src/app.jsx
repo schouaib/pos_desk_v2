@@ -97,12 +97,18 @@ export function App() {
       if (window.__TAURI_INTERNALS__) {
         try {
           const { invoke } = await import('@tauri-apps/api/core')
-          const [id, key] = await Promise.all([
-            invoke('get_machine_id'),
-            invoke('get_stored_activation_key'),
-          ])
+          const id = await invoke('get_machine_id')
+          const key = await invoke('get_stored_activation_key').catch(() => '')
+          if (!id || !key) {
+            setActivated(false)
+            return
+          }
           setActivationHeaders(id, key)
-        } catch {}
+        } catch (e) {
+          console.error('Failed to load activation headers:', e)
+          setActivated(false)
+          return
+        }
       }
       await loadConfig()
       if (!serverUrl.value) {

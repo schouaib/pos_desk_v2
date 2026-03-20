@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks'
 import { Layout } from '../components/Layout'
+import { SkeletonStats } from '../components/Skeleton'
 import { api } from '../lib/api'
 import { authUser, isTenantAdmin } from '../lib/auth'
 import { useI18n } from '../lib/i18n'
@@ -28,6 +29,8 @@ export default function Dashboard({ path }) {
   const email = authUser.value?.email || ''
   const initial = email[0]?.toUpperCase() || '?'
 
+  const isLoading = counts.products === null && counts.suppliers === null && counts.purchases === null
+
   const stats = [
     {
       label: t('productsPage'),
@@ -55,50 +58,108 @@ export default function Dashboard({ path }) {
     }] : []),
   ]
 
+  const quickActions = [
+    {
+      label: t('posNav'),
+      href: '/pos',
+      bg: 'bg-primary/10',
+      color: 'text-primary',
+      iconPath: 'M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z',
+    },
+    {
+      label: t('newProduct'),
+      href: '/products',
+      bg: 'bg-secondary/10',
+      color: 'text-secondary',
+      iconPath: 'M12 4.5v15m7.5-7.5h-15',
+    },
+    {
+      label: t('salesPage'),
+      href: '/sales',
+      bg: 'bg-accent/10',
+      color: 'text-accent',
+      iconPath: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z',
+    },
+  ]
+
   return (
     <Layout currentPath={path}>
-      {/* Welcome */}
-      <div class="flex items-center gap-3 mb-8">
-        <div class="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center text-primary font-bold text-lg shrink-0">
-          {initial}
+      <div class="page-enter">
+        {/* Welcome */}
+        <div class="flex items-center gap-3 mb-8">
+          <div class="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center text-primary font-bold text-lg shrink-0">
+            {initial}
+          </div>
+          <div>
+            <h2 class="text-2xl font-bold">{t('dashboard')}</h2>
+            <p class="text-sm text-base-content/55">{t('loggedInAs')} <span class="font-medium text-base-content/80">{email}</span></p>
+          </div>
         </div>
-        <div>
-          <h2 class="text-2xl font-bold">{t('dashboard')}</h2>
-          <p class="text-sm text-base-content/55">{t('loggedInAs')} <span class="font-medium text-base-content/80">{email}</span></p>
-        </div>
-      </div>
 
-      {/* Stat cards */}
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {stats.map((s) => (
-          <a key={s.href} href={s.href} class="card bg-base-100 shadow hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 cursor-pointer group">
-            <div class="card-body p-4">
-              <div class={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-150`}>
-                <Icon d={s.icon} className={`w-5 h-5 ${s.color}`} />
-              </div>
-              <p class="text-3xl font-bold tabular-nums">
-                {s.value === null ? <span class="loading loading-dots loading-xs opacity-30" /> : s.value}
-              </p>
-              <p class="text-sm text-base-content/55 mt-0.5">{s.label}</p>
-            </div>
-          </a>
-        ))}
-      </div>
+        {/* Stat cards */}
+        {isLoading ? (
+          <div class="mb-8">
+            <SkeletonStats count={isTenantAdmin() ? 4 : 3} />
+          </div>
+        ) : (
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            {stats.map((s) => (
+              <a key={s.href} href={s.href} class="card bg-base-100 shadow hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group">
+                <div class="card-body p-5">
+                  <div class="flex items-center justify-between mb-4">
+                    <div class={`w-11 h-11 rounded-xl ${s.bg} flex items-center justify-center group-hover:scale-110 transition-transform duration-200`}>
+                      <Icon d={s.icon} className={`w-5 h-5 ${s.color}`} />
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-base-content/25 group-hover:text-base-content/50 transition-colors duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                    </svg>
+                  </div>
+                  <p class="text-3xl font-bold tabular-nums">
+                    {s.value === null ? <span class="loading loading-dots loading-xs opacity-30" /> : s.value}
+                  </p>
+                  <p class="text-sm text-base-content/55 mt-1">{s.label}</p>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
 
-      {/* Quick links */}
-      {isTenantAdmin() && (
-        <div class="card bg-base-100 shadow">
-          <div class="card-body p-4">
-            <h3 class="font-semibold mb-3">{t('quickLinks')}</h3>
-            <div class="flex flex-wrap gap-2">
-              <a href="/products"  class="btn btn-sm btn-outline">{t('productsPage')}</a>
-              <a href="/purchases" class="btn btn-sm btn-outline">{t('purchasesPage')}</a>
-              <a href="/suppliers" class="btn btn-sm btn-outline">{t('suppliersPage')}</a>
-              <a href="/users"     class="btn btn-sm btn-outline">{t('manageStaff')}</a>
+        {/* Quick Actions */}
+        <div class="card bg-base-100 shadow mb-6">
+          <div class="card-body p-5">
+            <h3 class="font-semibold mb-4">{t('quickLinks')}</h3>
+            <div class="flex flex-wrap gap-3">
+              {quickActions.map((action) => (
+                <a
+                  key={action.href}
+                  href={action.href}
+                  class="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-base-200 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group"
+                >
+                  <div class={`w-9 h-9 rounded-lg ${action.bg} flex items-center justify-center group-hover:scale-110 transition-transform duration-200`}>
+                    <Icon d={action.iconPath} className={`w-4.5 h-4.5 ${action.color}`} />
+                  </div>
+                  <span class="text-sm font-medium">{action.label}</span>
+                </a>
+              ))}
             </div>
           </div>
         </div>
-      )}
+
+        {/* Quick links (admin only) */}
+        {isTenantAdmin() && (
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-5">
+              <h3 class="font-semibold mb-3">{t('manageStaff')}</h3>
+              <div class="flex flex-wrap gap-2">
+                <a href="/products"  class="btn btn-sm btn-outline">{t('productsPage')}</a>
+                <a href="/purchases" class="btn btn-sm btn-outline">{t('purchasesPage')}</a>
+                <a href="/suppliers" class="btn btn-sm btn-outline">{t('suppliersPage')}</a>
+                <a href="/users"     class="btn btn-sm btn-outline">{t('manageStaff')}</a>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </Layout>
   )
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "CiPOSdz",
-  "version": "1.0.0+4",
+  "version": "1.0.1",
   "identifier": "com.ciposdz.pos-desktop",
   "build": {
     "frontendDist": "../dist",
@@ -19,7 +19,7 @@
         "minHeight": 700,
         "resizable": true,
         "fullscreen": false,
-        "devtools": false
+        "devtools": true
       }
     ],
     "security": {
@@ -47,7 +47,8 @@
       "nsis": {
         "installMode": "both",
         "displayLanguageSelector": true,
-        "languages": ["English", "French", "Arabic"]
+        "languages": ["English", "French", "Arabic"],
+        "installerHooks": "nsis/hooks.nsi"
       }
     }
   },

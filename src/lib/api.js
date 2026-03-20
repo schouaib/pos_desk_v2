@@ -86,6 +86,10 @@ async function request(method, path, body, { timeout = 15000 } = {}) {
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024 // 10MB
 
 export const api = {
+  // Public (no auth required)
+  listPublicPlans: () => request('GET', '/plans'),
+  signup: (body) => request('POST', '/signup', body),
+
   // Auth
   login: (body) => request('POST', '/tenant/auth/login', body),
   logout: () => request('POST', '/tenant/auth/logout'),

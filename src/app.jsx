@@ -4,6 +4,9 @@ import { isLoggedIn, clearAuth, hasPerm, isTenantAdmin, hasFeature, batchAlerts 
 import { api, setActivationHeaders } from './lib/api'
 import { useI18n } from './lib/i18n'
 import { loadConfig, appMode, getServerUrl, resetConfig } from './lib/config'
+import { useHotkeys } from './lib/hotkeys'
+import { ToastContainer } from './components/Toast'
+import { ShortcutsOverlay, shortcutsOpen } from './components/ShortcutsOverlay'
 
 const Setup = lazy(() => import('./pages/Setup'))
 const ModeSelect = lazy(() => import('./pages/ModeSelect'))
@@ -146,7 +149,8 @@ function RedirectRoot() {
 }
 
 export function App() {
-  const [state, setState] = useState('loading') // 'loading' | 'activation' | 'modeSelect' | 'ready' | 'unreachable'
+  const { t } = useI18n()
+  const [state, setState] = useState('loading') // 'loading' | 'activation' | 'modeSelect' | 'needsSetup' | 'starting' | 'ready' | 'unreachable'
   const [planExpired, setPlanExpired] = useState(false)
   const [sessionReplaced, setSessionReplaced] = useState(false)
 
@@ -169,6 +173,10 @@ export function App() {
         // Load activation headers for server-side verification
         const machineId = await invoke('get_machine_id')
         const keyData = await invoke('get_stored_activation_key').catch(() => '')
+        if (!machineId || !keyData) {
+          setState('activation')
+          return
+        }
         setActivationHeaders(machineId, keyData)
       } catch {
         setState('activation')
@@ -184,6 +192,17 @@ export function App() {
       // Mode already chosen — verify server is reachable
       try {
         await fetch(`${getServerUrl()}/healthz`, { signal: AbortSignal.timeout(5000) })
+        // Check if first-time setup is needed (server mode, no super-admin yet)
+        if (appMode.value === 'server') {
+          try {
+            const res = await fetch(`${getServerUrl()}/api/super-admin/setup-status`, { signal: AbortSignal.timeout(5000) })
+            const json = await res.json()
+            if (json.data?.needs_setup) {
+              setState('needsSetup')
+              return
+            }
+          } catch {}
+        }
         setState('ready')
       } catch {
         // In server mode, try starting the server
@@ -191,14 +210,8 @@ export function App() {
           try {
             const { invoke } = await import('@tauri-apps/api/core')
             await invoke('start_server')
-            // Wait for it
-            for (let i = 0; i < 20; i++) {
-              try {
-                await fetch(`${getServerUrl()}/healthz`, { signal: AbortSignal.timeout(1000) })
-                setState('ready')
-                return
-              } catch { await new Promise(r => setTimeout(r, 500)) }
-            }
+            setState('starting')
+            return
           } catch {}
         }
         setState('unreachable')
@@ -206,6 +219,24 @@ export function App() {
     }
     init()
   }, [])
+
+  useEffect(() => {
+    if (state !== 'starting') return
+    let cancelled = false
+    async function poll() {
+      for (let i = 0; i < 30; i++) {
+        if (cancelled) return
+        try {
+          await fetch(`${getServerUrl()}/healthz`, { signal: AbortSignal.timeout(800) })
+          if (!cancelled) setState('ready')
+          return
+        } catch { await new Promise(r => setTimeout(r, 300)) }
+      }
+      if (!cancelled) setState('unreachable')
+    }
+    poll()
+    return () => { cancelled = true }
+  }, [state])
 
   useEffect(() => {
     if (state !== 'ready') return
@@ -222,7 +253,14 @@ export function App() {
     }
   }, [state])
 
-  if (state === 'loading') return <Spinner />
+  if (state === 'loading' || state === 'starting') return (
+    <div class="min-h-screen flex items-center justify-center bg-base-200">
+      <div class="flex flex-col items-center gap-3">
+        <span class="loading loading-spinner loading-lg text-primary" />
+        {state === 'starting' && <p class="text-base-content/60 text-sm">{t('startingServer') || 'Starting server...'}</p>}
+      </div>
+    </div>
+  )
   if (state === 'blocked') return (
     <div class="min-h-screen flex items-center justify-center bg-base-200">
       <div class="card bg-base-100 shadow max-w-sm w-full">
@@ -243,6 +281,22 @@ export function App() {
       <Setup onActivated={() => { setState('loading'); window.location.reload() }} />
     </Suspense>
   )
+  if (state === 'needsSetup') return (
+    <div class="min-h-screen flex items-center justify-center bg-base-200">
+      <div class="card bg-base-100 shadow max-w-md w-full">
+        <div class="card-body items-center text-center py-10">
+          <div class="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold">{t('firstTimeSetup')}</h2>
+          <p class="text-base-content/60 text-sm mt-2">{t('needsAdminSetup')}</p>
+          <button class="btn btn-primary btn-sm mt-6" onClick={() => window.location.reload()}>{t('retry')}</button>
+        </div>
+      </div>
+    </div>
+  )
   if (state === 'modeSelect') return (
     <Suspense fallback={<Spinner />}>
       <ModeSelect onReady={() => setState('ready')} />
@@ -252,8 +306,18 @@ export function App() {
   if (planExpired) return <PlanExpiredScreen />
   if (sessionReplaced) return <SessionReplacedScreen />
 
+  // Global keyboard shortcuts
+  useHotkeys({
+    'ctrl+d': () => route('/dashboard'),
+    'ctrl+p': () => route('/pos'),
+    'ctrl+f': () => { document.querySelector('[data-search]')?.focus() },
+    '?': () => { shortcutsOpen.value = !shortcutsOpen.value },
+  }, [])
+
   return (
     <Suspense fallback={<Spinner />}>
+      <ToastContainer />
+      <ShortcutsOverlay />
       <Router>
         <Login path="/login" />
         <Signup path="/signup" />

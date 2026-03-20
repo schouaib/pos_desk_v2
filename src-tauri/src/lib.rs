@@ -4,7 +4,6 @@ use ed25519_dalek::{VerifyingKey, Verifier, Signature};
 use std::env;
 use std::fs;
 use std::net::UdpSocket;
-use std::process::Command;
 use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::CommandChild;
@@ -220,23 +219,24 @@ fn get_fingerprint() -> String {
 
 // ─── Ed25519 offline activation (same as admin-desktop) ─────────────
 
-/// Public key from admin-keygen — can ONLY verify, never generate keys.
-fn get_public_key() -> Result<VerifyingKey, String> {
-    let pk_hex = obfstr!("3e3ce7e1af68e01eadbb9af7f45cee360efefa84deb7da65eb47049d0c26b283").to_string();
-    let pub_bytes = hex::decode(&pk_hex)
-        .map_err(|_| "Verification error".to_string())?;
-    let key_array: [u8; 32] = pub_bytes
-        .try_into()
-        .map_err(|_| "Verification error".to_string())?;
-    VerifyingKey::from_bytes(&key_array)
-        .map_err(|_| "Verification error".to_string())
+/// Public keys from admin-keygen — can ONLY verify, never generate keys.
+fn get_public_keys() -> Vec<VerifyingKey> {
+    let pk_hexes = [
+        obfstr!("3e3ce7e1af68e01eadbb9af7f45cee360efefa84deb7da65eb47049d0c26b283").to_string(),
+        obfstr!("f14c96fad2e14455c9994d1b7d4b1d96b6623afd50fa79d2938f6254594726a8").to_string(),
+    ];
+    pk_hexes.iter().filter_map(|pk_hex| {
+        let pub_bytes = hex::decode(pk_hex).ok()?;
+        let key_array: [u8; 32] = pub_bytes.try_into().ok()?;
+        VerifyingKey::from_bytes(&key_array).ok()
+    }).collect()
 }
 
 fn validate_key_offline(machine_id: &str, key: &str) -> bool {
-    let public_key = match get_public_key() {
-        Ok(pk) => pk,
-        Err(_) => return false,
-    };
+    let public_keys = get_public_keys();
+    if public_keys.is_empty() {
+        return false;
+    }
     let hex_str = key.trim().replace('-', "").to_lowercase();
     let sig_bytes = match hex::decode(&hex_str) {
         Ok(b) => b,
@@ -247,7 +247,7 @@ fn validate_key_offline(machine_id: &str, key: &str) -> bool {
         Err(_) => return false,
     };
     let signature = Signature::from_bytes(&sig_array);
-    public_key.verify(machine_id.as_bytes(), &signature).is_ok()
+    public_keys.iter().any(|pk| pk.verify(machine_id.as_bytes(), &signature).is_ok())
 }
 
 // ─── AES-256-GCM activation storage ─────────────────────────────────
@@ -439,8 +439,11 @@ fn cleanup_stale_lock(db_path: &str) {
             // Check if the process is still alive
             #[cfg(target_os = "windows")]
             {
+                use std::os::windows::process::CommandExt;
+                const CREATE_NO_WINDOW_TASK: u32 = 0x08000000;
                 let still_running = std::process::Command::new("tasklist")
                     .args(["/FI", &format!("PID eq {}", pid_str), "/NH"])
+                    .creation_flags(CREATE_NO_WINDOW_TASK)
                     .output()
                     .map(|o| {
                         let out = String::from_utf8_lossy(&o.stdout);
@@ -510,11 +513,20 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
         guard.mongod = Some(mongod.1);
     }
 
-    // Start Go server in background after mongod has time to init — doesn't block UI
+    // Start Go server once mongod is ready — poll instead of fixed sleep
     std::thread::spawn({
         let app = app.clone();
         move || {
-            std::thread::sleep(std::time::Duration::from_secs(3));
+            // Poll mongod readiness: try connecting to port 27017 (up to 10s)
+            for _ in 0..40 {
+                if std::net::TcpStream::connect_timeout(
+                    &"127.0.0.1:27017".parse().unwrap(),
+                    std::time::Duration::from_millis(200),
+                ).is_ok() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(250));
+            }
             if let Ok(server) = app.shell()
                 .sidecar("server")
                 .and_then(|cmd| cmd.spawn())
@@ -612,8 +624,12 @@ fn list_printers_impl() -> Result<PrinterList, String> {
 
 #[cfg(target_os = "windows")]
 fn list_printers_impl() -> Result<PrinterList, String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
     let output = std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", "Get-Printer | Select-Object -ExpandProperty Name"])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| format!("Failed to list printers: {}", e))?;
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -629,6 +645,7 @@ fn list_printers_impl() -> Result<PrinterList, String> {
             "-Command",
             "(Get-CimInstance -ClassName Win32_Printer | Where-Object {$_.Default}).Name",
         ])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .ok();
     let default = def_output.and_then(|o| {

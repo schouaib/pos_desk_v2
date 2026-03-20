@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import { useState, useRef, useEffect } from 'preact/hooks'
 import { route } from 'preact-router'
 import { api } from '../lib/api'
 import { setAuth, batchAlerts, hasFeature, isTenantAdmin } from '../lib/auth'
@@ -10,6 +10,9 @@ export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const emailRef = useRef()
+
+  useEffect(() => { emailRef.current?.focus() }, [])
 
   function translateError(msg) {
     if (msg === 'plan_expired' || msg.includes('plan expired')) return t('errPlanExpired')
@@ -37,38 +40,72 @@ export default function Login() {
   }
 
   return (
-    <div class="min-h-screen flex items-center justify-center bg-base-200">
-      <div class="card w-full max-w-sm bg-base-100 shadow-xl">
-        <div class="card-body">
-          <div class="flex justify-end mb-1">
+    <div class="min-h-screen flex items-center justify-center bg-base-200 p-4">
+      {/* Background decoration */}
+      <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
+        <div class="absolute -bottom-32 -left-32 w-[30rem] h-[30rem] rounded-full bg-primary/3 blur-3xl" />
+      </div>
+
+      <div class="card w-full max-w-sm bg-base-100 shadow-xl relative page-enter">
+        <div class="card-body py-8 px-7">
+          {/* Header */}
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-sm">
+                <svg class="w-5 h-5 text-primary-content" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div>
+                <h1 class="font-bold text-lg leading-tight">CiPOSdz</h1>
+              </div>
+            </div>
             <LangSwitcher />
           </div>
-          <h2 class="card-title text-2xl font-bold mb-1">{t('storeLogin')}</h2>
-          <p class="text-base-content/60 text-sm mb-4">{t('signInManage')}</p>
+
+          <h2 class="text-xl font-bold mb-0.5">{t('storeLogin')}</h2>
+          <p class="text-base-content/50 text-sm mb-5">{t('signInManage')}</p>
 
           {error && (
-            <div class={`alert text-sm py-2 mb-2 ${error.includes('disabled') ? 'alert-warning' : 'alert-error'}`}>
+            <div class={`alert text-sm py-2.5 px-3.5 mb-3 rounded-lg ${error.includes('disabled') ? 'alert-warning' : 'alert-error'}`}>
+              <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               <span>{error}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} class="space-y-3">
+          <form onSubmit={handleSubmit} class="space-y-4">
             <label class="form-control">
-              <span class="label-text text-sm font-medium">{t('email')}</span>
-              <input type="email" class="input input-bordered input-sm"
-                value={form.email} onInput={(e) => setForm({ ...form, email: e.target.value })} required />
+              <span class="label-text">{t('email')}</span>
+              <input ref={emailRef} type="email" class="input input-bordered w-full"
+                placeholder="name@store.com"
+                value={form.email} onInput={(e) => setForm({ ...form, email: e.target.value })}
+                data-search required autocomplete="email" />
             </label>
             <label class="form-control">
-              <span class="label-text text-sm font-medium">{t('password')}</span>
-              <input type="password" class="input input-bordered input-sm"
-                value={form.password} onInput={(e) => setForm({ ...form, password: e.target.value })} required />
+              <span class="label-text">{t('password')}</span>
+              <input type="password" class="input input-bordered w-full"
+                placeholder="••••••••"
+                value={form.password} onInput={(e) => setForm({ ...form, password: e.target.value })}
+                required autocomplete="current-password" />
             </label>
-            <button type="submit" class={`btn btn-primary btn-sm w-full ${loading ? 'loading' : ''}`} disabled={loading}>
+
+            <button type="submit"
+              class={`btn btn-primary w-full mt-1 ${loading ? 'loading' : ''}`}
+              disabled={loading}>
+              {!loading && (
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+              )}
               {t('signIn')}
             </button>
-            <p class="text-center text-sm text-base-content/50 mt-2">
+
+            <p class="text-center text-sm text-base-content/50 pt-1">
               {t('noAccount')}{' '}
-              <a href="/signup" class="link link-primary">{t('createStore')}</a>
+              <a href="/signup" class="link link-primary font-medium">{t('createStore')}</a>
             </p>
           </form>
         </div>

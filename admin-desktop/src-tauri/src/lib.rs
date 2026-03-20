@@ -180,22 +180,23 @@ fn compute_machine_id() -> String {
 
 // ─── Ed25519 signature verification ─────────────────────────────────
 
-fn get_public_key() -> Result<VerifyingKey, String> {
-    let pk_hex = obfstr!("3e3ce7e1af68e01eadbb9af7f45cee360efefa84deb7da65eb47049d0c26b283").to_string();
-    let pub_bytes = hex::decode(&pk_hex)
-        .map_err(|_| "Verification error".to_string())?;
-    let key_array: [u8; 32] = pub_bytes
-        .try_into()
-        .map_err(|_| "Verification error".to_string())?;
-    VerifyingKey::from_bytes(&key_array)
-        .map_err(|_| "Verification error".to_string())
+fn get_public_keys() -> Vec<VerifyingKey> {
+    let pk_hexes = [
+        obfstr!("3e3ce7e1af68e01eadbb9af7f45cee360efefa84deb7da65eb47049d0c26b283").to_string(),
+        obfstr!("f14c96fad2e14455c9994d1b7d4b1d96b6623afd50fa79d2938f6254594726a8").to_string(),
+    ];
+    pk_hexes.iter().filter_map(|pk_hex| {
+        let pub_bytes = hex::decode(pk_hex).ok()?;
+        let key_array: [u8; 32] = pub_bytes.try_into().ok()?;
+        VerifyingKey::from_bytes(&key_array).ok()
+    }).collect()
 }
 
 fn validate_key(machine_id: &str, key: &str) -> bool {
-    let public_key = match get_public_key() {
-        Ok(pk) => pk,
-        Err(_) => return false,
-    };
+    let public_keys = get_public_keys();
+    if public_keys.is_empty() {
+        return false;
+    }
     let hex_str = key.trim().replace('-', "").to_lowercase();
     let sig_bytes = match hex::decode(&hex_str) {
         Ok(b) => b,
@@ -206,7 +207,7 @@ fn validate_key(machine_id: &str, key: &str) -> bool {
         Err(_) => return false,
     };
     let signature = Signature::from_bytes(&sig_array);
-    public_key.verify(machine_id.as_bytes(), &signature).is_ok()
+    public_keys.iter().any(|pk| pk.verify(machine_id.as_bytes(), &signature).is_ok())
 }
 
 // ─── AES-256-GCM activation storage ─────────────────────────────────

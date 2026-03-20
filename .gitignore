@@ -6,6 +6,7 @@ build/*.icns
 build/*.png
 .DS_Store
 *.log
+src/compiled.css
 src-tauri/target/
 src-tauri/binaries/mongod-*
 src-tauri/binaries/server-*

@@ -4,6 +4,7 @@ import { route } from 'preact-router'
 import { useI18n } from '../lib/i18n'
 import { LangSwitcher } from './LangSwitcher'
 import { api } from '../lib/api'
+import { shortcutsOpen } from '../components/ShortcutsOverlay'
 
 const productPaths = ['/products', '/categories', '/brands', '/units', '/losses', '/favorites']
 const purchasePaths = ['/purchases', '/suppliers']
@@ -43,11 +44,11 @@ const ICONS = {
   close:      'M6 18L18 6M6 6l12 12',
 }
 
-const NavLink = memo(({ href, label, icon, active, onNavigate, badge }) => (
+const NavLink = memo(({ href, label, icon, active, onNavigate, badge, kbdHint }) => (
   <a
     href={href}
     onClick={onNavigate}
-    class={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
+    class={`group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
       ${active
         ? 'bg-primary text-primary-content shadow-sm'
         : 'text-base-content/65 hover:text-base-content hover:bg-base-200'}`}
@@ -55,6 +56,7 @@ const NavLink = memo(({ href, label, icon, active, onNavigate, badge }) => (
     {icon && <Icon d={icon} />}
     <span class="flex-1">{label}</span>
     {badge > 0 && <span class="badge badge-error badge-xs text-[10px] px-1.5">{badge}</span>}
+    {kbdHint && <span class="kbd-hint hidden lg:group-hover:inline-flex ms-auto">{kbdHint}</span>}
   </a>
 ))
 
@@ -128,7 +130,7 @@ export function Layout({ children, currentPath }) {
 
       {/* Nav */}
       <nav class="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        <NavLink href="/dashboard" label={t('dashboard')} icon={ICONS.dashboard} active={currentPath === '/dashboard'} onNavigate={closeMenu} />
+        <NavLink href="/dashboard" label={t('dashboard')} icon={ICONS.dashboard} active={currentPath === '/dashboard'} onNavigate={closeMenu} kbdHint="Ctrl+D" />
 
         {hasFeature('products') && (
           <GroupButton
@@ -181,7 +183,7 @@ export function Layout({ children, currentPath }) {
         )}
         {salesOpen && (
           <div class="ms-4 mt-0.5 space-y-0.5 border-s-2 border-base-300 ps-2">
-            {hasFeature('pos')      && hasPerm('sales', 'add')      && <NavLink href="/pos"         label={t('posNav')}          icon={ICONS.pos}        active={currentPath === '/pos'}         onNavigate={closeMenu} />}
+            {hasFeature('pos')      && hasPerm('sales', 'add')      && <NavLink href="/pos"         label={t('posNav')}          icon={ICONS.pos}        active={currentPath === '/pos'}         onNavigate={closeMenu} kbdHint="Ctrl+P" />}
             {hasFeature('sales')    && hasPerm('sales', 'view')     && <NavLink href="/sales"       label={t('salesPage')}       icon={ICONS.sales}      active={currentPath === '/sales'}       onNavigate={closeMenu} />}
             {hasFeature('sales')    && hasPerm('sales', 'return')   && <NavLink href="/sale-returns" label={t('saleReturns')}     icon={ICONS.sales}      active={currentPath === '/sale-returns'} onNavigate={closeMenu} />}
             {hasFeature('stats')    && hasPerm('sales', 'earnings') && <NavLink href="/sales-stats" label={t('salesStatsPage')}  icon={ICONS.salesStats} active={currentPath === '/sales-stats'} onNavigate={closeMenu} />}
@@ -211,6 +213,18 @@ export function Layout({ children, currentPath }) {
           <NavLink href="/chat" label={t('chat')} icon={ICONS.chat} active={currentPath === '/chat'} onNavigate={closeMenu} badge={chatUnread} />
         )}
       </nav>
+
+      {/* Shortcuts help button */}
+      <div class="px-3 pb-1">
+        <button
+          onClick={() => shortcutsOpen.value = true}
+          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-base-content/50 hover:text-base-content hover:bg-base-200 transition-all duration-150"
+          title="Keyboard shortcuts"
+        >
+          <span class="w-5 h-5 rounded border border-base-300 flex items-center justify-center text-xs font-bold shrink-0">?</span>
+          <span class="text-xs">{t('keyboardShortcuts') || 'Shortcuts'}</span>
+        </button>
+      </div>
 
       {/* Footer */}
       <div class="p-3 border-t border-base-300 space-y-2">
@@ -281,7 +295,7 @@ export function Layout({ children, currentPath }) {
             <button class="btn btn-xs btn-ghost" onClick={(e) => { e.stopPropagation(); setBatchAlertDismissed(true) }}>✕</button>
           </div>
         )}
-        {children}
+        <div class="page-enter">{children}</div>
       </main>
       {/* Expiry alert dialog */}
       <dialog id="expiry-alert-dialog" class="modal modal-bottom sm:modal-middle">
