@@ -223,7 +223,7 @@ func Create(tenantID, cashierID, cashierEmail string, input CreateInput) (*Sale,
 }
 
 // List returns paginated sales for a tenant, filtered by date range.
-func List(tenantID string, from, to time.Time, page, limit int) (*ListResult, error) {
+func List(tenantID string, from, to time.Time, page, limit int, ref string) (*ListResult, error) {
 	if limit <= 0 || limit > 10 {
 		limit = 10
 	}
@@ -237,6 +237,9 @@ func List(tenantID string, from, to time.Time, page, limit int) (*ListResult, er
 	filter := bson.M{
 		"tenant_id":  tenantID,
 		"created_at": bson.M{"$gte": from, "$lte": to},
+	}
+	if ref != "" {
+		filter["ref"] = bson.M{"$regex": ref, "$options": "i"}
 	}
 
 	total, _ := col().CountDocuments(ctx, filter)

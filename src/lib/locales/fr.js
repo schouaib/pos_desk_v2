@@ -406,6 +406,9 @@ export default {
   invoicePage: 'Page',
   salesPage: 'Ventes',
   noSales: 'Aucune vente',
+  saleDetail: 'Détail de la vente',
+  searchByRef: 'Chercher par réf...',
+  viewSale: 'Voir',
   saleDate: 'Date',
   saleItems: 'Articles',
   saleCashier: 'Caissier',
@@ -773,4 +776,7 @@ export default {
   declAcompte: 'Acompte',
   declSolde: 'Solde de liquidation',
   declIBSTotal: 'Total IBS à Payer',
+  // Paramètres TVA
+  useVAT: 'Activer la TVA',
+  useVATDesc: 'Afficher les champs TVA dans les produits, achats, ventes et déclarations',
 }

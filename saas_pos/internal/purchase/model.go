@@ -20,6 +20,10 @@ type PurchaseLine struct {
 	ReceivedQty float64            `bson:"received_qty" json:"received_qty"`
 	PrixAchat   float64            `bson:"prix_achat"   json:"prix_achat"`
 	Remise      float64            `bson:"remise"       json:"remise"`
+	VAT         int                `bson:"vat"          json:"vat"`
+	TotalHT     float64            `bson:"total_ht"     json:"total_ht"`
+	TotalVAT    float64            `bson:"total_vat"    json:"total_vat"`
+	TotalTTC    float64            `bson:"total_ttc"    json:"total_ttc"`
 	PrixVente1  float64            `bson:"prix_vente_1" json:"prix_vente_1"`
 	PrixVente2  float64            `bson:"prix_vente_2" json:"prix_vente_2"`
 	PrixVente3  float64            `bson:"prix_vente_3" json:"prix_vente_3"`
@@ -44,6 +48,8 @@ type Purchase struct {
 	Status           string              `bson:"status"             json:"status"`
 	Lines            []PurchaseLine      `bson:"lines"              json:"lines"`
 	Expenses         []PurchaseExpense   `bson:"expenses"           json:"expenses"`
+	TotalHT            float64             `bson:"total_ht"             json:"total_ht"`
+	TotalVAT           float64             `bson:"total_vat"            json:"total_vat"`
 	Total              float64             `bson:"total"                json:"total"`
 	GlobalRemise       float64             `bson:"global_remise"        json:"global_remise"`
 	GlobalRemiseType   string              `bson:"global_remise_type"   json:"global_remise_type"`
@@ -165,6 +171,8 @@ type LowStockProduct struct {
 type PurchaseStats struct {
 	Count          int64   `json:"count"`
 	TotalAmount    float64 `json:"total_amount"`
+	TotalHT        float64 `json:"total_ht"`
+	TotalVAT       float64 `json:"total_vat"`
 	TotalPaid      float64 `json:"total_paid"`
 	TotalRemaining float64 `json:"total_remaining"`
 	TotalExpenses  float64 `json:"total_expenses"`

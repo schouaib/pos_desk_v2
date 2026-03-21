@@ -406,6 +406,9 @@ export default {
   invoicePage: 'صفحة',
   salesPage: 'المبيعات',
   noSales: 'لا توجد مبيعات',
+  saleDetail: 'تفاصيل البيع',
+  searchByRef: 'بحث بالمرجع...',
+  viewSale: 'عرض',
   saleDate: 'التاريخ',
   saleItems: 'الأصناف',
   saleCashier: 'الكاشير',
@@ -773,4 +776,7 @@ export default {
   declAcompte: 'قسط',
   declSolde: 'رصيد التصفية',
   declIBSTotal: 'إجمالي IBS الواجب دفعه',
+  // إعدادات الرسم على القيمة المضافة
+  useVAT: 'تفعيل الرسم على القيمة المضافة (TVA)',
+  useVATDesc: 'إظهار حقول TVA في المنتجات والمشتريات والمبيعات والتصريحات',
 }

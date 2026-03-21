@@ -9,6 +9,11 @@
     "core:default",
     "store:default",
     "shell:allow-open",
+    "fs:default",
+    {
+      "identifier": "fs:allow-temp-write",
+      "allow": [{ "path": "$TEMP/**" }]
+    },
     {
       "identifier": "shell:allow-execute",
       "allow": [

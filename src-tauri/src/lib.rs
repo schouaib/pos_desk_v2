@@ -654,6 +654,33 @@ fn print_raw(printer: String, data: Vec<u8>) -> Result<(), String> {
     print_raw_impl(&printer, &data)
 }
 
+#[tauri::command]
+fn print_html(webview: tauri::Webview, html: String) -> Result<(), String> {
+    // Save current URL to navigate back after printing
+    let current_url = webview.url().map_err(|e| e.to_string())?;
+
+    // Write HTML to temp file and navigate the webview to it
+    let tmp = std::env::temp_dir().join(format!("ciposdz_print_{}.html", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()));
+    std::fs::write(&tmp, &html).map_err(|e| format!("Failed to write temp file: {}", e))?;
+
+    let file_url = tauri::Url::from_file_path(&tmp).map_err(|_| "Invalid path".to_string())?;
+    webview.navigate(file_url).map_err(|e| e.to_string())?;
+
+    // Wait for page to load, then print, then navigate back
+    let webview_clone = webview.clone();
+    let url_clone = current_url.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        let _ = webview_clone.print();
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+        let _ = webview_clone.navigate(url_clone);
+        // Clean up temp file
+        let _ = std::fs::remove_file(&tmp);
+    });
+
+    Ok(())
+}
+
 #[cfg(not(target_os = "windows"))]
 fn print_raw_impl(printer: &str, data: &[u8]) -> Result<(), String> {
     use std::io::Write;
@@ -758,6 +785,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(Processes(std::sync::Mutex::new(ProcessState {
             mongod: None,
             server: None,
@@ -785,6 +813,7 @@ pub fn run() {
             get_mongod_log,
             list_printers,
             print_raw,
+            print_html,
         ])
         .build(tauri::generate_context!())
         .expect("error")

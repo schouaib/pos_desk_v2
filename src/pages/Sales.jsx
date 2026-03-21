@@ -30,7 +30,8 @@ export default function Sales({ path }) {
   const [from, setFrom]     = useState(defaultFrom)
   const [to, setTo]         = useState(defaultTo)
   const [loading, setLoading] = useState(false)
-  const [expanded, setExpanded] = useState(null) // sale id whose lines are shown
+  const [detailSale, setDetailSale] = useState(null) // sale shown in detail dialog
+  const [searchRef, setSearchRef] = useState('')
   const [printingId, setPrintingId] = useState(null)
   const [store, setStore] = useState({})
   // Sale return
@@ -198,7 +199,9 @@ export default function Sales({ path }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await api.listSales({ from, to, page, limit })
+      const params = { from, to, page, limit }
+      if (searchRef.trim()) params.ref = searchRef.trim()
+      const data = await api.listSales(params)
       setItems(data.items || [])
       setTotal(data.total || 0)
       setPages(Math.max(1, Math.ceil((data.total || 0) / limit)))
@@ -207,12 +210,14 @@ export default function Sales({ path }) {
     } finally {
       setLoading(false)
     }
-  }, [from, to, page])
+  }, [from, to, page, searchRef])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    api.listSales({ from, to, page, limit })
+    const params = { from, to, page, limit }
+    if (searchRef.trim()) params.ref = searchRef.trim()
+    api.listSales(params)
       .then(data => {
         if (cancelled) return
         setItems(data.items || [])
@@ -222,7 +227,7 @@ export default function Sales({ path }) {
       .catch(() => { if (!cancelled) setItems([]) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [from, to, page])
+  }, [from, to, page, searchRef])
 
   const start = total === 0 ? 0 : (page - 1) * limit + 1
   const end   = Math.min(page * limit, total)
@@ -234,17 +239,22 @@ export default function Sales({ path }) {
       </div>
 
       {/* Filters */}
-      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-2 flex-wrap items-end">
-        <label class="form-control">
-          <span class="label-text text-xs">{t('dateFrom')}</span>
+      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-3 flex-wrap items-center">
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/50 mb-0.5">{t('dateFrom')}</span>
           <input type="date" class="input input-bordered input-sm"
             value={from} onInput={(e) => { setFrom(e.target.value); setPage(1) }} />
-        </label>
-        <label class="form-control">
-          <span class="label-text text-xs">{t('dateTo')}</span>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/50 mb-0.5">{t('dateTo')}</span>
           <input type="date" class="input input-bordered input-sm"
             value={to} onInput={(e) => { setTo(e.target.value); setPage(1) }} />
-        </label>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/50 mb-0.5">{t('ref')}</span>
+          <input type="text" class="input input-bordered input-sm w-44" placeholder={t('searchByRef')}
+            value={searchRef} onInput={(e) => { setSearchRef(e.target.value); setPage(1) }} />
+        </div>
       </div>
 
       <div class="card bg-base-100 shadow overflow-hidden">
@@ -256,9 +266,9 @@ export default function Sales({ path }) {
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap">{t('saleDate')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('saleCashier')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-center">{t('saleItems')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('saleTotalHT')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('saleTotalVAT')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('saleTotalTTC')}</th>
+              {store.use_vat && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('saleTotalHT')}</th>}
+              {store.use_vat && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('saleTotalVAT')}</th>}
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{store.use_vat ? t('saleTotalTTC') : t('purchaseTotal')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('saleAmountPaid')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('saleChange')}</th>
               {showEarnings && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-success text-end">{t('saleEarning')}</th>}
@@ -268,14 +278,14 @@ export default function Sales({ path }) {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={showEarnings ? 10 : 9} class="py-10 text-center">
+                <td colSpan={(showEarnings ? 10 : 9) - (store.use_vat ? 0 : 2)} class="py-10 text-center">
                   <span class="loading loading-spinner loading-md text-primary" />
                 </td>
               </tr>
             )}
             {!loading && items.length === 0 && (
               <tr>
-                <td colSpan={showEarnings ? 10 : 9} class="py-12 text-center">
+                <td colSpan={(showEarnings ? 10 : 9) - (store.use_vat ? 0 : 2)} class="py-12 text-center">
                   <div class="flex flex-col items-center gap-2 text-base-content/30">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
@@ -286,9 +296,7 @@ export default function Sales({ path }) {
               </tr>
             )}
             {!loading && items.map((s) => (
-              <>
-                <tr key={s.id} class={`border-b border-base-200 cursor-pointer transition-colors ${expanded === s.id ? 'bg-base-200/60' : 'hover:bg-base-50'}`}
-                  onClick={() => setExpanded(expanded === s.id ? null : s.id)}>
+              <tr key={s.id} class="border-b border-base-200 hover:bg-base-50 transition-colors">
                   <td class="px-3 py-2.5 font-mono text-xs text-base-content/70">{s.ref || '—'}</td>
                   <td class="px-3 py-2.5 text-sm whitespace-nowrap">
                     {new Date(s.created_at).toLocaleDateString()}{' '}
@@ -309,15 +317,24 @@ export default function Sales({ path }) {
                   <td class="px-3 py-2.5 text-center">
                     <span class="badge badge-sm badge-ghost">{s.lines?.length || 0}</span>
                   </td>
-                  <td class="px-3 py-2.5 text-end font-mono text-sm">{s.total_ht.toFixed(2)}</td>
-                  <td class="px-3 py-2.5 text-end font-mono text-sm text-warning">{s.total_vat.toFixed(2)}</td>
+                  {store.use_vat && <td class="px-3 py-2.5 text-end font-mono text-sm">{s.total_ht.toFixed(2)}</td>}
+                  {store.use_vat && <td class="px-3 py-2.5 text-end font-mono text-sm text-warning">{s.total_vat.toFixed(2)}</td>}
                   <td class="px-3 py-2.5 text-end font-mono text-sm font-semibold text-primary">{s.total.toFixed(2)}</td>
                   <td class="px-3 py-2.5 text-end font-mono text-sm">{s.amount_paid.toFixed(2)}</td>
                   <td class="px-3 py-2.5 text-end font-mono text-sm text-success">{s.change.toFixed(2)}</td>
                   {showEarnings && <td class="px-3 py-2.5 text-end font-mono text-sm font-semibold text-success">{(s.total_earning ?? 0).toFixed(2)}</td>}
                   <td class="px-3 py-2.5 text-end">
                     <div class="flex items-center justify-end gap-1">
-                      {/* Receipt button — browser print */}
+                      <button
+                        class="btn btn-xs btn-ghost btn-square"
+                        title={t('viewSale')}
+                        onClick={() => { setDetailSale(s); document.getElementById('detail-dialog')?.showModal() }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </button>
                       <button
                         class="btn btn-xs btn-ghost btn-square"
                         title={t('printReceipt')}
@@ -327,7 +344,6 @@ export default function Sales({ path }) {
                           <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
                         </svg>
                       </button>
-                      {/* BL button — always available (uses browser print) */}
                       <button
                         class="btn btn-xs btn-ghost btn-square"
                         title={t('printBL')}
@@ -337,7 +353,6 @@ export default function Sales({ path }) {
                           <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                         </svg>
                       </button>
-                      {/* Invoice button */}
                       <button
                         class="btn btn-xs btn-ghost btn-square"
                         title={t('printInvoice')}
@@ -361,61 +376,9 @@ export default function Sales({ path }) {
                           )}
                         </button>
                       )}
-                      <svg xmlns="http://www.w3.org/2000/svg"
-                        class={`w-3.5 h-3.5 transition-transform duration-200 text-base-content/40 ${expanded === s.id ? 'rotate-180' : ''}`}
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
                     </div>
                   </td>
-                </tr>
-                {expanded === s.id && (
-                  <tr key={`${s.id}-detail`}>
-                    <td colSpan={showEarnings ? 10 : 9} class="p-0 bg-base-200">
-                      <div class="p-3">
-                        <table class="table table-xs w-full bg-base-100 rounded-lg shadow-sm">
-                          <thead>
-                            <tr>
-                              <th>{t('productName')}</th>
-                              <th class="text-center">{t('qty')}</th>
-                              <th class="text-end">{t('prixVente1')}</th>
-                              <th class="text-end">{t('discount')}</th>
-                              <th class="text-end">{t('htLabel')}</th>
-                              <th class="text-end">{t('ttcLabel')}</th>
-                              {showEarnings && <th class="text-end text-success">{t('lineEarning')}</th>}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(s.lines || []).map((l, i) => (
-                              <tr key={i}>
-                                <td>
-                                  <div class="text-xs font-medium">{l.product_name}</div>
-                                  {l.barcode && <div class="text-xs text-base-content/40">{l.barcode}</div>}
-                                </td>
-                                <td class="text-center font-mono text-xs">{l.qty}</td>
-                                <td class="text-end font-mono text-xs">{l.unit_price.toFixed(2)}</td>
-                                <td class="text-end font-mono text-xs">
-                                  {l.discount > 0 ? `-${l.discount.toFixed(2)}` : '—'}
-                                </td>
-                                <td class="text-end font-mono text-xs">{l.total_ht.toFixed(2)}</td>
-                                <td class="text-end font-mono text-xs font-medium">{l.total_ttc.toFixed(2)}</td>
-                                {showEarnings && <td class="text-end font-mono text-xs font-semibold text-success">{(l.line_earning ?? 0).toFixed(2)}</td>}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {canReturn && s.total > 0 && (
-                          <div class="mt-2 flex justify-end">
-                            <button class="btn btn-xs btn-warning btn-outline" onClick={(e) => { e.stopPropagation(); openReturn(s) }}>
-                              {t('returnSale')}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </>
+              </tr>
             ))}
           </tbody>
         </table>
@@ -436,6 +399,74 @@ export default function Sales({ path }) {
           </div>
         </div>
       )}
+      {/* Sale Detail dialog */}
+      <dialog id="detail-dialog" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box w-full sm:max-w-2xl">
+          <h3 class="font-bold text-lg mb-1">{t('saleDetail')}</h3>
+          {detailSale && (
+            <>
+              <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-base-content/60 mb-3">
+                <span><b>{t('ref')}:</b> {detailSale.ref || '—'}</span>
+                <span><b>{t('saleDate')}:</b> {new Date(detailSale.created_at).toLocaleString()}</span>
+                <span><b>{t('saleCashier')}:</b> {detailSale.cashier_email}</span>
+                {detailSale.client_name && <span><b>{t('clientsPage')}:</b> {detailSale.client_name}</span>}
+              </div>
+              <div class="overflow-x-auto">
+                <table class="table table-xs w-full">
+                  <thead>
+                    <tr>
+                      <th>{t('productName')}</th>
+                      <th class="text-center">{t('qty')}</th>
+                      <th class="text-end">{t('prixVente1')}</th>
+                      <th class="text-end">{t('discount')}</th>
+                      <th class="text-end">{t('htLabel')}</th>
+                      <th class="text-end">{t('ttcLabel')}</th>
+                      {showEarnings && <th class="text-end text-success">{t('lineEarning')}</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(detailSale.lines || []).map((l, i) => (
+                      <tr key={i}>
+                        <td>
+                          <div class="text-xs font-medium">{l.product_name}</div>
+                          {l.barcode && <div class="text-xs text-base-content/40">{l.barcode}</div>}
+                        </td>
+                        <td class="text-center font-mono text-xs">{l.qty}</td>
+                        <td class="text-end font-mono text-xs">{l.unit_price.toFixed(2)}</td>
+                        <td class="text-end font-mono text-xs">
+                          {l.discount > 0 ? `-${l.discount.toFixed(2)}` : '—'}
+                        </td>
+                        <td class="text-end font-mono text-xs">{l.total_ht.toFixed(2)}</td>
+                        <td class="text-end font-mono text-xs font-medium">{l.total_ttc.toFixed(2)}</td>
+                        {showEarnings && <td class="text-end font-mono text-xs font-semibold text-success">{(l.line_earning ?? 0).toFixed(2)}</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div class="divider my-2"></div>
+              <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm font-mono">
+                {store.use_vat && <span>{t('saleTotalHT')}: <b>{detailSale.total_ht.toFixed(2)}</b></span>}
+                {store.use_vat && <span class="text-warning">{t('saleTotalVAT')}: <b>{detailSale.total_vat.toFixed(2)}</b></span>}
+                <span class="text-primary font-semibold">{store.use_vat ? t('saleTotalTTC') : t('purchaseTotal')}: {detailSale.total.toFixed(2)}</span>
+                <span>{t('saleAmountPaid')}: {detailSale.amount_paid.toFixed(2)}</span>
+                <span class="text-success">{t('saleChange')}: {detailSale.change.toFixed(2)}</span>
+                {showEarnings && <span class="text-success font-semibold">{t('saleEarning')}: {(detailSale.total_earning ?? 0).toFixed(2)}</span>}
+              </div>
+            </>
+          )}
+          <div class="modal-action">
+            {canReturn && detailSale && detailSale.total > 0 && (
+              <button class="btn btn-sm btn-warning btn-outline" onClick={() => { document.getElementById('detail-dialog')?.close(); openReturn(detailSale) }}>
+                {t('returnSale')}
+              </button>
+            )}
+            <button type="button" class="btn btn-sm" onClick={() => document.getElementById('detail-dialog')?.close()}>{t('back')}</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+      </dialog>
+
       {/* Sale Return dialog */}
       <dialog id="return-dialog" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box w-full sm:max-w-xl">

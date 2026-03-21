@@ -29,6 +29,7 @@ obfstr = "0.4"
 ed25519-dalek = "2"
 aes-gcm = "0.10"
 rand = "0.8"
+tauri-plugin-fs = "2.4.5"
 
 [target.'cfg(not(windows))'.dependencies]
 libc = "0.2"

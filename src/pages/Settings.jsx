@@ -34,6 +34,7 @@ export default function Settings({ path }) {
     name: '', phone: '', address: '', logo_url: '',
     currency: 'DZD',
     default_sale_price: 1,
+    use_vat: false,
     rc: '', nif: '', nis: '', nart: '', compte_rib: '',
   })
   const [loading, setLoading] = useState(false)
@@ -62,6 +63,7 @@ export default function Settings({ path }) {
           logo_url:   data.logo_url   || '',
           currency:           data.currency           || 'DZD',
           default_sale_price: data.default_sale_price || 1,
+          use_vat:            !!data.use_vat,
           rc:         data.rc         || '',
           nif:        data.nif        || '',
           nis:        data.nis        || '',
@@ -219,6 +221,16 @@ export default function Settings({ path }) {
             </svg>
           }
         >
+          <div class="flex items-center justify-between bg-base-200 rounded-lg px-4 py-3 mb-4">
+            <div>
+              <p class="text-sm font-medium">{t('useVAT')}</p>
+              <p class="text-xs text-base-content/50">{t('useVATDesc')}</p>
+            </div>
+            <input type="checkbox" class="toggle toggle-primary toggle-sm"
+              checked={form.use_vat}
+              onChange={(e) => setForm({ ...form, use_vat: e.target.checked })} />
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label class="form-control">
               <span class="label-text text-xs">{t('storeRC')}</span>

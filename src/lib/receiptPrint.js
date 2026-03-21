@@ -152,20 +152,13 @@ ${change > 0 ? `<div class="row"><span>${esc(L.change)}</span><span>${fmtNum(cha
   printViaIframe(html)
 }
 
-function printViaIframe(html) {
-  let iframe = document.getElementById('__print_frame')
-  if (iframe) iframe.remove()
-  iframe = document.createElement('iframe')
-  iframe.id = '__print_frame'
-  iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;border:none;'
-  document.body.appendChild(iframe)
-  const doc = iframe.contentDocument || iframe.contentWindow.document
-  doc.open()
-  doc.write(html)
-  doc.close()
-  iframe.contentWindow.focus()
-  setTimeout(() => {
-    iframe.contentWindow.print()
-    setTimeout(() => iframe.remove(), 1000)
-  }, 300)
+async function printViaIframe(html) {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke('print_html', { html })
+  } catch {
+    // Fallback for browser dev
+    const w = window.open('', '_blank')
+    if (w) { w.document.write(html); w.document.close(); w.focus(); w.print() }
+  }
 }

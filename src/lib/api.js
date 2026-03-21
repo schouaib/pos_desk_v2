@@ -312,6 +312,13 @@ export const api = {
   getLowStock: (params) => request('GET', `/tenant/purchases/low-stock?${new URLSearchParams(params)}`),
   getPurchaseStats: (params) => request('GET', `/tenant/purchases/stats?${new URLSearchParams(params)}`),
 
+  // Tax Declarations (G50, G50A, G11, G12, G20)
+  getDeclarationG50: (params) => request('GET', `/tenant/declarations/g50?${new URLSearchParams(params)}`),
+  getDeclarationG50A: (params) => request('GET', `/tenant/declarations/g50a?${new URLSearchParams(params)}`),
+  getDeclarationG11: (params) => request('GET', `/tenant/declarations/g11?${new URLSearchParams(params)}`),
+  getDeclarationG12: (params) => request('GET', `/tenant/declarations/g12?${new URLSearchParams(params)}`),
+  getDeclarationG20: (params) => request('GET', `/tenant/declarations/g20?${new URLSearchParams(params)}`),
+
   // Chat
   listChatMessages: (params) => request('GET', `/tenant/chat/messages?${new URLSearchParams(params)}`),
   sendChatMessage: (body) => request('POST', '/tenant/chat/messages', body),

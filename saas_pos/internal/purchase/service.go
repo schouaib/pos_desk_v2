@@ -82,6 +82,22 @@ func computeFinalTotal(lines []PurchaseLine, globalRemise float64, remiseType st
 	return math.Round((sal-gDiscount+expensesTotal)*100) / 100
 }
 
+func computeTotalHT(lines []PurchaseLine) float64 {
+	total := 0.0
+	for _, l := range lines {
+		total += l.TotalHT
+	}
+	return math.Round(total*100) / 100
+}
+
+func computeTotalVAT(lines []PurchaseLine) float64 {
+	total := 0.0
+	for _, l := range lines {
+		total += l.TotalVAT
+	}
+	return math.Round(total*100) / 100
+}
+
 func computeExpensesTotal(expenses []PurchaseExpense) float64 {
 	total := 0.0
 	for _, e := range expenses {
@@ -106,6 +122,7 @@ func buildLines(tenantID primitive.ObjectID, inputs []LineInput) ([]PurchaseLine
 
 		var p struct {
 			Name string `bson:"name"`
+			VAT  int    `bson:"vat"`
 		}
 		if err := database.Col("products").FindOne(ctx,
 			bson.M{"_id": pid, "tenant_id": tenantID},
@@ -121,6 +138,10 @@ func buildLines(tenantID primitive.ObjectID, inputs []LineInput) ([]PurchaseLine
 			remise = 100
 		}
 
+		lineHT := math.Round(li.Qty*li.PrixAchat*(1-remise/100)*100) / 100
+		lineVAT := math.Round(lineHT*float64(p.VAT)/100*100) / 100
+		lineTTC := math.Round((lineHT+lineVAT)*100) / 100
+
 		lines = append(lines, PurchaseLine{
 			ProductID:   pid,
 			ProductName: p.Name,
@@ -128,6 +149,10 @@ func buildLines(tenantID primitive.ObjectID, inputs []LineInput) ([]PurchaseLine
 			ReceivedQty: 0,
 			PrixAchat:   li.PrixAchat,
 			Remise:      remise,
+			VAT:         p.VAT,
+			TotalHT:     lineHT,
+			TotalVAT:    lineVAT,
+			TotalTTC:    lineTTC,
 			PrixVente1:  li.PrixVente1,
 			PrixVente2:  li.PrixVente2,
 			PrixVente3:  li.PrixVente3,
@@ -205,6 +230,12 @@ func Create(tenantID, userID, userEmail string, input CreateInput) (*Purchase, e
 	seq, _ := counter.Next(tenantID, "purchase")
 	ref := fmt.Sprintf("ACH-%06d", seq)
 
+	totalHT := computeTotalHT(lines)
+	totalVAT := computeTotalVAT(lines)
+	// Total (TTC) = HT after global discount + VAT + expenses
+	htAfterDiscount := computeFinalTotal(lines, globalRemise, remiseType, 0)
+	finalTotal := math.Round((htAfterDiscount+totalVAT+expensesTotal)*100) / 100
+
 	now := time.Now()
 	p := Purchase{
 		ID:               primitive.NewObjectID(),
@@ -217,7 +248,9 @@ func Create(tenantID, userID, userEmail string, input CreateInput) (*Purchase, e
 		Status:           StatusDraft,
 		Lines:            lines,
 		Expenses:         expenses,
-		Total:            computeFinalTotal(lines, globalRemise, remiseType, expensesTotal),
+		TotalHT:           totalHT,
+		TotalVAT:          totalVAT,
+		Total:             finalTotal,
 		GlobalRemise:      globalRemise,
 		GlobalRemiseType:  remiseType,
 		DiscountTotal:     computeDiscountTotal(lines, globalRemise, remiseType),
@@ -385,6 +418,11 @@ func Update(tenantID, id string, input UpdateInput) (*Purchase, error) {
 		}
 	}
 
+	updTotalHT := computeTotalHT(lines)
+	updTotalVAT := computeTotalVAT(lines)
+	updHTAfterDiscount := computeFinalTotal(lines, globalRemise, remiseType, 0)
+	updFinalTotal := math.Round((updHTAfterDiscount+updTotalVAT+expensesTotal)*100) / 100
+
 	after := options.After
 	var p Purchase
 	err = col().FindOneAndUpdate(ctx,
@@ -396,7 +434,9 @@ func Update(tenantID, id string, input UpdateInput) (*Purchase, error) {
 			"expected_delivery":   parseDate(input.ExpectedDelivery),
 			"lines":               lines,
 			"expenses":            expenses,
-			"total":               computeFinalTotal(lines, globalRemise, remiseType, expensesTotal),
+			"total_ht":            updTotalHT,
+			"total_vat":           updTotalVAT,
+			"total":               updFinalTotal,
 			"global_remise":       globalRemise,
 			"global_remise_type":  remiseType,
 			"discount_total":      computeDiscountTotal(lines, globalRemise, remiseType),
@@ -1195,6 +1235,8 @@ func Stats(tenantID string, from, to time.Time) (*PurchaseStats, error) {
 			"_id":            "$status",
 			"count":          bson.M{"$sum": 1},
 			"total_amount":   bson.M{"$sum": "$total"},
+			"total_ht":       bson.M{"$sum": "$total_ht"},
+			"total_vat":      bson.M{"$sum": "$total_vat"},
 			"total_paid":     bson.M{"$sum": "$paid_amount"},
 			"total_expenses": bson.M{"$sum": "$expenses_total"},
 		}}},
@@ -1210,6 +1252,8 @@ func Stats(tenantID string, from, to time.Time) (*PurchaseStats, error) {
 		Status        string  `bson:"_id"`
 		Count         int64   `bson:"count"`
 		TotalAmount   float64 `bson:"total_amount"`
+		TotalHT       float64 `bson:"total_ht"`
+		TotalVAT      float64 `bson:"total_vat"`
 		TotalPaid     float64 `bson:"total_paid"`
 		TotalExpenses float64 `bson:"total_expenses"`
 	}
@@ -1222,11 +1266,15 @@ func Stats(tenantID string, from, to time.Time) (*PurchaseStats, error) {
 	for _, r := range rows {
 		result.Count += r.Count
 		result.TotalAmount += r.TotalAmount
+		result.TotalHT += r.TotalHT
+		result.TotalVAT += r.TotalVAT
 		result.TotalPaid += r.TotalPaid
 		result.TotalExpenses += r.TotalExpenses
 		result.ByStatus[r.Status] = StatusStats{Count: r.Count, Amount: r.TotalAmount}
 	}
 	result.TotalAmount = math.Round(result.TotalAmount*100) / 100
+	result.TotalHT = math.Round(result.TotalHT*100) / 100
+	result.TotalVAT = math.Round(result.TotalVAT*100) / 100
 	result.TotalPaid = math.Round(result.TotalPaid*100) / 100
 	result.TotalRemaining = math.Round((result.TotalAmount-result.TotalPaid)*100) / 100
 	result.TotalExpenses = math.Round(result.TotalExpenses*100) / 100

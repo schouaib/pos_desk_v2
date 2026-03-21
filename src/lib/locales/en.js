@@ -424,6 +424,9 @@ export default {
   // Sales history
   salesPage: 'Sales',
   noSales: 'No sales found',
+  saleDetail: 'Sale Detail',
+  searchByRef: 'Search by ref...',
+  viewSale: 'View',
   saleDate: 'Date',
   saleItems: 'Items',
   saleCashier: 'Cashier',
@@ -796,4 +799,7 @@ export default {
   declAcompte: 'Payment',
   declSolde: 'Balance (Solde de liquidation)',
   declIBSTotal: 'Total IBS Payable',
+  // VAT Settings
+  useVAT: 'Enable VAT (TVA)',
+  useVATDesc: 'Show VAT fields in products, purchases, sales, and declarations',
 }

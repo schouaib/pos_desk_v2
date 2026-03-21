@@ -54,6 +54,7 @@ export default function Products({ path }) {
 
   const [storeName, setStoreName] = useState('')
   const [defaultSalePrice, setDefaultSalePrice] = useState(1)
+  const [useVAT, setUseVAT] = useState(false)
   const [categories, setCategories] = useState([])
   const [brands, setBrands] = useState([])
   const [units, setUnits] = useState([])
@@ -121,7 +122,7 @@ export default function Products({ path }) {
     api.listCategories().then(d => { if (!cancelled) setCategories(d) }).catch(() => {})
     api.listBrands().then(d => { if (!cancelled) setBrands(d) }).catch(() => {})
     api.listUnits().then(d => { if (!cancelled) setUnits(d) }).catch(() => {})
-    api.getStoreSettings().then(d => { if (!cancelled) { setStoreName(d?.name || ''); setDefaultSalePrice(d?.default_sale_price || 1) } }).catch(() => {})
+    api.getStoreSettings().then(d => { if (!cancelled) { setStoreName(d?.name || ''); setDefaultSalePrice(d?.default_sale_price || 1); setUseVAT(!!d?.use_vat) } }).catch(() => {})
     return () => { cancelled = true }
   }, [])
 
@@ -519,7 +520,7 @@ export default function Products({ path }) {
                           <span class="text-[10px] font-mono text-base-content/40">{p.barcodes[0]}</span>
                         )}
                         {p.ref && <span class="text-[10px] text-base-content/40">ref: {p.ref}</span>}
-                        {p.vat > 0 && <span class="badge badge-warning gap-0 text-[9px] px-1 py-0 h-3.5">{p.vat}%</span>}
+                        {useVAT && p.vat > 0 && <span class="badge badge-warning gap-0 text-[9px] px-1 py-0 h-3.5">{p.vat}%</span>}
                         {p.is_service && <span class="badge badge-outline gap-0 text-[9px] px-1 py-0 h-3.5">{t('isService')}</span>}
                       </div>
                     </div>
@@ -897,6 +898,7 @@ export default function Products({ path }) {
           {tab === 1 && (
             <div class="space-y-5">
               {/* VAT */}
+              {useVAT && (
               <div class="bg-base-200/50 rounded-xl p-4">
                 <div class="flex items-center gap-3">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0c1.1.128 1.907 1.077 1.907 2.185ZM9.75 9h.008v.008H9.75V9Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 4.5h.008v.008h-.008V13.5Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
@@ -915,6 +917,7 @@ export default function Products({ path }) {
                   {form.vat === 0 && <span class="badge badge-ghost badge-sm">{t('noVat')}</span>}
                 </div>
               </div>
+              )}
 
               {/* Purchase & minimum prices */}
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -959,7 +962,7 @@ export default function Products({ path }) {
                           <input type="number" step="any" min="0" class="input input-bordered input-sm w-28 font-mono"
                             value={form[key]}
                             onInput={(e) => setForm({ ...form, [key]: parseFloat(e.target.value) || 0 })} />
-                          {form.vat > 0 && (
+                          {useVAT && form.vat > 0 && (
                             <span class="text-xs font-mono text-warning font-semibold whitespace-nowrap">
                               TTC: {(form[key] * (1 + form.vat / 100)).toFixed(2)}
                             </span>

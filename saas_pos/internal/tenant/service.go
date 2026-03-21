@@ -227,6 +227,7 @@ func UpdateSettings(tenantID string, input SettingsInput) (*Tenant, error) {
 		"nis":                input.NIS,
 		"nart":               input.NART,
 		"compte_rib":         input.CompteRIB,
+		"use_vat":            input.UseVAT,
 		"updated_at":         time.Now(),
 	}
 

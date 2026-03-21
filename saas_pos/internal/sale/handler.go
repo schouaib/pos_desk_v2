@@ -45,8 +45,9 @@ func HandleList(c *fiber.Ctx) error {
 
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 10)
+	ref := c.Query("ref")
 
-	result, err := List(claims.TenantID, from, to, page, limit)
+	result, err := List(claims.TenantID, from, to, page, limit, ref)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}

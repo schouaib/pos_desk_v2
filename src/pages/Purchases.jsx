@@ -102,6 +102,9 @@ export default function Purchases({ path }) {
   const [lowStockOpen, setLowStockOpen] = useState(false)
   const [lowStockItems, setLowStockItems] = useState([])
 
+  // VAT setting
+  const [useVAT, setUseVAT] = useState(false)
+
   const brandMap = useMemo(() => new Map(brands.map((b) => [b.id, b.name])), [brands])
   const catMap   = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories])
 
@@ -140,6 +143,7 @@ export default function Purchases({ path }) {
     api.listSuppliers().then(d => { if (!cancelled) setSuppliers(d) }).catch(() => {})
     api.listBrands().then(d => { if (!cancelled) setBrands(d) }).catch(() => {})
     api.listCategories().then(d => { if (!cancelled) setCategories(d) }).catch(() => {})
+    api.getStoreSettings().then(d => { if (!cancelled) setUseVAT(!!d?.use_vat) }).catch(() => {})
     return () => { cancelled = true }
   }, [])
 
@@ -961,7 +965,9 @@ export default function Purchases({ path }) {
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('purchaseSupplier')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('supplierInvoice')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('purchaseStatus')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('purchaseTotal')}</th>
+              {useVAT && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('htLabel')}</th>}
+              {useVAT && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">TVA</th>}
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{useVAT ? t('ttcLabel') : t('purchaseTotal')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('purchasePaid2')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('purchaseRemaining')}</th>
               {canWrite && <th class="px-3 py-2.5 w-28"></th>}
@@ -970,7 +976,7 @@ export default function Purchases({ path }) {
           <tbody>
             {items.length === 0 && (
               <tr>
-                <td colSpan={canWrite ? 9 : 8} class="px-3 py-12 text-center">
+                <td colSpan={(canWrite ? 9 : 8) + (useVAT ? 2 : 0)} class="px-3 py-12 text-center">
                   <div class="flex flex-col items-center gap-2 text-base-content/30">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
@@ -993,6 +999,8 @@ export default function Purchases({ path }) {
                       {t('purchase' + p.status.charAt(0).toUpperCase() + p.status.slice(1))}
                     </span>
                   </td>
+                  {useVAT && <td class="px-3 py-2.5 text-end font-mono text-sm">{(p.total_ht || 0).toFixed(2)}</td>}
+                  {useVAT && <td class="px-3 py-2.5 text-end font-mono text-sm text-warning">{(p.total_vat || 0).toFixed(2)}</td>}
                   <td class="px-3 py-2.5 text-end font-mono text-sm">{p.total.toFixed(2)}</td>
                   <td class="px-3 py-2.5 text-end font-mono text-sm">{p.paid_amount.toFixed(2)}</td>
                   <td class={`px-3 py-2.5 text-end font-mono text-sm ${remaining > 0 ? 'text-error' : 'text-success'}`}>

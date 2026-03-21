@@ -224,7 +224,7 @@ function PriceEditor({ line, onApply, onClose, t }) {
 
 // ─── PaymentModal ─────────────────────────────────────────────────────────────
 
-function PaymentModal({ total, onConfirm, onClose, loading, error, t }) {
+function PaymentModal({ total, onConfirm, onClose, loading, error, t, store }) {
   const [amount, setAmount] = useState('')
   const inputRef = useRef(null)
 
@@ -250,7 +250,7 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t }) {
         <h3 class="font-bold text-lg mb-4">{t('payment')}</h3>
 
         <div class="pos-pay-total mb-4">
-          <span class="text-sm font-semibold text-base-content/60">{t('totalTTC')}</span>
+          <span class="text-sm font-semibold text-base-content/60">{store.use_vat ? t('totalTTC') : t('purchaseTotal')}</span>
           <span class={`text-2xl font-extrabold font-mono ${total < 0 ? 'text-error' : 'text-primary'}`}>{fmt(total)}</span>
         </div>
 
@@ -1516,7 +1516,7 @@ export default function Pos({ path }) {
                   <th class="text-center w-20">{t('qty')}</th>
                   <th class="text-end w-28">{store.default_sale_price === 2 ? t('prixVente2') : store.default_sale_price === 3 ? t('prixVente3') : t('prixVente1')}</th>
                   <th class="text-end w-24">{t('discount')}</th>
-                  <th class="text-end w-28">{t('totalTTC')}</th>
+                  <th class="text-end w-28">{store.use_vat ? t('totalTTC') : t('purchaseTotal')}</th>
                   <th class="w-10"></th>
                 </tr>
               </thead>
@@ -1664,19 +1664,21 @@ export default function Pos({ path }) {
               </div>
             )}
 
+            {store.use_vat && (
             <div class="flex justify-between text-sm py-0.5">
               <span class="text-base-content/50">{t('subtotalHT')}</span>
               <span class="font-mono font-medium">{fmt(totalHT)}</span>
             </div>
+            )}
 
             {/* VAT breakdown */}
-            {Object.entries(vatBreakdown).map(([rate, amount]) => (
+            {store.use_vat && Object.entries(vatBreakdown).map(([rate, amount]) => (
               <div key={rate} class="flex justify-between text-sm py-0.5">
                 <span class="text-base-content/50">{t('totalVAT')} {rate}%</span>
                 <span class="font-mono text-warning font-medium">{fmt(amount)}</span>
               </div>
             ))}
-            {totalVAT === 0 && (
+            {store.use_vat && totalVAT === 0 && (
               <div class="flex justify-between text-sm py-0.5">
                 <span class="text-base-content/50">{t('totalVAT')}</span>
                 <span class="font-mono text-base-content/30">0.00</span>
@@ -1688,7 +1690,7 @@ export default function Pos({ path }) {
 
             {/* ── Total TTC (gradient banner) ── */}
             <div class="pos-summary-total rounded-xl">
-              <span class="pos-total-label">{t('totalTTC')}</span>
+              <span class="pos-total-label">{store.use_vat ? t('totalTTC') : t('purchaseTotal')}</span>
               <span class={`pos-total-amount ${total < 0 ? 'text-red-200' : ''}`}>{fmt(total)}</span>
             </div>
 
@@ -1916,6 +1918,7 @@ export default function Pos({ path }) {
           loading={payLoading}
           error={payError}
           t={t}
+          store={store}
         />
       )}
 
