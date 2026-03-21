@@ -97,48 +97,62 @@ function PriceEditor({ line, onApply, onClose, t }) {
 
   return (
     <dialog class="modal modal-bottom sm:modal-middle" open>
-      <div class="modal-box">
+      <div class="modal-box max-w-sm">
         <h3 class="font-bold text-base mb-1">{t('editPrice')}</h3>
-        <p class="text-sm text-base-content/60 mb-4">{line.name}</p>
+        <p class="text-sm text-base-content/50 mb-4">{line.name}</p>
 
         {/* Quick PV buttons */}
-        <div class="flex gap-2 mb-3 flex-wrap">
+        <div class="flex gap-2 mb-4 flex-wrap">
           {line.pv1 > 0 && (
-            <button class={`btn btn-sm ${price === line.pv1 ? 'btn-primary' : 'btn-outline'}`}
+            <button class={`btn flex-1 min-w-[6rem] ${price === line.pv1 ? 'btn-primary' : 'btn-outline'}`}
+              style="height:2.75rem;border-radius:0.625rem;font-weight:700"
               onClick={() => quickSet(line.pv1)}>
-              {t('pv1')} — {line.pv1.toFixed(2)}
+              <span class="flex flex-col items-center leading-tight">
+                <span class="text-[10px] opacity-70 font-medium">{t('pv1')}</span>
+                <span class="font-mono">{line.pv1.toFixed(2)}</span>
+              </span>
             </button>
           )}
           {line.pv2 > 0 && (
-            <button class={`btn btn-sm ${price === line.pv2 ? 'btn-primary' : 'btn-outline'}`}
+            <button class={`btn flex-1 min-w-[6rem] ${price === line.pv2 ? 'btn-primary' : 'btn-outline'}`}
+              style="height:2.75rem;border-radius:0.625rem;font-weight:700"
               onClick={() => quickSet(line.pv2)}>
-              {t('pv2')} — {line.pv2.toFixed(2)}
+              <span class="flex flex-col items-center leading-tight">
+                <span class="text-[10px] opacity-70 font-medium">{t('pv2')}</span>
+                <span class="font-mono">{line.pv2.toFixed(2)}</span>
+              </span>
             </button>
           )}
           {line.pv3 > 0 && (
-            <button class={`btn btn-sm ${price === line.pv3 ? 'btn-primary' : 'btn-outline'}`}
+            <button class={`btn flex-1 min-w-[6rem] ${price === line.pv3 ? 'btn-primary' : 'btn-outline'}`}
+              style="height:2.75rem;border-radius:0.625rem;font-weight:700"
               onClick={() => quickSet(line.pv3)}>
-              {t('pv3')} — {line.pv3.toFixed(2)}
+              <span class="flex flex-col items-center leading-tight">
+                <span class="text-[10px] opacity-70 font-medium">{t('pv3')}</span>
+                <span class="font-mono">{line.pv3.toFixed(2)}</span>
+              </span>
             </button>
           )}
         </div>
 
         <div class="grid grid-cols-2 gap-3 mb-3">
           <label class="form-control">
-            <span class="label-text text-xs">{t('customPrice')} (HT)</span>
+            <span class="label-text text-xs font-semibold">{t('customPrice')} (HT)</span>
             <input
               ref={inputRef}
               type="number" step="any" min="0"
-              class="input input-bordered input-sm"
+              class="input input-bordered font-mono font-bold"
+              style="height:2.75rem;border-radius:0.625rem"
               value={price}
               onInput={(e) => setPrice(parseFloat(e.target.value) || 0)}
             />
           </label>
           <label class="form-control">
-            <span class="label-text text-xs">{t('discount')} (HT)</span>
+            <span class="label-text text-xs font-semibold">{t('discount')} (HT)</span>
             <input
               type="number" step="any" min="0"
-              class="input input-bordered input-sm"
+              class="input input-bordered font-mono"
+              style="height:2.75rem;border-radius:0.625rem"
               value={discount}
               onInput={(e) => setDiscount(parseFloat(e.target.value) || 0)}
             />
@@ -146,15 +160,15 @@ function PriceEditor({ line, onApply, onClose, t }) {
         </div>
 
         {minPrice > 0 && (
-          <p class={`text-xs mb-3 ${belowMin ? 'text-error font-medium' : 'text-base-content/50'}`}>
+          <p class={`text-xs mb-3 ${belowMin ? 'text-error font-semibold' : 'text-base-content/45'}`}>
             {t('pvMin')}: {minPrice.toFixed(2)}
             {belowMin && ` — ${t('priceBelow')}`}
           </p>
         )}
 
         <div class="modal-action">
-          <button class="btn btn-sm btn-ghost" onClick={onClose}>{t('back')}</button>
-          <button class="btn btn-sm btn-primary" onClick={handleApply} disabled={belowMin}>
+          <button class="btn btn-ghost" onClick={onClose}>{t('back')}</button>
+          <button class="btn btn-primary flex-1" style="height:2.75rem;border-radius:0.625rem;font-weight:700" onClick={handleApply} disabled={belowMin}>
             {t('applyPrice')}
           </button>
         </div>
@@ -191,17 +205,17 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t }) {
       <div class="modal-box max-w-sm">
         <h3 class="font-bold text-lg mb-4">{t('payment')}</h3>
 
-        <div class="flex items-center justify-between mb-4 p-3 bg-base-200 rounded-lg">
-          <span class="text-sm font-medium">{t('totalTTC')}</span>
-          <span class={`text-xl font-bold font-mono ${total < 0 ? 'text-error' : 'text-primary'}`}>{total.toFixed(2)}</span>
+        <div class="pos-pay-total mb-4">
+          <span class="text-sm font-semibold text-base-content/60">{t('totalTTC')}</span>
+          <span class={`text-2xl font-extrabold font-mono ${total < 0 ? 'text-error' : 'text-primary'}`}>{total.toFixed(2)}</span>
         </div>
 
-        <label class="form-control mb-2">
-          <span class="label-text text-sm">{t('amountPaid')}</span>
+        <label class="form-control mb-3">
+          <span class="label-text text-sm font-medium">{t('amountPaid')}</span>
           <input
             ref={inputRef}
             type="number" step="any"
-            class="input input-bordered input-lg text-center font-mono text-lg"
+            class="input pos-pay-input w-full text-center font-mono"
             placeholder={total.toFixed(2)}
             value={amount}
             onInput={(e) => setAmount(e.target.value)}
@@ -210,9 +224,9 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t }) {
         </label>
 
         {/* Quick-pay buttons */}
-        <div class="flex flex-wrap gap-1.5 mb-3">
+        <div class="flex flex-wrap gap-2 mb-4">
           <button
-            class={`btn btn-sm flex-1 min-w-[4.5rem] ${paid === total ? 'btn-primary' : 'btn-outline btn-primary'}`}
+            class={`btn pos-denom-btn flex-1 min-w-[5rem] ${paid === total ? 'btn-primary' : 'btn-outline btn-primary'}`}
             onClick={() => setAmount(total.toFixed(2))}
           >
             {t('exactAmount')}
@@ -220,7 +234,7 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t }) {
           {denominations.filter(d => d >= total).slice(0, 4).map(d => (
             <button
               key={d}
-              class={`btn btn-sm flex-1 min-w-[3.5rem] ${paid === d ? 'btn-primary' : 'btn-outline'}`}
+              class={`btn pos-denom-btn flex-1 min-w-[4rem] ${paid === d ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setAmount(String(d))}
             >
               {d}
@@ -229,26 +243,28 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t }) {
         </div>
 
         {paid !== 0 && (
-          <div class={`flex items-center justify-between p-3 rounded-lg mb-3 ${
+          <div class={`pos-change-display mb-4 ${
             change >= 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
           }`}>
-            <span class="text-sm font-medium">{t('changeDue')}</span>
-            <span class="text-lg font-bold font-mono">{change.toFixed(2)}</span>
+            <span class="text-sm font-semibold">{t('changeDue')}</span>
+            <span class="text-xl font-extrabold font-mono">{change.toFixed(2)}</span>
           </div>
         )}
 
         {insufficient && paid !== 0 && (
-          <p class="text-error text-sm mb-3">{t('amountInsufficient')}</p>
+          <p class="text-error text-sm mb-3 font-medium">{t('amountInsufficient')}</p>
         )}
         {error && <p class="text-error text-sm mb-3">{error}</p>}
 
         <div class="modal-action">
-          <button class="btn btn-ghost btn-sm" onClick={onClose}>{t('back')}</button>
+          <button class="btn btn-ghost" onClick={onClose}>{t('back')}</button>
           <button
-            class={`btn btn-success btn-sm flex-1 ${loading ? 'loading' : ''}`}
+            class={`btn btn-success flex-1 gap-2 ${loading ? 'loading' : ''}`}
+            style="height:3rem;font-size:1rem;font-weight:700;border-radius:0.75rem"
             onClick={() => onConfirm(paid)}
             disabled={loading || insufficient || paid === 0}
           >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
             {t('checkout')}
           </button>
         </div>
@@ -316,16 +332,16 @@ function SaleSuccessModal({ sale, store, onClose, t, client, lang }) {
     <dialog class="modal modal-bottom sm:modal-middle" open>
       <div class="modal-box max-w-sm text-center">
         {/* Success icon */}
-        <div class="flex justify-center mb-3">
-          <div class="w-16 h-16 rounded-full bg-success/15 flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-9 h-9 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <div class="flex justify-center mb-4">
+          <div class="pos-success-icon bg-success/12">
+            <svg xmlns="http://www.w3.org/2000/svg" class="text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
             </svg>
           </div>
         </div>
 
         <h3 class="font-bold text-lg mb-1">{t('saleSuccess')}</h3>
-        <p class="text-2xl font-bold font-mono text-primary mb-4">
+        <p class="text-3xl font-extrabold font-mono text-primary mb-5" style="letter-spacing:-0.03em">
           {Number(sale?.total ?? 0).toFixed(2)}
         </p>
 
@@ -1198,7 +1214,7 @@ export default function Pos({ path }) {
   // ─── render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div ref={posRef} class="page-enter min-h-screen bg-base-200 p-4 md:p-6 overflow-auto">
+    <div ref={posRef} class="page-enter h-screen bg-base-200 p-4 md:p-6 flex flex-col overflow-hidden">
 
       {/* Caisse opening modal — blocks POS until session is opened */}
       {caisseSession === undefined && (
@@ -1210,15 +1226,20 @@ export default function Pos({ path }) {
       {caisseSession === null && (
         <dialog class="modal modal-open">
           <div class="modal-box max-w-sm">
-            <h3 class="font-bold text-lg mb-4">{t('openCaisse')}</h3>
-            <p class="text-sm text-base-content/60 mb-4">{t('caisseRequired')}</p>
+            <div class="flex justify-center mb-4">
+              <div class="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+              </div>
+            </div>
+            <h3 class="font-bold text-lg mb-1 text-center">{t('openCaisse')}</h3>
+            <p class="text-sm text-base-content/60 mb-5 text-center">{t('caisseRequired')}</p>
             <div class="form-control mb-3">
               <label class="label"><span class="label-text">{t('openingAmount')}</span></label>
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                class="input input-bordered w-full"
+                class="input input-bordered w-full text-center font-mono text-lg"
                 value={caisseOpenAmount}
                 onInput={e => setCaisseOpenAmount(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleOpenCaisse()}
@@ -1240,7 +1261,7 @@ export default function Pos({ path }) {
                 {t('back')}
               </button>
               <button
-                class={`btn btn-primary btn-sm ${caisseOpenLoading ? 'loading' : ''}`}
+                class={`btn btn-primary flex-1 ${caisseOpenLoading ? 'loading' : ''}`}
                 onClick={handleOpenCaisse}
                 disabled={caisseOpenLoading}
               >
@@ -1252,21 +1273,41 @@ export default function Pos({ path }) {
       )}
 
       {caisseSession && (<>
-      {/* Page title + shortcuts hint + printer button */}
-      <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <div class="flex items-center gap-3">
+      {/* ── Glass Header Toolbar ──────────────────────────────────────────────── */}
+      <div class="pos-header">
+        <div class="flex items-center gap-2">
           <button class="btn btn-sm btn-ghost btn-square" onClick={() => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); route('/dashboard') }} title={t('dashboard')}>
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
           </button>
-          <h2 class="text-2xl font-bold">{t('posPage')}</h2>
+          <h2 class="text-lg font-bold tracking-tight">{t('posPage')}</h2>
           <button class="btn btn-sm btn-ghost btn-square" onClick={toggleFullscreen} title="Fullscreen">
             {isFullscreen
-              ? <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" /></svg>
-              : <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
+              ? <svg xmlns="http://www.w3.org/2000/svg" class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" /></svg>
+              : <svg xmlns="http://www.w3.org/2000/svg" class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
             }
           </button>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          {/* Printer status */}
+          {printerConnected ? (
+            <div class="flex items-center gap-1.5">
+              <span class="pos-status-pill bg-success/10 text-success">
+                <span class="pos-status-pill-dot bg-success" />
+                {t('printerConnected')}
+              </span>
+              <button class="btn btn-xs btn-ghost text-error" onClick={handleDisconnectPrinter}>
+                {t('disconnectPrinter')}
+              </button>
+            </div>
+          ) : (
+            <button class="btn btn-xs btn-ghost gap-1 text-base-content/50" onClick={handleConnectPrinter}>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
+              </svg>
+              {t('connectPrinter')}
+            </button>
+          )}
+          {printerError && <p class="text-xs text-error">{printerError}</p>}
           {/* Close caisse */}
           <button class="btn btn-sm btn-outline btn-error gap-1.5" onClick={() => {
             setCaisseCloseOpen(true)
@@ -1292,41 +1333,21 @@ export default function Pos({ path }) {
             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
             {t('closeCaisse')}
           </button>
-          {/* Printer connect/disconnect */}
-          {printerConnected ? (
-            <div class="flex items-center gap-2">
-              <span class="flex items-center gap-1 text-xs text-success">
-                <span class="w-2 h-2 rounded-full bg-success inline-block" />
-                {t('printerConnected')}
-              </span>
-              <button class="btn btn-xs btn-ghost text-error" onClick={handleDisconnectPrinter}>
-                {t('disconnectPrinter')}
-              </button>
-            </div>
-          ) : (
-            <button class="btn btn-xs btn-outline gap-1" onClick={handleConnectPrinter}>
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
-              </svg>
-              {t('connectPrinter')}
-            </button>
-          )}
-          {printerError && <p class="text-xs text-error">{printerError}</p>}
           {/* Shortcuts hint */}
-          <div class="hidden sm:flex gap-1 items-center text-xs text-base-content/40">
-            <kbd class="kbd kbd-xs">F1</kbd> Help
-            <span class="mx-1">·</span>
-            <kbd class="kbd kbd-xs">F2</kbd> {t('searchProduct')}
-            <span class="mx-1">·</span>
-            <kbd class="kbd kbd-xs">F10</kbd> {t('checkout')}
+          <div class="hidden lg:flex gap-1 items-center text-xs text-base-content/35">
+            <kbd class="kbd kbd-xs">F1</kbd> <span class="text-base-content/25">Help</span>
+            <span class="mx-0.5 text-base-content/15">|</span>
+            <kbd class="kbd kbd-xs">F2</kbd> <span class="text-base-content/25">{t('searchProduct')}</span>
+            <span class="mx-0.5 text-base-content/15">|</span>
+            <kbd class="kbd kbd-xs">F10</kbd> <span class="text-base-content/25">{t('checkout')}</span>
           </div>
         </div>
       </div>
 
-      {/* ── Scan success toast ───────────────────────────────────────────────── */}
+      {/* ── Scan success toast (floating, centered) ──────────────────────────── */}
       {scanToast && (
-        <div class="scan-success mb-2 flex items-center gap-2 px-3 py-1.5 bg-success/10 text-success rounded-lg text-sm font-medium animate-pulse">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <div class="pos-scan-toast">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
           </svg>
           {scanToast}
@@ -1334,18 +1355,18 @@ export default function Pos({ path }) {
       )}
 
       {/* ── Scan bar ─────────────────────────────────────────────────────────── */}
-      <div class="flex gap-2 mb-4">
-        <div class="relative flex-1">
+      <div class="flex gap-2 mt-3 mb-3 shrink-0">
+        <div class="pos-scan-wrap">
           <input
             ref={scanRef}
             data-search
-            class={`input input-bordered w-full ps-10 ${scanLoading ? 'input-disabled' : ''}`}
+            class={`input w-full pos-scan-wrap ${scanLoading ? 'input-disabled' : ''}`}
+            style="height:3.25rem;font-size:1rem;padding-inline-start:3rem;border-radius:0.75rem;border:2px solid color-mix(in oklab,var(--color-base-content) 10%,transparent)"
             placeholder={t('scanBarcode')}
             value={scanInput}
             onInput={(e) => {
               const val = e.target.value
               setScanInput(val); setScanError('')
-              // Auto-submit: if chars arrive quickly (scanner), submit after 50ms idle
               const now = Date.now()
               if (val.length === 1) scanStartRef.current = now
               clearTimeout(scanIdleRef.current)
@@ -1359,7 +1380,7 @@ export default function Pos({ path }) {
             disabled={scanLoading}
             autoComplete="off"
           />
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 absolute start-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" class="pos-scan-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
             <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
           </svg>
@@ -1367,15 +1388,16 @@ export default function Pos({ path }) {
             <p class="scan-error absolute -bottom-5 start-0 text-xs text-error">{scanError}</p>
           )}
         </div>
-        <button class="btn btn-outline gap-1.5" onClick={() => setSearchOpen(true)}>
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <button class="btn btn-outline gap-1.5" style="height:3.25rem;border-radius:0.75rem" onClick={() => setSearchOpen(true)}>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
           <span class="hidden sm:inline">{t('searchProduct')}</span>
+          <kbd class="kbd kbd-xs hidden md:inline-flex">F2</kbd>
         </button>
         {(favorites.length > 0 || categories.length > 0 || isTenantAdmin()) && (
-          <button class="btn btn-outline gap-1.5" onClick={() => setCatalogOpen(true)}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <button class="btn btn-outline gap-1.5" style="height:3.25rem;border-radius:0.75rem" onClick={() => setCatalogOpen(true)}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
             </svg>
             <span class="hidden sm:inline">{t('favorites')}</span>
@@ -1384,15 +1406,15 @@ export default function Pos({ path }) {
       </div>
 
       {/* ── Main area: Ticket + Summary ──────────────────────────────────────── */}
-      <div class="flex flex-col lg:flex-row gap-4 mt-6">
+      <div class="pos-main-area flex flex-col lg:flex-row gap-4">
 
         {/* Ticket table */}
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center justify-between mb-2">
-            <span class="font-semibold text-sm">
+        <div class="flex-1 min-w-0 flex flex-col">
+          <div class="pos-ticket-header">
+            <span class="pos-ticket-title">
               {t('ticket')}
               {lines.length > 0 && (
-                <span class="badge badge-sm badge-neutral ms-2">{itemCount}</span>
+                <span class="pos-item-count">{itemCount}</span>
               )}
             </span>
             <div class="flex items-center gap-1">
@@ -1405,11 +1427,12 @@ export default function Pos({ path }) {
                 </button>
               )}
               {lines.length > 0 && (
-                <button class="btn btn-xs btn-ghost text-info" onClick={parkCurrentTicket} title="F7">
+                <button class="btn btn-xs btn-ghost text-info gap-1" onClick={parkCurrentTicket} title="F7">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
                   </svg>
                   {t('holdTicket')}
+                  <kbd class="kbd kbd-xs hidden md:inline-flex">F7</kbd>
                 </button>
               )}
               {parkedTickets.length > 0 && (
@@ -1422,14 +1445,15 @@ export default function Pos({ path }) {
                 </button>
               )}
               {lines.length > 0 && (
-                <button class="btn btn-xs btn-ghost text-error" onClick={() => setLines([])}>
+                <button class="btn btn-xs btn-ghost text-error gap-1" onClick={() => setLines([])}>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                   {t('clearTicket')}
                 </button>
               )}
             </div>
           </div>
 
-          <div class="card bg-base-100 shadow overflow-x-auto">
+          <div class="pos-ticket bg-base-100 overflow-x-auto flex-1">
             <table class="table table-sm">
               <thead>
                 <tr>
@@ -1444,23 +1468,25 @@ export default function Pos({ path }) {
               <tbody>
                 {lines.length === 0 && (
                   <tr>
-                    <td colSpan={6} class="py-16 text-center">
-                      <div class="flex flex-col items-center gap-2 text-base-content/30">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-                        </svg>
-                        <p class="text-sm">{t('scanOrSearch')}</p>
-                        <p class="text-xs opacity-60"><kbd class="kbd kbd-xs">F1</kbd> {t('keyboardShortcuts')}</p>
+                    <td colSpan={6}>
+                      <div class="pos-empty">
+                        <div class="pos-empty-icon">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                          </svg>
+                        </div>
+                        <p class="text-sm text-base-content/40 font-medium">{t('scanOrSearch')}</p>
+                        <p class="text-xs text-base-content/25"><kbd class="kbd kbd-xs">F1</kbd> {t('keyboardShortcuts')}</p>
                       </div>
                     </td>
                   </tr>
                 )}
-                {lines.map((line) => {
+                {lines.map((line, idx) => {
                   const isSelected = line._key === selectedKey
                   return (
                     <tr
                       key={line._key}
-                      class={`hover cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 outline outline-1 outline-primary/30' : ''}`}
+                      class={`cursor-pointer ${isSelected ? 'pos-row-selected' : ''} ${idx === 0 ? 'pos-line-new' : ''}`}
                       onClick={() => setSelectedKey(line._key)}
                     >
                       {/* Product */}
@@ -1478,13 +1504,13 @@ export default function Pos({ path }) {
                             </span>
                           )}
                         </div>
-                        {line.barcode && <div class="text-xs text-base-content/40">{line.barcode}</div>}
+                        {line.barcode && <div class="text-xs text-base-content/35 font-mono">{line.barcode}</div>}
                       </td>
 
                       {/* Qty — click to open numpad */}
                       <td class="text-center">
                         <button
-                          class={`btn btn-xs btn-ghost font-mono min-w-10 ${isSelected ? 'btn-primary' : ''}`}
+                          class={`btn btn-xs font-mono min-w-12 font-bold ${isSelected ? 'btn-primary' : 'btn-ghost'}`}
                           onClick={(e) => { e.stopPropagation(); setNumpadKey(line._key); setNumpadVal(String(line.qty)) }}
                         >
                           {line.qty % 1 === 0 ? line.qty : line.qty.toFixed(3)}
@@ -1507,19 +1533,19 @@ export default function Pos({ path }) {
                       {/* Discount */}
                       <td class="text-end">
                         {line.discount > 0
-                          ? <span class="text-xs font-mono text-warning">-{line.discount.toFixed(2)}</span>
-                          : <span class="text-base-content/20 text-xs">—</span>
+                          ? <span class="text-xs font-mono text-warning font-semibold">-{line.discount.toFixed(2)}</span>
+                          : <span class="text-base-content/15 text-xs">--</span>
                         }
                       </td>
 
                       {/* Total TTC */}
-                      <td class={`text-end font-mono text-sm font-medium ${line.qty < 0 ? 'text-error' : ''}`}>
+                      <td class={`text-end font-mono text-sm font-bold ${line.qty < 0 ? 'text-error' : ''}`}>
                         {lineTTC(line).toFixed(2)}
                       </td>
 
                       {/* Delete */}
                       <td>
-                        <button class="btn btn-xs btn-ghost btn-square text-error"
+                        <button class="btn btn-xs btn-ghost btn-square text-base-content/25 hover:text-error"
                           onClick={(e) => { e.stopPropagation(); removeLine(line._key) }}>
                           <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1535,41 +1561,43 @@ export default function Pos({ path }) {
         </div>
 
         {/* ── Summary + Pay ─────────────────────────────────────────────────── */}
-        <div class="lg:w-72 shrink-0">
-          <div class="card bg-base-100 shadow p-4 space-y-2 sticky top-4">
-            <p class="font-semibold text-sm mb-1">{t('ticket')}</p>
+        <div class="lg:w-80 shrink-0 flex flex-col">
+          <div class="pos-summary bg-base-100 p-5 space-y-3">
 
             {/* Client selector */}
             {canSelectClient && (
               <div class="pb-1">
                 {selectedClient ? (
-                  <div class="flex items-center justify-between bg-primary/10 border border-primary/30 rounded-lg px-2 py-1.5">
+                  <div class="pos-client-card">
                     <div class="min-w-0">
-                      <p class="text-xs font-semibold text-primary truncate">{selectedClient.name}</p>
-                      <p class="text-xs text-base-content/50 font-mono">{selectedClient.code}</p>
+                      <p class="text-xs font-bold text-primary truncate">{selectedClient.name}</p>
+                      <p class="text-[11px] text-base-content/45 font-mono">{selectedClient.code}</p>
                     </div>
-                    <button class="btn btn-xs btn-ghost text-base-content/40 shrink-0" onClick={clearClient}>✕</button>
+                    <button class="btn btn-xs btn-ghost btn-square text-base-content/30 shrink-0" onClick={clearClient}>
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
                   </div>
                 ) : (
                   <button
-                    class="btn btn-outline btn-xs w-full justify-start font-normal text-base-content/50 gap-1"
+                    class="btn btn-outline btn-sm w-full justify-start font-normal text-base-content/50 gap-1.5"
                     onClick={openClientDialog}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                     </svg>
                     {t('selectClient')}
+                    <kbd class="kbd kbd-xs ms-auto">F6</kbd>
                   </button>
                 )}
-                {/* Sale type toggle — only shown when client is selected and plan allows */}
+                {/* Sale type toggle */}
                 {selectedClient && canCreditSale && (
-                  <div class="join w-full mt-1">
+                  <div class="join w-full mt-1.5">
                     <button
-                      class={`join-item btn btn-xs flex-1 ${saleType === 'cash' ? 'btn-primary' : 'btn-outline'}`}
+                      class={`join-item btn btn-sm flex-1 ${saleType === 'cash' ? 'btn-primary' : 'btn-outline'}`}
                       onClick={() => setSaleType('cash')}
                     >{t('cashSale')}</button>
                     <button
-                      class={`join-item btn btn-xs flex-1 ${saleType === 'credit' ? 'btn-error' : 'btn-outline'}`}
+                      class={`join-item btn btn-sm flex-1 ${saleType === 'credit' ? 'btn-error' : 'btn-outline'}`}
                       onClick={() => setSaleType('credit')}
                     >{t('creditSale')}</button>
                   </div>
@@ -1577,34 +1605,33 @@ export default function Pos({ path }) {
               </div>
             )}
 
-            <div class="flex justify-between text-sm">
-              <span class="text-base-content/60">{t('subtotalHT')}</span>
-              <span class="font-mono">{totalHT.toFixed(2)}</span>
+            <div class="flex justify-between text-sm py-0.5">
+              <span class="text-base-content/50">{t('subtotalHT')}</span>
+              <span class="font-mono font-medium">{totalHT.toFixed(2)}</span>
             </div>
 
             {/* VAT breakdown */}
             {Object.entries(vatBreakdown).map(([rate, amount]) => (
-              <div key={rate} class="flex justify-between text-sm">
-                <span class="text-base-content/60">{t('totalVAT')} {rate}%</span>
-                <span class="font-mono text-warning">{amount.toFixed(2)}</span>
+              <div key={rate} class="flex justify-between text-sm py-0.5">
+                <span class="text-base-content/50">{t('totalVAT')} {rate}%</span>
+                <span class="font-mono text-warning font-medium">{amount.toFixed(2)}</span>
               </div>
             ))}
             {totalVAT === 0 && (
-              <div class="flex justify-between text-sm">
-                <span class="text-base-content/60">{t('totalVAT')}</span>
-                <span class="font-mono">0.00</span>
+              <div class="flex justify-between text-sm py-0.5">
+                <span class="text-base-content/50">{t('totalVAT')}</span>
+                <span class="font-mono text-base-content/30">0.00</span>
               </div>
             )}
 
-            <div class="divider my-1" />
-
-            <div class="flex justify-between items-center">
-              <span class="font-bold">{t('totalTTC')}</span>
-              <span class={`text-xl font-bold font-mono ${total < 0 ? 'text-error' : 'text-primary'}`}>{total.toFixed(2)}</span>
+            {/* ── Total TTC (gradient banner) ── */}
+            <div class="pos-summary-total rounded-xl">
+              <span class="pos-total-label">{t('totalTTC')}</span>
+              <span class={`pos-total-amount ${total < 0 ? 'text-red-200' : ''}`}>{total.toFixed(2)}</span>
             </div>
 
             <button
-              class={`btn w-full mt-2 gap-2 ${saleType === 'credit' ? 'btn-error' : 'btn-primary'}`}
+              class={`btn w-full pos-checkout-btn ${saleType === 'credit' ? 'btn-error' : 'btn-primary'}`}
               disabled={lines.length === 0 || payLoading}
               onClick={() => {
                 if (saleType === 'credit' && selectedClient) {
@@ -1616,22 +1643,28 @@ export default function Pos({ path }) {
             >
               {payLoading
                 ? <span class="loading loading-spinner loading-sm" />
-                : <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                : <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
                   </svg>
               }
-              {saleType === 'credit' ? t('confirmCredit') : t('checkout')} — F10
+              {saleType === 'credit' ? t('confirmCredit') : t('checkout')}
+              <kbd class="kbd kbd-xs border-white/30 bg-white/10 text-white/80">F10</kbd>
             </button>
 
             {/* Selected line quick actions */}
             {selectedKey && lines.find((l) => l._key === selectedKey) && (
-              <div class="flex gap-1 pt-1">
-                <button class="btn btn-xs btn-outline flex-1"
-                  onClick={() => adjustQty(selectedKey, -1)}>−</button>
-                <button class="btn btn-xs btn-outline flex-1"
-                  onClick={() => adjustQty(selectedKey, 1)}>+</button>
-                <button class="btn btn-xs btn-outline flex-1"
+              <div class="pos-quick-actions">
+                <button class="btn btn-sm btn-outline"
+                  onClick={() => adjustQty(selectedKey, -1)}>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" /></svg>
+                </button>
+                <button class="btn btn-sm btn-outline"
+                  onClick={() => adjustQty(selectedKey, 1)}>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6" /></svg>
+                </button>
+                <button class="btn btn-sm btn-outline flex-[2]"
                   onClick={() => { const l = lines.find((x) => x._key === selectedKey); if (l) setEditingLine(l) }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                   {t('editPrice')}
                 </button>
               </div>
@@ -2048,38 +2081,42 @@ export default function Pos({ path }) {
         <dialog class="modal modal-bottom sm:modal-middle" open>
           <div class="modal-box max-w-xs">
             <h3 class="font-bold text-base mb-3">{t('qty')}</h3>
-            <div class="text-center mb-3">
+            <div class="text-center mb-4">
               <input
                 type="text"
-                class="input input-bordered input-lg text-center font-mono text-xl w-full"
+                class="input input-bordered text-center font-mono w-full"
+                style="height:3.5rem;font-size:1.5rem;border-radius:0.75rem;border-width:2px;font-weight:700"
                 value={numpadVal}
                 readOnly
               />
             </div>
-            <div class="grid grid-cols-3 gap-1.5">
+            <div class="pos-numpad grid grid-cols-3 gap-2">
               {[7,8,9,4,5,6,1,2,3].map(n => (
-                <button key={n} class="btn btn-outline btn-lg text-lg"
+                <button key={n} class="btn btn-outline"
                   onClick={() => setNumpadVal(prev => prev === '0' ? String(n) : prev + n)}>
                   {n}
                 </button>
               ))}
-              <button class="btn btn-outline btn-lg text-lg"
+              <button class="btn btn-outline"
                 onClick={() => setNumpadVal(prev => prev.includes('.') ? prev : prev + '.')}>.</button>
-              <button class="btn btn-outline btn-lg text-lg"
+              <button class="btn btn-outline"
                 onClick={() => setNumpadVal('0')}>0</button>
-              <button class="btn btn-outline btn-lg text-lg"
+              <button class="btn btn-outline"
                 onClick={() => setNumpadVal(prev => prev.slice(0, -1) || '0')}>
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 9.75L14.25 12m0 0l2.25 2.25M14.25 12l2.25-2.25M14.25 12L12 14.25m-2.58 4.92l-6.375-6.375a1.125 1.125 0 010-1.59L9.42 4.83c.211-.211.498-.33.796-.33H19.5a2.25 2.25 0 012.25 2.25v10.5a2.25 2.25 0 01-2.25 2.25h-9.284c-.298 0-.585-.119-.796-.33z" />
                 </svg>
               </button>
             </div>
-            <div class="modal-action mt-3">
-              <button class="btn btn-ghost btn-sm" onClick={() => { setNumpadKey(null); refocusScan() }}>{t('back')}</button>
-              <button class="btn btn-primary btn-sm flex-1" onClick={() => {
+            <div class="modal-action mt-4">
+              <button class="btn btn-ghost" onClick={() => { setNumpadKey(null); refocusScan() }}>{t('back')}</button>
+              <button class="btn btn-primary flex-1 gap-1" style="height:3rem;font-size:1rem;font-weight:700;border-radius:0.75rem" onClick={() => {
                 updateQty(numpadKey, numpadVal)
                 setNumpadKey(null)
-              }}>{t('applyPrice')}</button>
+              }}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                {t('applyPrice')}
+              </button>
             </div>
           </div>
           <div class="modal-backdrop" onClick={() => { setNumpadKey(null); refocusScan() }} />

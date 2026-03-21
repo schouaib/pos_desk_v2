@@ -3,6 +3,7 @@ use sha2::{Sha256, Digest};
 use ed25519_dalek::{VerifyingKey, Verifier, Signature};
 use std::env;
 use std::fs;
+use std::process::Command;
 use std::net::UdpSocket;
 use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
@@ -556,16 +557,8 @@ fn get_mongod_log(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn stop_server(app: tauri::AppHandle) -> Result<String, String> {
-    if let Some(state) = app.try_state::<Processes>() {
-        let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-        if let Some(child) = guard.server.take() {
-            let _ = child.kill();
-        }
-        if let Some(child) = guard.mongod.take() {
-            let _ = child.kill();
-        }
-    }
+fn stop_server(_app: tauri::AppHandle) -> Result<String, String> {
+    // Don't kill mongod/server — let them keep running after app closes
     Ok("stopped".to_string())
 }
 
@@ -797,14 +790,12 @@ pub fn run() {
         .expect("error")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                // Don't kill mongod/server — let them keep running after app closes
                 if let Some(state) = app.try_state::<Processes>() {
                     if let Ok(mut guard) = state.0.lock() {
-                        if let Some(child) = guard.server.take() {
-                            let _ = child.kill();
-                        }
-                        if let Some(child) = guard.mongod.take() {
-                            let _ = child.kill();
-                        }
+                        // Drop references without killing
+                        let _ = guard.server.take();
+                        let _ = guard.mongod.take();
                     }
                 }
             }
