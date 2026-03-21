@@ -11,13 +11,15 @@
  */
 
 /** Format a BL number from a sale */
-function blNumber(sale) {
+function blNumber(sale, prefix = 'BL') {
   const d = new Date(sale.created_at)
-  const ymd = d.getFullYear().toString() +
-    String(d.getMonth() + 1).padStart(2, '0') +
-    String(d.getDate()).padStart(2, '0')
-  const suffix = String(sale.id || '').slice(-6).toUpperCase()
-  return `BL-${ymd}-${suffix}`
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const num = sale.number
+    ? String(sale.number).padStart(4, '0')
+    : String(sale.id || '').slice(-6).toUpperCase()
+  return `${prefix}-${y}${m}${day}-${num}`
 }
 
 function esc(s) {

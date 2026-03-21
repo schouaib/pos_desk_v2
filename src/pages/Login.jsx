@@ -4,12 +4,14 @@ import { api } from '../lib/api'
 import { setAuth, batchAlerts, hasFeature, isTenantAdmin } from '../lib/auth'
 import { useI18n } from '../lib/i18n'
 import { LangSwitcher } from '../components/LangSwitcher'
+import { TermsModal, isTermsAccepted } from '../components/TermsModal'
 
 export default function Login() {
   const { t } = useI18n()
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showTerms, setShowTerms] = useState(() => !isTermsAccepted())
   const emailRef = useRef()
 
   useEffect(() => { emailRef.current?.focus() }, [])
@@ -41,6 +43,7 @@ export default function Login() {
 
   return (
     <div class="min-h-screen flex items-center justify-center bg-base-200 p-4">
+      {showTerms && <TermsModal onAccept={() => setShowTerms(false)} />}
       {/* Background decoration */}
       <div class="absolute inset-0 overflow-hidden pointer-events-none">
         <div class="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
@@ -108,6 +111,12 @@ export default function Login() {
               <a href="/signup" class="link link-primary font-medium">{t('createStore')}</a>
             </p>
           </form>
+
+          <div class="text-center mt-3 pt-3 border-t border-base-200">
+            <a href="/terms" class="link link-hover text-xs text-base-content/40">
+              شروط وأحكام الاستخدام
+            </a>
+          </div>
         </div>
       </div>
     </div>

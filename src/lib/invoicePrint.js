@@ -10,13 +10,16 @@
  *   printInvoice({ store, sale, client, labels, lang })
  */
 
-function invoiceNumber(sale) {
+function invoiceNumber(sale, prefix = 'FA') {
   const d = new Date(sale.created_at)
-  const ymd = d.getFullYear().toString() +
-    String(d.getMonth() + 1).padStart(2, '0') +
-    String(d.getDate()).padStart(2, '0')
-  const suffix = String(sale.id || '').slice(-6).toUpperCase()
-  return `FA-${ymd}-${suffix}`
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  // Use sale.number if available (sequential), otherwise fallback to ID suffix
+  const num = sale.number
+    ? String(sale.number).padStart(4, '0')
+    : String(sale.id || '').slice(-6).toUpperCase()
+  return `${prefix}-${y}${m}${day}-${num}`
 }
 
 function esc(s) {
@@ -213,9 +216,9 @@ export function printInvoice({ store = {}, sale = {}, labels = {}, client = null
     const lineTTC = lineHT * (1 + (l.vat ?? 0) / 100)
     return `
       <tr style="${i % 2 === 1 ? 'background:#fafbfc;' : ''}">
-        <td style="text-align:center;color:#94a3b8;font-size:10px;padding:7px 6px">${i + 1}</td>
-        <td style="padding:7px 8px">
-          <div style="font-weight:600;color:#1e293b">${esc(l.product_name)}</div>
+        <td style="text-align:center;color:#94a3b8;font-size:11px;padding:8px 6px">${i + 1}</td>
+        <td style="padding:8px">
+          <div style="font-weight:600;font-size:12px;color:#1e293b">${esc(l.product_name)}</div>
           ${l.barcode ? `<div style="font-size:9px;color:#94a3b8;font-family:'SF Mono',Consolas,monospace;margin-top:1px">${esc(l.barcode)}${l.ref ? ` · ${esc(l.ref)}` : ''}</div>` : ''}
         </td>
         <td style="text-align:center;font-weight:600;color:#334155">${esc(l.qty)}</td>
@@ -292,7 +295,7 @@ export function printInvoice({ store = {}, sale = {}, labels = {}, client = null
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: ${rtl ? "'Noto Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif" : "'Segoe UI', system-ui, -apple-system, Arial, sans-serif"};
-      font-size: 11px;
+      font-size: 12px;
       color: #1e293b;
       background: #e2e8f0;
       direction: ${dir};
@@ -410,7 +413,7 @@ export function printInvoice({ store = {}, sale = {}, labels = {}, client = null
     .items-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 10.5px;
+      font-size: 11.5px;
     }
     .items-table thead tr {
       background: #f1f5f9;
@@ -425,7 +428,7 @@ export function printInvoice({ store = {}, sale = {}, labels = {}, client = null
       border-bottom: 2px solid #e2e8f0;
     }
     .items-table td {
-      padding: 0;
+      padding: 7px 8px;
       border-bottom: 1px solid #f1f5f9;
     }
     .items-table tbody tr:last-child td { border-bottom: none; }

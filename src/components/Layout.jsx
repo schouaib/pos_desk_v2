@@ -6,9 +6,13 @@ import { LangSwitcher } from './LangSwitcher'
 import { api } from '../lib/api'
 import { shortcutsOpen } from '../components/ShortcutsOverlay'
 
-const productPaths = ['/products', '/categories', '/brands', '/units', '/losses', '/favorites']
+const inventoryPaths = ['/products', '/categories', '/brands', '/units', '/favorites']
+const stockPaths = ['/losses', '/low-stock', '/expiring-batches', '/archived-products', '/transfers']
 const purchasePaths = ['/purchases', '/suppliers']
-const salesPaths = ['/pos', '/sales', '/sales-stats', '/expenses', '/retraits', '/user-summary']
+const salesPaths = ['/pos', '/sales', '/sale-returns']
+const financePaths = ['/sales-stats', '/expenses', '/retraits', '/user-summary', '/declarations']
+const peoplePaths = ['/clients', '/users']
+const systemPaths = ['/settings', '/folders', '/chat']
 
 const Icon = memo(({ d, className = 'w-4 h-4 shrink-0' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" class={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -40,6 +44,11 @@ const ICONS = {
   store:      'M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.375.375 0 00.375-.375v-1.5a.375.375 0 00-.375-.375h-3.75a.375.375 0 00-.375.375v1.5c0 .207.168.375.375.375z',
   folders:    'M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z',
   chat:       'M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z',
+  stock:      'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125',
+  finance:    'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  people:     'M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z',
+  systemGear: 'M11.42 15.17l-5.1 3.03a.75.75 0 01-1.14-.76l1.28-5.63a.75.75 0 00-.24-.7L1.53 7.11a.75.75 0 01.43-1.32l5.79-.49a.75.75 0 00.63-.43L10.97.74a.75.75 0 011.37 0l2.59 5.13a.75.75 0 00.63.43l5.79.49a.75.75 0 01.43 1.32l-4.28 3.7a.75.75 0 00-.24.7l1.28 5.63a.75.75 0 01-1.14.76l-5.1-3.03a.75.75 0 00-.74 0z',
+  declarations: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
   menu:       'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5',
   close:      'M6 18L18 6M6 6l12 12',
 }
@@ -78,9 +87,18 @@ export function Layout({ children, currentPath }) {
   const { t, lang } = useI18n()
   const rtl = lang === 'ar'
   const [open, setOpen] = useState(false)
-  const [productOpen, setProductOpen] = useState(productPaths.includes(currentPath))
-  const [purchaseOpen, setPurchaseOpen] = useState(purchasePaths.includes(currentPath))
-  const [salesOpen, setSalesOpen] = useState(salesPaths.includes(currentPath))
+
+  // Accordion: only one group open at a time
+  const initialGroup =
+    inventoryPaths.includes(currentPath) ? 'inventory' :
+    stockPaths.includes(currentPath) ? 'stock' :
+    purchasePaths.includes(currentPath) ? 'purchases' :
+    salesPaths.includes(currentPath) ? 'sales' :
+    financePaths.includes(currentPath) ? 'finance' :
+    peoplePaths.includes(currentPath) ? 'people' :
+    systemPaths.includes(currentPath) ? 'system' : null
+  const [activeGroup, setActiveGroup] = useState(initialGroup)
+  const toggleGroup = useCallback((group) => setActiveGroup((v) => v === group ? null : group), [])
 
   const [chatUnread, setChatUnread] = useState(0)
   const chatPollRef = useRef(null)
@@ -132,85 +150,134 @@ export function Layout({ children, currentPath }) {
       <nav class="flex-1 p-3 space-y-0.5 overflow-y-auto">
         <NavLink href="/dashboard" label={t('dashboard')} icon={ICONS.dashboard} active={currentPath === '/dashboard'} onNavigate={closeMenu} kbdHint="Ctrl+D" />
 
+        {/* Inventory: products, categories, brands, units, favorites */}
         {hasFeature('products') && (
           <GroupButton
-            label={t('productManagement')}
+            label={t('inventory')}
             icon={ICONS.products}
-            isActive={productPaths.includes(currentPath)}
-            isOpen={productOpen}
-            onClick={() => setProductOpen((v) => !v)}
+            isActive={inventoryPaths.includes(currentPath)}
+            isOpen={activeGroup === 'inventory'}
+            onClick={() => toggleGroup('inventory')}
           />
         )}
-        {hasFeature('products') && productOpen && (
+        {hasFeature('products') && activeGroup === 'inventory' && (
           <div class="ms-4 mt-0.5 space-y-0.5 border-s-2 border-base-300 ps-2">
             {hasPerm('products',   'view') && <NavLink href="/products"   label={t('productsPage')}   icon={ICONS.products}   active={currentPath === '/products'}   onNavigate={closeMenu} />}
             {hasPerm('categories', 'view') && <NavLink href="/categories" label={t('categoriesPage')} icon={ICONS.categories} active={currentPath === '/categories'} onNavigate={closeMenu} />}
             {hasPerm('brands',     'view') && <NavLink href="/brands"     label={t('brandsPage')}     icon={ICONS.brands}     active={currentPath === '/brands'}     onNavigate={closeMenu} />}
             {hasPerm('units',      'view') && <NavLink href="/units"      label={t('unitsPage')}      icon={ICONS.units}      active={currentPath === '/units'}      onNavigate={closeMenu} />}
+            {hasFeature('favorites') && hasPerm('favorites', 'view') && <NavLink href="/favorites" label={t('favoritesPage')} icon={ICONS.favorites} active={currentPath === '/favorites'} onNavigate={closeMenu} />}
+          </div>
+        )}
+
+        {/* Stock: losses, low-stock, expiring, archived, transfers */}
+        {hasFeature('products') && (
+          <GroupButton
+            label={t('stockManagement')}
+            icon={ICONS.stock}
+            isActive={stockPaths.includes(currentPath)}
+            isOpen={activeGroup === 'stock'}
+            onClick={() => toggleGroup('stock')}
+          />
+        )}
+        {hasFeature('products') && activeGroup === 'stock' && (
+          <div class="ms-4 mt-0.5 space-y-0.5 border-s-2 border-base-300 ps-2">
             {hasFeature('losses') && hasPerm('products', 'loss') && <NavLink href="/losses" label={t('losses')} icon={ICONS.losses} active={currentPath === '/losses'} onNavigate={closeMenu} />}
             {hasPerm('products', 'alert') && <NavLink href="/low-stock" label={t('lowStockAlert')} icon={ICONS.losses} active={currentPath === '/low-stock'} onNavigate={closeMenu} />}
             {hasFeature('batch_tracking') && hasPerm('products', 'view') && <NavLink href="/expiring-batches" label={t('expiring')} icon={ICONS.losses} active={currentPath === '/expiring-batches'} onNavigate={closeMenu} />}
             {hasPerm('products', 'archive') && <NavLink href="/archived-products" label={t('archivedProducts')} icon={ICONS.products} active={currentPath === '/archived-products'} onNavigate={closeMenu} />}
-            {hasFeature('favorites') && hasPerm('favorites', 'view') && <NavLink href="/favorites" label={t('favoritesPage')} icon={ICONS.favorites} active={currentPath === '/favorites'} onNavigate={closeMenu} />}
             {hasFeature('stock_transfers') && hasPerm('products', 'view') && <NavLink href="/transfers" label={t('transfers')} icon={ICONS.products} active={currentPath === '/transfers'} onNavigate={closeMenu} />}
           </div>
         )}
 
+        {/* Purchases */}
         {(hasFeature('purchases') || hasFeature('suppliers')) && (
           <GroupButton
             label={t('purchasesPage')}
             icon={ICONS.purchases}
             isActive={purchasePaths.includes(currentPath)}
-            isOpen={purchaseOpen}
-            onClick={() => setPurchaseOpen((v) => !v)}
+            isOpen={activeGroup === 'purchases'}
+            onClick={() => toggleGroup('purchases')}
           />
         )}
-        {(hasFeature('purchases') || hasFeature('suppliers')) && purchaseOpen && (
+        {(hasFeature('purchases') || hasFeature('suppliers')) && activeGroup === 'purchases' && (
           <div class="ms-4 mt-0.5 space-y-0.5 border-s-2 border-base-300 ps-2">
             {hasFeature('purchases') && hasPerm('purchases', 'view') && <NavLink href="/purchases" label={t('purchasesPage')} icon={ICONS.purchases} active={currentPath === '/purchases'} onNavigate={closeMenu} />}
             {hasFeature('suppliers') && hasPerm('suppliers', 'view') && <NavLink href="/suppliers" label={t('suppliersPage')} icon={ICONS.suppliers} active={currentPath === '/suppliers'} onNavigate={closeMenu} />}
           </div>
         )}
 
-        {(hasFeature('pos') || hasFeature('sales') || hasFeature('expenses') || hasFeature('retraits')) && (hasPerm('sales', 'add') || hasPerm('sales', 'view')) && (
+        {/* Sales: pos, sales history, returns */}
+        {(hasFeature('pos') || hasFeature('sales')) && (hasPerm('sales', 'add') || hasPerm('sales', 'view')) && (
           <GroupButton
             label={t('salesPage')}
             icon={ICONS.pos}
             isActive={salesPaths.includes(currentPath)}
-            isOpen={salesOpen}
-            onClick={() => setSalesOpen((v) => !v)}
+            isOpen={activeGroup === 'sales'}
+            onClick={() => toggleGroup('sales')}
           />
         )}
-        {salesOpen && (
+        {activeGroup === 'sales' && (
           <div class="ms-4 mt-0.5 space-y-0.5 border-s-2 border-base-300 ps-2">
-            {hasFeature('pos')      && hasPerm('sales', 'add')      && <NavLink href="/pos"         label={t('posNav')}          icon={ICONS.pos}        active={currentPath === '/pos'}         onNavigate={closeMenu} kbdHint="Ctrl+P" />}
-            {hasFeature('sales')    && hasPerm('sales', 'view')     && <NavLink href="/sales"       label={t('salesPage')}       icon={ICONS.sales}      active={currentPath === '/sales'}       onNavigate={closeMenu} />}
-            {hasFeature('sales')    && hasPerm('sales', 'return')   && <NavLink href="/sale-returns" label={t('saleReturns')}     icon={ICONS.sales}      active={currentPath === '/sale-returns'} onNavigate={closeMenu} />}
-            {hasFeature('stats')    && hasPerm('sales', 'earnings') && <NavLink href="/sales-stats" label={t('salesStatsPage')}  icon={ICONS.salesStats} active={currentPath === '/sales-stats'} onNavigate={closeMenu} />}
-            {hasFeature('expenses') && hasPerm('expenses', 'view')  && <NavLink href="/expenses"    label={t('expensesPage')}    icon={ICONS.expenses}   active={currentPath === '/expenses'}    onNavigate={closeMenu} />}
-            {hasFeature('retraits') && hasPerm('retraits', 'view')  && <NavLink href="/retraits"    label={t('retraitsPage')}    icon={ICONS.retraits}   active={currentPath === '/retraits'}    onNavigate={closeMenu} />}
-            {hasFeature('user_summary') && hasPerm('sales', 'user_summary') && <NavLink href="/user-summary" label={t('userSummaryPage')} icon={ICONS.userSummary} active={currentPath === '/user-summary'} onNavigate={closeMenu} />}
+            {hasFeature('pos')   && hasPerm('sales', 'add')    && <NavLink href="/pos"          label={t('posNav')}      icon={ICONS.pos}   active={currentPath === '/pos'}          onNavigate={closeMenu} kbdHint="Ctrl+P" />}
+            {hasFeature('sales') && hasPerm('sales', 'view')   && <NavLink href="/sales"        label={t('salesPage')}   icon={ICONS.sales} active={currentPath === '/sales'}        onNavigate={closeMenu} />}
+            {hasFeature('sales') && hasPerm('sales', 'return') && <NavLink href="/sale-returns" label={t('saleReturns')} icon={ICONS.sales} active={currentPath === '/sale-returns'} onNavigate={closeMenu} />}
           </div>
         )}
 
-        {hasFeature('clients') && hasPerm('clients', 'view') && (
-          <NavLink href="/clients" label={t('clientsPage')} icon={ICONS.clients} active={currentPath === '/clients'} onNavigate={closeMenu} />
+        {/* Finance: stats, expenses, retraits, user summary */}
+        {(hasFeature('stats') || hasFeature('expenses') || hasFeature('retraits') || hasFeature('user_summary')) && (
+          <GroupButton
+            label={t('finance')}
+            icon={ICONS.finance}
+            isActive={financePaths.includes(currentPath)}
+            isOpen={activeGroup === 'finance'}
+            onClick={() => toggleGroup('finance')}
+          />
+        )}
+        {activeGroup === 'finance' && (
+          <div class="ms-4 mt-0.5 space-y-0.5 border-s-2 border-base-300 ps-2">
+            {hasFeature('stats')    && hasPerm('sales', 'earnings')      && <NavLink href="/sales-stats"  label={t('salesStatsPage')}  icon={ICONS.salesStats}  active={currentPath === '/sales-stats'}  onNavigate={closeMenu} />}
+            {hasFeature('expenses') && hasPerm('expenses', 'view')       && <NavLink href="/expenses"     label={t('expensesPage')}    icon={ICONS.expenses}    active={currentPath === '/expenses'}     onNavigate={closeMenu} />}
+            {hasFeature('retraits') && hasPerm('retraits', 'view')       && <NavLink href="/retraits"     label={t('retraitsPage')}    icon={ICONS.retraits}    active={currentPath === '/retraits'}     onNavigate={closeMenu} />}
+            {hasFeature('user_summary') && hasPerm('sales', 'user_summary') && <NavLink href="/user-summary" label={t('userSummaryPage')} icon={ICONS.userSummary} active={currentPath === '/user-summary'} onNavigate={closeMenu} />}
+            {hasFeature('stats') && isTenantAdmin() && <NavLink href="/declarations" label={t('declarationsPage')} icon={ICONS.declarations} active={currentPath === '/declarations'} onNavigate={closeMenu} />}
+          </div>
         )}
 
-        {isTenantAdmin() && hasFeature('access_management') && (
-          <NavLink href="/users" label={t('staff')} icon={ICONS.staff} active={currentPath === '/users'} onNavigate={closeMenu} />
+        {/* People: clients, staff */}
+        {(hasFeature('clients') || (isTenantAdmin() && hasFeature('access_management'))) && (
+          <GroupButton
+            label={t('people')}
+            icon={ICONS.people}
+            isActive={peoplePaths.includes(currentPath)}
+            isOpen={activeGroup === 'people'}
+            onClick={() => toggleGroup('people')}
+          />
+        )}
+        {activeGroup === 'people' && (
+          <div class="ms-4 mt-0.5 space-y-0.5 border-s-2 border-base-300 ps-2">
+            {hasFeature('clients') && hasPerm('clients', 'view') && <NavLink href="/clients" label={t('clientsPage')} icon={ICONS.clients} active={currentPath === '/clients'} onNavigate={closeMenu} />}
+            {isTenantAdmin() && hasFeature('access_management') && <NavLink href="/users" label={t('staff')} icon={ICONS.staff} active={currentPath === '/users'} onNavigate={closeMenu} />}
+          </div>
         )}
 
+        {/* System: settings, folders, chat */}
         {isTenantAdmin() && (
-          <NavLink href="/settings" label={t('storeSettings')} icon={ICONS.settings} active={currentPath === '/settings'} onNavigate={closeMenu} />
+          <GroupButton
+            label={t('system')}
+            icon={ICONS.settings}
+            isActive={systemPaths.includes(currentPath)}
+            isOpen={activeGroup === 'system'}
+            onClick={() => toggleGroup('system')}
+          />
         )}
-
-        {hasFeature('multi_folders') && (isTenantAdmin() || hasPerm('folders', 'view')) && (
-          <NavLink href="/folders" label={t('folders')} icon={ICONS.folders} active={currentPath === '/folders'} onNavigate={closeMenu} />
-        )}
-
-        {isTenantAdmin() && (
-          <NavLink href="/chat" label={t('chat')} icon={ICONS.chat} active={currentPath === '/chat'} onNavigate={closeMenu} badge={chatUnread} />
+        {isTenantAdmin() && activeGroup === 'system' && (
+          <div class="ms-4 mt-0.5 space-y-0.5 border-s-2 border-base-300 ps-2">
+            <NavLink href="/settings" label={t('storeSettings')} icon={ICONS.settings} active={currentPath === '/settings'} onNavigate={closeMenu} />
+            {hasFeature('multi_folders') && (isTenantAdmin() || hasPerm('folders', 'view')) && <NavLink href="/folders" label={t('folders')} icon={ICONS.folders} active={currentPath === '/folders'} onNavigate={closeMenu} />}
+            <NavLink href="/chat" label={t('chat')} icon={ICONS.chat} active={currentPath === '/chat'} onNavigate={closeMenu} badge={chatUnread} />
+          </div>
         )}
       </nav>
 

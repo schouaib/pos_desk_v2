@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'preact/hooks'
 
 export function Modal({ id, title, children, size }) {
-  const boxClass = size === 'xl' ? 'modal-box w-full sm:max-w-4xl'
-    : size === 'lg' ? 'modal-box w-full sm:max-w-2xl'
-    : 'modal-box w-full sm:max-w-lg'
+  const boxClass = size === 'xl' ? 'modal-box w-full sm:max-w-3xl max-h-[85vh] overflow-y-auto'
+    : size === 'lg' ? 'modal-box w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto'
+    : 'modal-box w-full sm:max-w-lg max-h-[85vh] overflow-y-auto'
 
   const boxRef = useRef()
 

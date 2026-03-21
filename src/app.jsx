@@ -37,6 +37,8 @@ const ArchivedProducts = lazy(() => import('./pages/ArchivedProducts'))
 const LowStock = lazy(() => import('./pages/LowStock'))
 const Transfers = lazy(() => import('./pages/Transfers'))
 const ExpiringBatches = lazy(() => import('./pages/ExpiringBatches'))
+const TermsConditions = lazy(() => import('./pages/TermsConditions'))
+const Declarations = lazy(() => import('./pages/Declarations'))
 
 const Spinner = memo(() => (
   <div class="min-h-screen flex items-center justify-center bg-base-200">
@@ -346,6 +348,8 @@ export function App() {
         <Guard component={Folders} path="/folders" feat="multi_folders" perm={['folders', 'view']} />
         <Guard component={Transfers} path="/transfers" feat="stock_transfers" perm={['products', 'view']} />
         <Guard component={Chat} path="/chat" adminOnly />
+        <Guard component={Declarations} path="/declarations" adminOnly feat="stats" />
+        <TermsConditions path="/terms" />
         <RedirectRoot path="/" />
       </Router>
     </Suspense>

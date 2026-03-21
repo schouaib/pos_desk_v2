@@ -53,6 +53,7 @@ export default function Products({ path }) {
   const canBatches     = hasFeature('batch_tracking')
 
   const [storeName, setStoreName] = useState('')
+  const [defaultSalePrice, setDefaultSalePrice] = useState(1)
   const [categories, setCategories] = useState([])
   const [brands, setBrands] = useState([])
   const [units, setUnits] = useState([])
@@ -120,7 +121,7 @@ export default function Products({ path }) {
     api.listCategories().then(d => { if (!cancelled) setCategories(d) }).catch(() => {})
     api.listBrands().then(d => { if (!cancelled) setBrands(d) }).catch(() => {})
     api.listUnits().then(d => { if (!cancelled) setUnits(d) }).catch(() => {})
-    api.getStoreSettings().then(d => { if (!cancelled) setStoreName(d?.name || '') }).catch(() => {})
+    api.getStoreSettings().then(d => { if (!cancelled) { setStoreName(d?.name || ''); setDefaultSalePrice(d?.default_sale_price || 1) } }).catch(() => {})
     return () => { cancelled = true }
   }, [])
 
@@ -440,8 +441,8 @@ export default function Products({ path }) {
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-2xl font-bold">{t('productsPage')}</h2>
         {canAdd && (
-          <button class="btn btn-primary btn-sm gap-1" onClick={openCreate}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+          <button class="btn btn-primary btn-sm gap-1.5" onClick={openCreate}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
             {t('newProduct')}
           </button>
         )}
@@ -495,12 +496,12 @@ export default function Products({ path }) {
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('category')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('qtyAvailable')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('prixAchat')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('prixVente1')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{defaultSalePrice === 2 ? t('prixVente2') : defaultSalePrice === 3 ? t('prixVente3') : t('prixVente1')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end w-36">{t('actions')}</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((p) => (
+            {items.map((p, _idx) => (
               <tr key={p.id} class="border-b border-base-200/50 hover:bg-primary/[0.03] transition-colors group">
                 {/* Product info: image + name + meta */}
                 <td class="px-3 py-2">
@@ -546,7 +547,7 @@ export default function Products({ path }) {
                 </td>
                 {/* Prix vente */}
                 <td class="px-3 py-2 text-end">
-                  <span class="text-sm font-semibold tabular-nums">{p.prix_vente_1}</span>
+                  <span class="text-sm font-semibold tabular-nums">{(defaultSalePrice === 2 ? p.prix_vente_2 : defaultSalePrice === 3 ? p.prix_vente_3 : p.prix_vente_1)?.toFixed(2)}</span>
                 </td>
                 {/* Actions — compact dropdown + primary actions */}
                 <td class="px-3 py-2 text-end">
@@ -579,7 +580,7 @@ export default function Products({ path }) {
                       </div>
                     )}
                     {/* More actions dropdown */}
-                    <div class="dropdown dropdown-end">
+                    <div class={`dropdown dropdown-end ${_idx >= items.length - 2 ? 'dropdown-top' : ''}`}>
                       <label tabIndex={0} class="btn btn-xs btn-ghost btn-square">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5zM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5zM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z" />
@@ -691,19 +692,23 @@ export default function Products({ path }) {
       {/* Create / Edit Modal */}
       <Modal id="product-modal" title={editing ? t('editProduct') : t('newProductTitle')} size="xl">
         {/* Step indicator */}
-        <div class="flex items-center mb-6 bg-base-200 rounded-xl p-2">
-          {[t('basicInfo'), t('pricing'), t('stock')].map((label, i) => (
+        <div class="flex items-center mb-6 bg-base-200/60 rounded-xl p-1.5 gap-1">
+          {[
+            { label: t('basicInfo'), icon: <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg> },
+            { label: t('pricing'), icon: <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg> },
+            { label: t('stock'), icon: <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg> },
+          ].map(({ label, icon }, i) => (
             <button
               key={i}
               type="button"
               onClick={() => setTab(i)}
-              class={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all
-                ${tab === i ? 'bg-primary text-primary-content shadow-sm' : tab > i ? 'text-success' : 'text-base-content/40 hover:text-base-content/60'}`}
+              class={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all
+                ${tab === i ? 'bg-primary text-primary-content shadow-sm' : tab > i ? 'text-success bg-success/8' : 'text-base-content/40 hover:text-base-content/60 hover:bg-base-300/50'}`}
             >
-              <span class={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-colors
-                ${tab === i ? 'border-primary-content bg-primary-content/20 text-primary-content' : tab > i ? 'border-success bg-success text-success-content' : 'border-current'}`}>
-                {tab > i ? '✓' : i + 1}
-              </span>
+              {tab > i
+                ? <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                : icon
+              }
               {label}
             </button>
           ))}
@@ -738,7 +743,7 @@ export default function Products({ path }) {
                 </div>
                 {/* Image */}
                 <div class="shrink-0 flex flex-col items-center gap-1.5">
-                  <div class="w-20 h-20 rounded-xl border-2 border-dashed border-base-300 flex items-center justify-center overflow-hidden bg-base-200">
+                  <div class="w-24 h-24 rounded-xl border-2 border-dashed border-base-300 flex items-center justify-center overflow-hidden bg-base-200 transition-colors hover:border-primary/40">
                     {(imagePreview || form.image_url)
                       ? <img src={imagePreview || form.image_url} alt="product" class="w-full h-full object-cover" />
                       : <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" /></svg>
@@ -802,9 +807,12 @@ export default function Products({ path }) {
                     placeholder={t('addBarcode')}
                     onInput={(e) => setBarcodeInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (canMultiBarcode || form.barcodes.length === 0) addBarcode() } }} />
-                  <button type="button" class="btn btn-sm btn-outline btn-secondary" onClick={async () => {
+                  <button type="button" class="btn btn-sm btn-outline btn-secondary gap-1" onClick={async () => {
                     try { setBarcodeInput(await api.generateBarcode()) } catch {}
-                  }}>Gen</button>
+                  }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" /></svg>
+                    Gen
+                  </button>
                   {(canMultiBarcode || form.barcodes.length === 0) && (
                     <button type="button" class="btn btn-sm btn-outline" onClick={addBarcode}>+</button>
                   )}
@@ -889,18 +897,21 @@ export default function Products({ path }) {
           {tab === 1 && (
             <div class="space-y-5">
               {/* VAT */}
-              <div class="bg-base-200/50 rounded-xl p-3">
+              <div class="bg-base-200/50 rounded-xl p-4">
                 <div class="flex items-center gap-3">
-                  <span class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">{t('vatRate')}</span>
-                  <input type="number" min="0" max="100" step="1" class="input input-bordered input-sm w-20"
-                    value={form.vat}
-                    onInput={(e) => {
-                      let v = parseInt(e.target.value) || 0
-                      if (v < 0) v = 0
-                      if (v > 100) v = 100
-                      setForm({ ...form, vat: v })
-                    }} />
-                  <span class="text-sm text-base-content/60">%</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0c1.1.128 1.907 1.077 1.907 2.185ZM9.75 9h.008v.008H9.75V9Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 4.5h.008v.008h-.008V13.5Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
+                  <span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">{t('vatRate')}</span>
+                  <div class="relative">
+                    <input type="number" min="0" max="100" step="1" class="input input-bordered input-sm w-20 pe-6 text-end"
+                      value={form.vat}
+                      onInput={(e) => {
+                        let v = parseInt(e.target.value) || 0
+                        if (v < 0) v = 0
+                        if (v > 100) v = 100
+                        setForm({ ...form, vat: v })
+                      }} />
+                    <span class="absolute end-2 top-1/2 -translate-y-1/2 text-xs text-base-content/30 pointer-events-none">%</span>
+                  </div>
                   {form.vat === 0 && <span class="badge badge-ghost badge-sm">{t('noVat')}</span>}
                 </div>
               </div>
@@ -916,40 +927,48 @@ export default function Products({ path }) {
               </div>
 
               {/* Sale prices */}
-              <div class="bg-base-200/50 rounded-xl p-3">
-                <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-2">{t('pricing')}</p>
-                <div class="overflow-x-auto">
-                  <table class="table table-sm">
-                    <thead>
-                      <tr>
-                        <th class="ps-0"></th>
-                        <th>HT</th>
-                        {form.vat > 0 && <th class="text-warning">{t('ttcLabel')}</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        { label: t('prixVente1'), key: 'prix_vente_1' },
-                        { label: t('prixVente2'), key: 'prix_vente_2' },
-                        { label: t('prixVente3'), key: 'prix_vente_3' },
-                      ].map(({ label, key }) => (
-                        <tr key={key}>
-                          <td class="ps-0 text-sm text-base-content/70">{label}</td>
-                          <td class="py-1">
-                            <input type="number" step="any" min="0" class="input input-bordered input-sm w-28"
-                              value={form[key]}
-                              onInput={(e) => setForm({ ...form, [key]: parseFloat(e.target.value) || 0 })} />
-                        </td>
-                        {form.vat > 0 && (
-                          <td class="font-mono text-sm text-warning font-medium">
-                            {(form[key] * (1 + form.vat / 100)).toFixed(2)}
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <div class="bg-base-200/50 rounded-xl p-4">
+                <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-3">{t('pricing')}</p>
+                <div class="space-y-3">
+                  {[
+                    { label: t('prixVente1'), key: 'prix_vente_1', color: 'primary' },
+                    { label: t('prixVente2'), key: 'prix_vente_2', color: 'info' },
+                    { label: t('prixVente3'), key: 'prix_vente_3', color: 'accent' },
+                  ].map(({ label, key, color }) => {
+                    const margin = form.prix_achat > 0
+                      ? (((form[key] - form.prix_achat) / form.prix_achat) * 100)
+                      : 0
+                    const marginRounded = Math.round(margin * 100) / 100
+                    return (
+                      <div key={key} class={`flex items-center gap-2 p-2.5 rounded-lg bg-base-100 border border-base-300/50`}>
+                        <span class={`text-xs font-bold text-${color} min-w-16`}>{label}</span>
+                        <div class="flex items-center gap-1.5 flex-1">
+                          <div class="relative">
+                            <input type="number" step="any" min="0" class="input input-bordered input-sm w-20 pe-6 text-end"
+                              value={marginRounded || ''}
+                              placeholder="0"
+                              onInput={(e) => {
+                                const pct = parseFloat(e.target.value)
+                                if (!isNaN(pct) && form.prix_achat > 0) {
+                                  setForm({ ...form, [key]: Math.round(form.prix_achat * (1 + pct / 100) * 100) / 100 })
+                                }
+                              }} />
+                            <span class="absolute end-2 top-1/2 -translate-y-1/2 text-xs text-base-content/30 pointer-events-none">%</span>
+                          </div>
+                          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-base-content/20 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
+                          <input type="number" step="any" min="0" class="input input-bordered input-sm w-28 font-mono"
+                            value={form[key]}
+                            onInput={(e) => setForm({ ...form, [key]: parseFloat(e.target.value) || 0 })} />
+                          {form.vat > 0 && (
+                            <span class="text-xs font-mono text-warning font-semibold whitespace-nowrap">
+                              TTC: {(form[key] * (1 + form.vat / 100)).toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -975,27 +994,28 @@ export default function Products({ path }) {
                 </div>
           )}
 
-          <div class="modal-action mt-6 border-t border-base-200 pt-4">
+          <div class="modal-action mt-6 border-t border-base-200 pt-4 flex items-center">
             {tab > 0 && (
-              <button type="button" class="btn btn-sm btn-ghost gap-1" onClick={() => setTab(tab - 1)}>
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+              <button type="button" class="btn btn-sm btn-ghost gap-1.5" onClick={() => setTab(tab - 1)}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
                 {t('back')}
               </button>
             )}
             <div class="flex-1" />
-            {tab < 2
-              ? <button type="button" class="btn btn-sm btn-primary gap-1" onClick={() => {
+            {tab < 2 && (
+              <button type="button" class="btn btn-sm btn-outline gap-1.5 min-w-24" onClick={() => {
                   if (tab === 0 && !form.name.trim()) { setError(t('productName') + ' required'); return }
                   setError('')
                   setTab(tab + 1)
                 }}>
                   {t('next')}
-                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
-                </button>
-              : <button type="button" onClick={handleSubmit} class={`btn btn-primary btn-sm gap-1 ${loading ? 'loading' : ''}`} disabled={loading}>
-                  {editing ? t('saveChanges') : t('newProduct')}
-                </button>
-            }
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+              </button>
+            )}
+            <button type="button" onClick={handleSubmit} class={`btn btn-primary btn-sm gap-1.5 min-w-28 ms-2 ${loading ? 'loading' : ''}`} disabled={loading}>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+              {editing ? t('saveChanges') : t('newProduct')}
+            </button>
           </div>
         </form>
       </Modal>
@@ -1377,6 +1397,18 @@ export default function Products({ path }) {
                         <td>
                           {m.type === 'loss'
                             ? <span class="badge badge-xs badge-error">{t('loss' + (m.reference?.charAt(0).toUpperCase() + m.reference?.slice(1)) || 'loss')}</span>
+                            : m.type === 'sale'
+                            ? <span class="badge badge-xs badge-success">{t('movementSale')}</span>
+                            : m.type === 'return' || m.type === 'sale_return'
+                            ? <span class="badge badge-xs badge-warning">{t('movementReturn')}</span>
+                            : m.type === 'adjustment' || m.type === 'adjust'
+                            ? <span class="badge badge-xs badge-ghost">{t('movementAdjust')}</span>
+                            : m.type === 'transfer'
+                            ? <span class="badge badge-xs badge-accent">{t('movementTransfer')}</span>
+                            : m.type === 'purchase'
+                            ? <span class="badge badge-xs badge-info">{t('movementPurchase')}</span>
+                            : m.qty < 0
+                            ? <span class="badge badge-xs badge-success">{t('movementSale')}</span>
                             : <span class="badge badge-xs badge-info">{t('movementPurchase')}</span>
                           }
                         </td>

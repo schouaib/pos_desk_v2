@@ -22,6 +22,50 @@ function lineTTC(line) {
 function round2(v) {
   return Math.round(v * 100) / 100
 }
+function fmt(v) {
+  return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// ─── Sound effects (Web Audio API — no files needed) ──────────────────────────
+let _audioCtx
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+  return _audioCtx
+}
+function playBeep(freq = 800, duration = 0.1, volume = 0.15) {
+  try {
+    const ctx = getAudioCtx()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.frequency.value = freq
+    osc.type = 'sine'
+    gain.gain.setValueAtTime(volume, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + duration)
+  } catch {}
+}
+function playAddSound() { playBeep(900, 0.08, 0.12) }
+function playSaleSound() {
+  try {
+    const ctx = getAudioCtx()
+    const now = ctx.currentTime
+    ;[523, 659, 784].forEach((f, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = f
+      osc.type = 'sine'
+      gain.gain.setValueAtTime(0.12, now + i * 0.1)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.2)
+      osc.start(now + i * 0.1)
+      osc.stop(now + i * 0.1 + 0.2)
+    })
+  } catch {}
+}
 
 // ─── HelpModal ────────────────────────────────────────────────────────────────
 
@@ -109,7 +153,7 @@ function PriceEditor({ line, onApply, onClose, t }) {
               onClick={() => quickSet(line.pv1)}>
               <span class="flex flex-col items-center leading-tight">
                 <span class="text-[10px] opacity-70 font-medium">{t('pv1')}</span>
-                <span class="font-mono">{line.pv1.toFixed(2)}</span>
+                <span class="font-mono">{fmt(line.pv1)}</span>
               </span>
             </button>
           )}
@@ -119,7 +163,7 @@ function PriceEditor({ line, onApply, onClose, t }) {
               onClick={() => quickSet(line.pv2)}>
               <span class="flex flex-col items-center leading-tight">
                 <span class="text-[10px] opacity-70 font-medium">{t('pv2')}</span>
-                <span class="font-mono">{line.pv2.toFixed(2)}</span>
+                <span class="font-mono">{fmt(line.pv2)}</span>
               </span>
             </button>
           )}
@@ -129,7 +173,7 @@ function PriceEditor({ line, onApply, onClose, t }) {
               onClick={() => quickSet(line.pv3)}>
               <span class="flex flex-col items-center leading-tight">
                 <span class="text-[10px] opacity-70 font-medium">{t('pv3')}</span>
-                <span class="font-mono">{line.pv3.toFixed(2)}</span>
+                <span class="font-mono">{fmt(line.pv3)}</span>
               </span>
             </button>
           )}
@@ -161,7 +205,7 @@ function PriceEditor({ line, onApply, onClose, t }) {
 
         {minPrice > 0 && (
           <p class={`text-xs mb-3 ${belowMin ? 'text-error font-semibold' : 'text-base-content/45'}`}>
-            {t('pvMin')}: {minPrice.toFixed(2)}
+            {t('pvMin')}: {fmt(minPrice)}
             {belowMin && ` — ${t('priceBelow')}`}
           </p>
         )}
@@ -207,7 +251,7 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t }) {
 
         <div class="pos-pay-total mb-4">
           <span class="text-sm font-semibold text-base-content/60">{t('totalTTC')}</span>
-          <span class={`text-2xl font-extrabold font-mono ${total < 0 ? 'text-error' : 'text-primary'}`}>{total.toFixed(2)}</span>
+          <span class={`text-2xl font-extrabold font-mono ${total < 0 ? 'text-error' : 'text-primary'}`}>{fmt(total)}</span>
         </div>
 
         <label class="form-control mb-3">
@@ -216,7 +260,7 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t }) {
             ref={inputRef}
             type="number" step="any"
             class="input pos-pay-input w-full text-center font-mono"
-            placeholder={total.toFixed(2)}
+            placeholder={fmt(total)}
             value={amount}
             onInput={(e) => setAmount(e.target.value)}
             onKeyDown={handleKey}
@@ -247,7 +291,7 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t }) {
             change >= 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
           }`}>
             <span class="text-sm font-semibold">{t('changeDue')}</span>
-            <span class="text-xl font-extrabold font-mono">{change.toFixed(2)}</span>
+            <span class="text-xl font-extrabold font-mono">{fmt(change)}</span>
           </div>
         )}
 
@@ -342,7 +386,7 @@ function SaleSuccessModal({ sale, store, onClose, t, client, lang }) {
 
         <h3 class="font-bold text-lg mb-1">{t('saleSuccess')}</h3>
         <p class="text-3xl font-extrabold font-mono text-primary mb-5" style="letter-spacing:-0.03em">
-          {Number(sale?.total ?? 0).toFixed(2)}
+          {fmt(Number(sale?.total ?? 0))}
         </p>
 
         {printErr && <p class="text-error text-sm mb-3">{printErr}</p>}
@@ -791,6 +835,7 @@ export default function Pos({ path }) {
   // ── Ticket operations ────────────────────────────────────────────────────────
 
   function addToTicketSelecting(product, qty = 1) {
+    playAddSound()
     setLines((prev) => {
       const idx = prev.findIndex((l) => l.productId === product.id)
       if (idx !== -1) {
@@ -836,6 +881,14 @@ export default function Pos({ path }) {
     const q = parseFloat(qty) || 0
     if (q === 0) { removeLine(key); return }
     setLines((prev) => prev.map((l) => l._key === key ? { ...l, qty: q } : l))
+  }
+
+  function toggleReturn(key) {
+    setLines((prev) => prev.map((l) => l._key === key ? { ...l, qty: -Math.abs(l.qty) } : l))
+  }
+
+  function toggleSale(key) {
+    setLines((prev) => prev.map((l) => l._key === key ? { ...l, qty: Math.abs(l.qty) } : l))
   }
 
   function adjustQty(key, delta) {
@@ -1060,6 +1113,7 @@ export default function Pos({ path }) {
       lastClientRef.current = selectedClient
       clearClient()
       setLastSale(result.data ?? result)
+      playSaleSound()
       refocusScan()
     } catch (err) {
       setPayError(err.message)
@@ -1214,7 +1268,7 @@ export default function Pos({ path }) {
   // ─── render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div ref={posRef} class="page-enter h-screen bg-base-200 p-4 md:p-6 flex flex-col overflow-hidden">
+    <div ref={posRef} class="page-enter h-screen bg-base-200 p-4 flex flex-col overflow-hidden">
 
       {/* Caisse opening modal — blocks POS until session is opened */}
       {caisseSession === undefined && (
@@ -1272,7 +1326,8 @@ export default function Pos({ path }) {
         </dialog>
       )}
 
-      {caisseSession && (<>
+      {caisseSession && (
+      <div class="flex flex-col flex-1 min-h-0">
       {/* ── Glass Header Toolbar ──────────────────────────────────────────────── */}
       <div class="pos-header">
         <div class="flex items-center gap-2">
@@ -1459,7 +1514,7 @@ export default function Pos({ path }) {
                 <tr>
                   <th class="min-w-32">{t('productName')}</th>
                   <th class="text-center w-20">{t('qty')}</th>
-                  <th class="text-end w-28">{t('prixVente1')}</th>
+                  <th class="text-end w-28">{store.default_sale_price === 2 ? t('prixVente2') : store.default_sale_price === 3 ? t('prixVente3') : t('prixVente1')}</th>
                   <th class="text-end w-24">{t('discount')}</th>
                   <th class="text-end w-28">{t('totalTTC')}</th>
                   <th class="w-10"></th>
@@ -1483,15 +1538,19 @@ export default function Pos({ path }) {
                 )}
                 {lines.map((line, idx) => {
                   const isSelected = line._key === selectedKey
+                  const isReturn = line.qty < 0
                   return (
                     <tr
                       key={line._key}
-                      class={`cursor-pointer ${isSelected ? 'pos-row-selected' : ''} ${idx === 0 ? 'pos-line-new' : ''}`}
+                      class={`cursor-pointer ${isSelected ? 'pos-row-selected' : ''} ${idx === 0 ? 'pos-line-new' : ''} ${isReturn ? 'bg-error/5' : ''}`}
                       onClick={() => setSelectedKey(line._key)}
                     >
                       {/* Product */}
                       <td>
-                        <div class="font-medium text-sm leading-tight flex items-center gap-1.5">
+                        <div class={`font-medium text-sm leading-tight flex items-center gap-1.5 ${isReturn ? 'text-error' : ''}`}>
+                          {isReturn && (
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-error shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>
+                          )}
                           {line.name}
                           {!line.isService && line.qty > line.stockQty && (
                             <span class="badge badge-xs badge-error gap-0.5 whitespace-nowrap" title={`${t('qtyAvailable')}: ${line.stockQty}`}>
@@ -1523,7 +1582,7 @@ export default function Pos({ path }) {
                           class="btn btn-xs btn-ghost font-mono text-end w-full justify-end"
                           onClick={(e) => { e.stopPropagation(); setEditingLine(line) }}
                         >
-                          {line.unitPrice.toFixed(2)}
+                          {fmt(line.unitPrice)}
                           {line.vat > 0 && (
                             <span class="badge badge-xs badge-warning ms-1">{line.vat}%</span>
                           )}
@@ -1533,14 +1592,14 @@ export default function Pos({ path }) {
                       {/* Discount */}
                       <td class="text-end">
                         {line.discount > 0
-                          ? <span class="text-xs font-mono text-warning font-semibold">-{line.discount.toFixed(2)}</span>
+                          ? <span class="text-xs font-mono text-warning font-semibold">-{fmt(line.discount)}</span>
                           : <span class="text-base-content/15 text-xs">--</span>
                         }
                       </td>
 
                       {/* Total TTC */}
                       <td class={`text-end font-mono text-sm font-bold ${line.qty < 0 ? 'text-error' : ''}`}>
-                        {lineTTC(line).toFixed(2)}
+                        {fmt(lineTTC(line))}
                       </td>
 
                       {/* Delete */}
@@ -1561,8 +1620,8 @@ export default function Pos({ path }) {
         </div>
 
         {/* ── Summary + Pay ─────────────────────────────────────────────────── */}
-        <div class="lg:w-80 shrink-0 flex flex-col">
-          <div class="pos-summary bg-base-100 p-5 space-y-3">
+        <div class="lg:w-80 shrink-0 flex flex-col order-first lg:order-none">
+          <div class="pos-summary bg-base-100 p-5 space-y-3 flex-1 flex flex-col">
 
             {/* Client selector */}
             {canSelectClient && (
@@ -1607,14 +1666,14 @@ export default function Pos({ path }) {
 
             <div class="flex justify-between text-sm py-0.5">
               <span class="text-base-content/50">{t('subtotalHT')}</span>
-              <span class="font-mono font-medium">{totalHT.toFixed(2)}</span>
+              <span class="font-mono font-medium">{fmt(totalHT)}</span>
             </div>
 
             {/* VAT breakdown */}
             {Object.entries(vatBreakdown).map(([rate, amount]) => (
               <div key={rate} class="flex justify-between text-sm py-0.5">
                 <span class="text-base-content/50">{t('totalVAT')} {rate}%</span>
-                <span class="font-mono text-warning font-medium">{amount.toFixed(2)}</span>
+                <span class="font-mono text-warning font-medium">{fmt(amount)}</span>
               </div>
             ))}
             {totalVAT === 0 && (
@@ -1624,10 +1683,13 @@ export default function Pos({ path }) {
               </div>
             )}
 
+            {/* Spacer to push total to bottom */}
+            <div class="flex-1" />
+
             {/* ── Total TTC (gradient banner) ── */}
             <div class="pos-summary-total rounded-xl">
               <span class="pos-total-label">{t('totalTTC')}</span>
-              <span class={`pos-total-amount ${total < 0 ? 'text-red-200' : ''}`}>{total.toFixed(2)}</span>
+              <span class={`pos-total-amount ${total < 0 ? 'text-red-200' : ''}`}>{fmt(total)}</span>
             </div>
 
             <button
@@ -1652,7 +1714,11 @@ export default function Pos({ path }) {
             </button>
 
             {/* Selected line quick actions */}
-            {selectedKey && lines.find((l) => l._key === selectedKey) && (
+            {selectedKey && (() => {
+              const sel = lines.find((l) => l._key === selectedKey)
+              if (!sel) return null
+              const isReturn = sel.qty < 0
+              return (
               <div class="pos-quick-actions">
                 <button class="btn btn-sm btn-outline"
                   onClick={() => adjustQty(selectedKey, -1)}>
@@ -1662,13 +1728,19 @@ export default function Pos({ path }) {
                   onClick={() => adjustQty(selectedKey, 1)}>
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6" /></svg>
                 </button>
-                <button class="btn btn-sm btn-outline flex-[2]"
+                <button class={`btn btn-sm flex-1 ${isReturn ? 'btn-success' : 'btn-warning'}`}
+                  onClick={() => isReturn ? toggleSale(selectedKey) : toggleReturn(selectedKey)}>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>
+                  {isReturn ? t('sale') : t('returnSale')}
+                </button>
+                <button class="btn btn-sm btn-outline"
                   onClick={() => { const l = lines.find((x) => x._key === selectedKey); if (l) setEditingLine(l) }}>
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                   {t('editPrice')}
                 </button>
               </div>
-            )}
+              )
+            })()}
           </div>
         </div>
       </div>
@@ -1717,7 +1789,7 @@ export default function Pos({ path }) {
                     </p>
                   </div>
                   <div class="text-end shrink-0 ms-3">
-                    <p class="font-mono text-sm font-semibold">{((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0).toFixed(2)}</p>
+                    <p class="font-mono text-sm font-semibold">{fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}</p>
                     {!p.is_service && (
                       <p class={`text-xs ${p.qty_available <= p.qty_min ? 'text-warning' : 'text-base-content/40'}`}>
                         {t('qtyAvailable')}: {p.qty_available}
@@ -1819,7 +1891,7 @@ export default function Pos({ path }) {
                   <div class="text-end shrink-0 ms-3">
                     <p class="font-mono text-xs text-base-content/40">{c.code}</p>
                     {c.balance > 0 && (
-                      <p class="text-xs text-error font-mono">{c.balance.toFixed(2)}</p>
+                      <p class="text-xs text-error font-mono">{fmt(c.balance)}</p>
                     )}
                   </div>
                 </button>
@@ -1865,7 +1937,7 @@ export default function Pos({ path }) {
                   <div key={ticket.id} class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
                     <div class="min-w-0">
                       <p class="text-sm font-medium">
-                        {ticket.lines.length} {t('saleItems')} · <span class="font-mono font-bold">{ticket.total.toFixed(2)}</span>
+                        {ticket.lines.length} {t('saleItems')} · <span class="font-mono font-bold">{fmt(ticket.total)}</span>
                       </p>
                       <p class="text-xs text-base-content/50">
                         {ticket.client ? ticket.client.name + ' · ' : ''}
@@ -1943,7 +2015,7 @@ export default function Pos({ path }) {
                     >
                       <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
                       <span class="text-[11px] font-mono font-bold text-primary">
-                        {((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0).toFixed(2)}
+                        {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                       </span>
                     </button>
                   ))}
@@ -1998,7 +2070,7 @@ export default function Pos({ path }) {
                         >
                           <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
                           <span class={`text-[11px] font-mono font-bold ${fc ? 'text-white/80' : 'text-primary'}`}>
-                            {((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0).toFixed(2)}
+                            {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                           </span>
                         </button>
                       )
@@ -2028,7 +2100,7 @@ export default function Pos({ path }) {
                           >
                             <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
                             <span class={`text-[11px] font-mono font-bold ${pc ? 'text-white/80' : 'text-primary'}`}>
-                              {((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0).toFixed(2)}
+                              {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                             </span>
                           </button>
                         )
@@ -2055,7 +2127,7 @@ export default function Pos({ path }) {
                         >
                           <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
                           <span class="text-[11px] font-mono font-bold text-primary">
-                            {((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0).toFixed(2)}
+                            {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                           </span>
                         </button>
                       ))}
@@ -2156,25 +2228,25 @@ export default function Pos({ path }) {
               <div class="divider my-1"></div>
               <div class="flex justify-between">
                 <span class="text-base-content/60">{t('openingAmount')}</span>
-                <span class="font-semibold">{opening.toFixed(2)}</span>
+                <span class="font-semibold">{fmt(opening)}</span>
               </div>
               {caisseStats ? (<>
               <div class="flex justify-between">
                 <span class="text-base-content/60">{t('summSalesTotal')}</span>
-                <span class="font-semibold text-success">+{sales.toFixed(2)}</span>
+                <span class="font-semibold text-success">+{fmt(sales)}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-base-content/60">{t('summReturnsTotal')}</span>
-                <span class="font-semibold text-error">-{returns.toFixed(2)}</span>
+                <span class="font-semibold text-error">-{fmt(returns)}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-base-content/60">{t('summRetraitsTotal')}</span>
-                <span class="font-semibold text-warning">-{retraits.toFixed(2)}</span>
+                <span class="font-semibold text-warning">-{fmt(retraits)}</span>
               </div>
               <div class="divider my-1"></div>
               <div class="flex justify-between font-bold">
                 <span>{t('caisseExpectedAmount')}</span>
-                <span>{expected.toFixed(2)}</span>
+                <span>{fmt(expected)}</span>
               </div>
               </>) : (
               <div class="flex justify-center py-2">
@@ -2200,7 +2272,7 @@ export default function Pos({ path }) {
                 <div class="flex justify-between font-bold">
                   <span>{t('caisseDifference')}</span>
                   <span class={ecart >= 0 ? 'text-success' : 'text-error'}>
-                    {ecart >= 0 ? '+' : ''}{ecart.toFixed(2)}
+                    {ecart >= 0 ? '+' : ''}{fmt(ecart)}
                   </span>
                 </div>
               </div>
@@ -2232,7 +2304,7 @@ export default function Pos({ path }) {
         </dialog>
       )}
 
-      </>)}
+      </div>)}
     </div>
   )
 }
