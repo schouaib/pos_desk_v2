@@ -24,3 +24,4 @@ src-tauri/binaries/
 src-tauri/nsis-plugins/
 src-tauri/nsis/
 src-tauri/runtime-dlls/
+saas_pos/server
