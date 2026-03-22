@@ -31,9 +31,9 @@ func Load() {
 	App = Config{
 		AppHost:         getEnv("APP_HOST", "0.0.0.0"),
 		AppPort:         getEnv("APP_PORT", "3000"),
-		MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017"),
+		MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27099"),
 		MongoDB:         getEnv("MONGO_DB", "saas_pos"),
-		JWTSecret:       getEnv("JWT_SECRET", "kerty-pos-desktop-secret"),
+		JWTSecret:       requireEnv("JWT_SECRET"),
 		JWTExpiresIn:    dur,
 		TurnstileSecret: getEnv("TURNSTILE_SECRET", ""),
 		CORSOrigins:     getEnv("CORS_ORIGINS", "tauri://localhost,http://tauri.localhost,https://tauri.localhost,http://localhost:5180,http://localhost:5181"),

@@ -123,6 +123,35 @@ func NeedsSetup() (bool, error) {
 	return count == 0, nil
 }
 
+func ChangePassword(id string, newPassword string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return errors.New("invalid id")
+	}
+
+	if err := validate.Password(newPassword); err != nil {
+		return err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	_, err = col().UpdateOne(ctx,
+		bson.M{"_id": oid},
+		bson.M{"$set": bson.M{
+			"password":             string(hash),
+			"must_change_password": false,
+			"updated_at":           time.Now(),
+		}},
+	)
+	return err
+}
+
 func SetActive(id string, active bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"saas_pos/internal/database"
+	"saas_pos/internal/variant"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -37,6 +38,11 @@ func Create(tenantID string, input CreateInput) (*StockLoss, error) {
 
 	ctx := context.Background()
 
+	// Variant loss
+	if input.VariantID != "" {
+		return createVariantLoss(ctx, tenantID, tid, pid, input)
+	}
+
 	var product struct {
 		Name     string   `bson:"name"`
 		Barcodes []string `bson:"barcodes"`
@@ -66,6 +72,62 @@ func Create(tenantID string, input CreateInput) (*StockLoss, error) {
 		Qty:         input.Qty,
 		Remark:      input.Remark,
 		CreatedAt:   time.Now(),
+	}
+	_, err = col().InsertOne(ctx, loss)
+	return loss, err
+}
+
+func createVariantLoss(ctx context.Context, tenantID string, tid, pid primitive.ObjectID, input CreateInput) (*StockLoss, error) {
+	vid, err := primitive.ObjectIDFromHex(input.VariantID)
+	if err != nil {
+		return nil, errors.New("invalid variant_id")
+	}
+
+	v, err := variant.GetByID(tenantID, input.VariantID)
+	if err != nil {
+		return nil, errors.New("variant not found")
+	}
+
+	// Get parent product name
+	var product struct {
+		Name string `bson:"name"`
+	}
+	productCol().FindOne(ctx, bson.M{"_id": pid, "tenant_id": tid}).Decode(&product)
+
+	variantLabel := ""
+	for k, val := range v.Attributes {
+		if variantLabel != "" {
+			variantLabel += ", "
+		}
+		variantLabel += k + ": " + val
+	}
+
+	barcode := ""
+	if len(v.Barcodes) > 0 {
+		barcode = v.Barcodes[0]
+	}
+
+	// Decrement variant qty
+	database.Col("product_variants").UpdateOne(ctx,
+		bson.M{"_id": vid, "tenant_id": tid},
+		bson.M{"$inc": bson.M{"qty_available": -input.Qty}},
+	)
+
+	// Sync parent product qty
+	_ = variant.SyncParentStock(tenantID, pid)
+
+	loss := &StockLoss{
+		ID:           primitive.NewObjectID(),
+		TenantID:     tenantID,
+		ProductID:    pid,
+		VariantID:    &vid,
+		VariantLabel: variantLabel,
+		ProductName:  product.Name,
+		Barcode:      barcode,
+		Type:         input.Type,
+		Qty:          input.Qty,
+		Remark:       input.Remark,
+		CreatedAt:    time.Now(),
 	}
 	_, err = col().InsertOne(ctx, loss)
 	return loss, err

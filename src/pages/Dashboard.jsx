@@ -2,7 +2,7 @@ import { useState, useEffect } from 'preact/hooks'
 import { Layout } from '../components/Layout'
 import { SkeletonStats } from '../components/Skeleton'
 import { api } from '../lib/api'
-import { authUser, isTenantAdmin } from '../lib/auth'
+import { authUser, isTenantAdmin, mustChangePassword, setAuth } from '../lib/auth'
 import { useI18n } from '../lib/i18n'
 
 const Icon = ({ d, className = 'w-5 h-5' }) => (
@@ -82,8 +82,56 @@ export default function Dashboard({ path }) {
     },
   ]
 
+  const [showPwChange, setShowPwChange] = useState(mustChangePassword())
+  const [pwForm, setPwForm] = useState({ pw: '', confirm: '' })
+  const [pwError, setPwError] = useState('')
+  const [pwLoading, setPwLoading] = useState(false)
+
+  async function handlePwChange(e) {
+    e.preventDefault()
+    if (pwForm.pw !== pwForm.confirm) { setPwError(t('passwordMismatch') || 'Passwords do not match'); return }
+    setPwError(''); setPwLoading(true)
+    try {
+      await api.changePassword({ new_password: pwForm.pw })
+      const updated = { ...authUser.value, must_change_password: false }
+      setAuth(sessionStorage.getItem('tenant_token'), updated)
+      setShowPwChange(false)
+    } catch (err) { setPwError(err.message) }
+    finally { setPwLoading(false) }
+  }
+
   return (
     <Layout currentPath={path}>
+      {showPwChange && (
+        <div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
+          <div class="card w-full max-w-sm bg-base-100 shadow-xl">
+            <div class="card-body">
+              <h2 class="card-title text-lg font-bold text-warning">
+                {t('changePasswordRequired') || 'Change Password Required'}
+              </h2>
+              <p class="text-sm text-base-content/60 mb-2">
+                {t('defaultPasswordWarning') || 'You are using a default password. Please change it now for security.'}
+              </p>
+              {pwError && <div class="alert alert-error text-sm py-2 mb-2"><span>{pwError}</span></div>}
+              <form onSubmit={handlePwChange} class="space-y-3">
+                <label class="form-control">
+                  <span class="label-text text-sm">{t('newPassword') || 'New Password'}</span>
+                  <input type="password" class="input input-bordered input-sm"
+                    value={pwForm.pw} onInput={(e) => setPwForm({ ...pwForm, pw: e.target.value })} required minLength={8} autoFocus />
+                </label>
+                <label class="form-control">
+                  <span class="label-text text-sm">{t('confirmPassword') || 'Confirm Password'}</span>
+                  <input type="password" class="input input-bordered input-sm"
+                    value={pwForm.confirm} onInput={(e) => setPwForm({ ...pwForm, confirm: e.target.value })} required minLength={8} />
+                </label>
+                <button type="submit" class={`btn btn-warning btn-sm w-full ${pwLoading ? 'loading' : ''}`} disabled={pwLoading}>
+                  {t('changePassword') || 'Change Password'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
       <div class="page-enter">
         {/* Welcome */}
         <div class="flex items-center gap-3 mb-8">

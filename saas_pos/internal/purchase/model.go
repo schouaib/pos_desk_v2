@@ -14,21 +14,23 @@ const (
 )
 
 type PurchaseLine struct {
-	ProductID   primitive.ObjectID `bson:"product_id"   json:"product_id"`
-	ProductName string             `bson:"product_name" json:"product_name"`
-	Qty         float64            `bson:"qty"          json:"qty"`
-	ReceivedQty float64            `bson:"received_qty" json:"received_qty"`
-	PrixAchat   float64            `bson:"prix_achat"   json:"prix_achat"`
-	Remise      float64            `bson:"remise"       json:"remise"`
-	VAT         int                `bson:"vat"          json:"vat"`
-	TotalHT     float64            `bson:"total_ht"     json:"total_ht"`
-	TotalVAT    float64            `bson:"total_vat"    json:"total_vat"`
-	TotalTTC    float64            `bson:"total_ttc"    json:"total_ttc"`
-	PrixVente1  float64            `bson:"prix_vente_1" json:"prix_vente_1"`
-	PrixVente2  float64            `bson:"prix_vente_2" json:"prix_vente_2"`
-	PrixVente3  float64            `bson:"prix_vente_3" json:"prix_vente_3"`
-	Lot         string             `bson:"lot,omitempty" json:"lot,omitempty"`
-	ExpiryDate  *time.Time         `bson:"expiry_date,omitempty" json:"expiry_date,omitempty"`
+	ProductID         primitive.ObjectID  `bson:"product_id"                   json:"product_id"`
+	VariantID         *primitive.ObjectID `bson:"variant_id,omitempty"         json:"variant_id,omitempty"`
+	VariantAttributes map[string]string   `bson:"variant_attributes,omitempty" json:"variant_attributes,omitempty"`
+	ProductName       string              `bson:"product_name"                 json:"product_name"`
+	Qty               float64             `bson:"qty"                          json:"qty"`
+	ReceivedQty       float64             `bson:"received_qty"                 json:"received_qty"`
+	PrixAchat         float64             `bson:"prix_achat"                   json:"prix_achat"`
+	Remise            float64             `bson:"remise"                       json:"remise"`
+	VAT               int                 `bson:"vat"                          json:"vat"`
+	TotalHT           float64             `bson:"total_ht"                     json:"total_ht"`
+	TotalVAT          float64             `bson:"total_vat"                    json:"total_vat"`
+	TotalTTC          float64             `bson:"total_ttc"                    json:"total_ttc"`
+	PrixVente1        float64             `bson:"prix_vente_1"                 json:"prix_vente_1"`
+	PrixVente2        float64             `bson:"prix_vente_2"                 json:"prix_vente_2"`
+	PrixVente3        float64             `bson:"prix_vente_3"                 json:"prix_vente_3"`
+	Lot               string              `bson:"lot,omitempty"                json:"lot,omitempty"`
+	ExpiryDate        *time.Time          `bson:"expiry_date,omitempty"        json:"expiry_date,omitempty"`
 }
 
 // PurchaseExpense represents an additional cost on a purchase (shipping, customs, etc.)
@@ -69,6 +71,7 @@ type Purchase struct {
 
 type LineInput struct {
 	ProductID  string  `json:"product_id"`
+	VariantID  string  `json:"variant_id,omitempty"`
 	Qty        float64 `json:"qty"`
 	PrixAchat  float64 `json:"prix_achat"`
 	Remise     float64 `json:"remise"`
@@ -114,6 +117,7 @@ type ValidateInput struct {
 
 type ValidateLineInput struct {
 	ProductID   string  `json:"product_id"`
+	VariantID   string  `json:"variant_id,omitempty"`
 	ReceivedQty float64 `json:"received_qty"`
 }
 

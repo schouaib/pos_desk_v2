@@ -48,6 +48,24 @@ func HandleMe(c *fiber.Ctx) error {
 	})
 }
 
+// POST /api/tenant/auth/change-password  [any authenticated user]
+func HandleChangePassword(c *fiber.Ctx) error {
+	claims := middleware.GetClaims(c)
+	var body struct {
+		NewPassword string `json:"new_password"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return response.BadRequest(c, "invalid body")
+	}
+	if body.NewPassword == "" {
+		return response.BadRequest(c, "new_password is required")
+	}
+	if err := ChangePassword(claims.TenantID, claims.ID, body.NewPassword); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"updated": true})
+}
+
 // POST /api/tenant/users  [tenant_admin only]
 func HandleCreate(c *fiber.Ctx) error {
 	claims := middleware.GetClaims(c)
@@ -89,6 +107,24 @@ func HandleGetByID(c *fiber.Ctx) error {
 		return response.NotFound(c, err.Error())
 	}
 	return response.OK(c, u)
+}
+
+// PATCH /api/tenant/users/:id/password  [tenant_admin only — reset any user's password]
+func HandleResetPassword(c *fiber.Ctx) error {
+	claims := middleware.GetClaims(c)
+	var body struct {
+		NewPassword string `json:"new_password"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return response.BadRequest(c, "invalid body")
+	}
+	if body.NewPassword == "" {
+		return response.BadRequest(c, "new_password is required")
+	}
+	if err := ChangePassword(claims.TenantID, c.Params("id"), body.NewPassword); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"updated": true})
 }
 
 // PUT /api/tenant/users/:id  [tenant_admin only]

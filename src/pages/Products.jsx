@@ -6,8 +6,9 @@ import { Modal, openModal, closeModal } from '../components/Modal'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 import { hasPerm, hasFeature } from '../lib/auth'
-import { getServerUrl } from '../lib/config'
+import { getServerUrl, isWindows } from '../lib/config'
 import { compressImage } from '../lib/imageCompress'
+import { toast } from '../components/Toast'
 
 const PRINT_MODAL_ID = 'print-label-modal'
 const PrintLabelModal = lazy(() =>
@@ -20,6 +21,8 @@ const emptyForm = {
   prix_achat: 0, prix_vente_1: 0, prix_vente_2: 0, prix_vente_3: 0, prix_minimum: 0,
   vat: 0,
   is_service: false, expiry_alert_days: 0, image_url: '',
+  is_weighable: false, lfcode: 0, weight_unit: 4, tare: 0, shelf_life: 0,
+  package_type: 0, package_weight: 0, scale_deptment: 0,
 }
 
 function NumInput({ label, value, onChange }) {
@@ -34,7 +37,7 @@ function NumInput({ label, value, onChange }) {
 }
 
 export default function Products({ path }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const canAdd      = hasPerm('products', 'add')
   const canEdit     = hasPerm('products', 'edit')
   const canDelete   = hasPerm('products', 'delete')
@@ -51,6 +54,7 @@ export default function Products({ path }) {
   const canDiscounts   = hasFeature('product_discounts')
   const canBundles     = hasFeature('product_bundles')
   const canBatches     = hasFeature('batch_tracking')
+  const canScale       = hasFeature('scale') && isWindows
 
   const [storeName, setStoreName] = useState('')
   const [defaultSalePrice, setDefaultSalePrice] = useState(1)
@@ -79,8 +83,12 @@ export default function Products({ path }) {
 
   // Stock movements
   const [movTarget, setMovTarget] = useState(null)
-  const [movResult, setMovResult] = useState({ items: [], total: 0, page: 1, limit: 20, pages: 1 })
+  const [movAllItems, setMovAllItems] = useState([])
   const [movPage, setMovPage] = useState(1)
+  const MOV_PER_PAGE = 10
+  const movPages = Math.max(1, Math.ceil(movAllItems.length / MOV_PER_PAGE))
+  const movItems = movAllItems.slice((movPage - 1) * MOV_PER_PAGE, movPage * MOV_PER_PAGE)
+
   const [movLoading, setMovLoading] = useState(false)
   const [movDateFrom, setMovDateFrom] = useState('')
   const [movDateTo, setMovDateTo] = useState('')
@@ -106,7 +114,13 @@ export default function Products({ path }) {
   // Plan-gated features state
   const [variantTarget, setVariantTarget] = useState(null)
   const [variantItems, setVariantItems] = useState([])
-  const [variantForm, setVariantForm] = useState({ attributes: '', barcodes: '', qty_available: 0, prix_achat: 0, prix_vente_1: 0, prix_vente_2: 0, prix_vente_3: 0 })
+  const [variantForm, setVariantForm] = useState({ attrPairs: [{ key: '', value: '' }], barcodes: '', qty_available: 0, prix_achat: 0, prix_vente_1: 0, prix_vente_2: 0, prix_vente_3: 0 })
+  const [editingVariant, setEditingVariant] = useState(null) // variant being edited
+  const [variantFormOpen, setVariantFormOpen] = useState(false)
+  const [variantLossTarget, setVariantLossTarget] = useState(null) // variant for loss
+  const [variantLossForm, setVariantLossForm] = useState({ type: 'perte', qty: 1, remark: '' })
+  const [variantAdjTarget, setVariantAdjTarget] = useState(null) // variant for adjust
+  const [variantAdjForm, setVariantAdjForm] = useState({ qty_after: 0, reason: '' })
   const [discountTarget, setDiscountTarget] = useState(null)
   const [discountItems, setDiscountItems] = useState([])
   const [discountForm, setDiscountForm] = useState({ type: 'percentage', value: 0, min_qty: 0, start_date: '', end_date: '' })
@@ -177,6 +191,14 @@ export default function Products({ path }) {
       is_service: p.is_service,
       expiry_alert_days: p.expiry_alert_days || 0,
       image_url: p.image_url || '',
+      is_weighable: p.is_weighable || false,
+      lfcode: p.lfcode || 0,
+      weight_unit: p.weight_unit ?? 4,
+      tare: p.tare || 0,
+      shelf_life: p.shelf_life || 0,
+      package_type: p.package_type || 0,
+      package_weight: p.package_weight || 0,
+      scale_deptment: p.scale_deptment || 0,
     })
     setBarcodeInput('')
     setError('')
@@ -239,7 +261,15 @@ export default function Products({ path }) {
       closeModal('product-modal')
       load()
     } catch (err) {
-      setError(err.message)
+      const msg = err.message || ''
+      if (msg === 'product_limit' || msg.includes('product limit')) {
+        setError(t('errProductLimit'))
+        toast.error(t('errProductLimit'))
+      } else if (msg === 'plan_expired') {
+        setError(t('errPlanExpired'))
+      } else {
+        setError(msg)
+      }
     } finally {
       setLoading(false)
     }
@@ -248,32 +278,32 @@ export default function Products({ path }) {
   async function openMovements(p) {
     setMovTarget(p)
     setMovPage(1)
-    setMovDateFrom('')
-    setMovDateTo('')
-    setMovResult({ items: [], total: 0, page: 1, limit: 20, pages: 1 })
+    const now = new Date()
+    const from30 = new Date(now)
+    from30.setDate(from30.getDate() - 30)
+    const df = from30.toISOString().slice(0, 10)
+    const dt = now.toISOString().slice(0, 10)
+    setMovDateFrom(df)
+    setMovDateTo(dt)
+    setMovAllItems([])
     setMovLoading(true)
     document.getElementById('mov-dialog')?.showModal()
     try {
-      const data = await api.listProductMovements(p.id, { page: 1, limit: 20 })
-      setMovResult(data)
-    } catch {} finally { setMovLoading(false) }
-  }
-
-  async function loadMovPage(p, pg, dateFrom, dateTo) {
-    setMovPage(pg)
-    setMovLoading(true)
-    try {
-      const params = { page: pg, limit: 20 }
-      if (dateFrom) params.date_from = dateFrom
-      if (dateTo) params.date_to = dateTo
-      const data = await api.listProductMovements(p.id, params)
-      setMovResult(data)
+      const data = await api.listProductMovements(p.id, { limit: 10000, date_from: df, date_to: dt })
+      setMovAllItems(data.items || [])
     } catch {} finally { setMovLoading(false) }
   }
 
   async function applyMovFilter() {
-    await loadMovPage(movTarget, 1, movDateFrom, movDateTo)
     setMovPage(1)
+    setMovLoading(true)
+    try {
+      const params = { limit: 10000 }
+      if (movDateFrom) params.date_from = movDateFrom
+      if (movDateTo) params.date_to = movDateTo
+      const data = await api.listProductMovements(movTarget.id, params)
+      setMovAllItems(data.items || [])
+    } catch {} finally { setMovLoading(false) }
   }
 
   function openLoss(p) {
@@ -328,7 +358,7 @@ export default function Products({ path }) {
 
   // Duplicate
   async function handleDuplicate(p) {
-    try { await api.duplicateProduct(p.id); load() } catch (err) { console.error('Duplicate failed:', err.message) }
+    try { await api.duplicateProduct(p.id); load() } catch (err) { alert(err.message) }
   }
 
   // Archive / Unarchive
@@ -350,24 +380,96 @@ export default function Products({ path }) {
   }
 
   // Variants
+  function newVariantForm(product) {
+    return { attrPairs: [{ key: '', value: '' }], barcodes: '', qty_available: 0, prix_achat: product?.prix_achat || 0, prix_vente_1: product?.prix_vente_1 || 0, prix_vente_2: product?.prix_vente_2 || 0, prix_vente_3: product?.prix_vente_3 || 0 }
+  }
+  const emptyVariantForm = { attrPairs: [{ key: '', value: '' }], barcodes: '', qty_available: 0, prix_achat: 0, prix_vente_1: 0, prix_vente_2: 0, prix_vente_3: 0 }
   async function openVariants(p) {
     setVariantTarget(p)
+    setVariantFormOpen(false)
+    setEditingVariant(null)
+    setVariantForm(newVariantForm(p))
     try { setVariantItems(await api.listVariants(p.id)) } catch { setVariantItems([]) }
     document.getElementById('variant-dialog')?.showModal()
+  }
+  function buildVariantPayload() {
+    const attrs = {}
+    variantForm.attrPairs.forEach(({ key, value }) => { const k = key.trim(); const v = value.trim(); if (k && v) attrs[k] = v })
+    const barcodes = variantForm.barcodes ? variantForm.barcodes.split(',').map(s => s.trim()).filter(Boolean) : []
+    return { attributes: attrs, barcodes, qty_available: variantForm.qty_available, prix_achat: variantForm.prix_achat, prix_vente_1: variantForm.prix_vente_1, prix_vente_2: variantForm.prix_vente_2, prix_vente_3: variantForm.prix_vente_3 }
   }
   async function addVariant(e) {
     e.preventDefault()
     try {
-      const attrs = {}
-      variantForm.attributes.split(',').forEach(s => { const [k, v] = s.split(':').map(x => x.trim()); if (k && v) attrs[k] = v })
-      const barcodes = variantForm.barcodes ? variantForm.barcodes.split(',').map(s => s.trim()).filter(Boolean) : []
-      await api.createVariant(variantTarget.id, { attributes: attrs, barcodes, qty_available: variantForm.qty_available, prix_achat: variantForm.prix_achat, prix_vente_1: variantForm.prix_vente_1, prix_vente_2: variantForm.prix_vente_2, prix_vente_3: variantForm.prix_vente_3 })
+      await api.createVariant(variantTarget.id, buildVariantPayload())
       setVariantItems(await api.listVariants(variantTarget.id))
-      setVariantForm({ attributes: '', barcodes: '', qty_available: 0, prix_achat: 0, prix_vente_1: 0, prix_vente_2: 0, prix_vente_3: 0 })
+      setVariantForm(newVariantForm(variantTarget))
+      setVariantFormOpen(false)
+      load() // refresh product list to update synced qty
     } catch {}
   }
+  function startEditVariant(v) {
+    const pairs = v.attributes ? Object.entries(v.attributes).map(([k, val]) => ({ key: k, value: val })) : [{ key: '', value: '' }]
+    if (pairs.length === 0) pairs.push({ key: '', value: '' })
+    setEditingVariant(v.id)
+    setVariantFormOpen(true)
+    setVariantForm({
+      attrPairs: pairs,
+      barcodes: v.barcodes ? v.barcodes.join(', ') : '',
+      qty_available: v.qty_available || 0,
+      prix_achat: v.prix_achat || 0,
+      prix_vente_1: v.prix_vente_1 || 0,
+      prix_vente_2: v.prix_vente_2 || 0,
+      prix_vente_3: v.prix_vente_3 || 0,
+    })
+  }
+  async function saveEditVariant(e) {
+    e.preventDefault()
+    if (!editingVariant) return
+    try {
+      await api.updateVariant(editingVariant, { ...buildVariantPayload(), is_active: true })
+      setVariantItems(await api.listVariants(variantTarget.id))
+      setEditingVariant(null)
+      setVariantForm(newVariantForm(variantTarget))
+      setVariantFormOpen(false)
+      load() // refresh product list to update synced qty
+    } catch {}
+  }
+  function cancelEditVariant() {
+    setEditingVariant(null)
+    setVariantForm(newVariantForm(variantTarget))
+    setVariantFormOpen(false)
+  }
   async function deleteVariant(id) {
-    try { await api.deleteVariant(id); setVariantItems(await api.listVariants(variantTarget.id)) } catch {}
+    try { await api.deleteVariant(id); setVariantItems(await api.listVariants(variantTarget.id)); load() } catch {}
+  }
+  function addAttrPair() { setVariantForm({ ...variantForm, attrPairs: [...variantForm.attrPairs, { key: '', value: '' }] }) }
+  function removeAttrPair(i) { setVariantForm({ ...variantForm, attrPairs: variantForm.attrPairs.filter((_, idx) => idx !== i) }) }
+  function updateAttrPair(i, field, val) { const pairs = [...variantForm.attrPairs]; pairs[i] = { ...pairs[i], [field]: val }; setVariantForm({ ...variantForm, attrPairs: pairs }) }
+
+  // Variant loss
+  function openVariantLoss(v) { setVariantLossTarget(v); setVariantLossForm({ type: 'perte', qty: 1, remark: '' }) }
+  async function submitVariantLoss(e) {
+    e.preventDefault()
+    if (!variantLossTarget || !variantTarget) return
+    try {
+      await api.createLoss({ product_id: variantTarget.id, variant_id: variantLossTarget.id, ...variantLossForm })
+      setVariantItems(await api.listVariants(variantTarget.id))
+      setVariantLossTarget(null)
+      load()
+    } catch {}
+  }
+  // Variant adjust
+  function openVariantAdj(v) { setVariantAdjTarget(v); setVariantAdjForm({ qty_after: v.qty_available, reason: '' }) }
+  async function submitVariantAdj(e) {
+    e.preventDefault()
+    if (!variantAdjTarget || !variantTarget) return
+    try {
+      await api.createAdjustment({ product_id: variantTarget.id, variant_id: variantAdjTarget.id, ...variantAdjForm })
+      setVariantItems(await api.listVariants(variantTarget.id))
+      setVariantAdjTarget(null)
+      load()
+    } catch {}
   }
 
   // Discounts
@@ -489,7 +591,7 @@ export default function Products({ path }) {
       </div>
 
       <div class="card bg-base-100 shadow">
-        <div class="overflow-x-auto overflow-y-auto max-h-[70vh]">
+        <div class="overflow-x-auto overflow-y-auto" style="max-height: calc(100vh - 280px); min-height: 320px">
         <table class="table table-sm w-full">
           <thead class="bg-base-200/60 sticky top-0 z-10">
             <tr>
@@ -522,6 +624,7 @@ export default function Products({ path }) {
                         {p.ref && <span class="text-[10px] text-base-content/40">ref: {p.ref}</span>}
                         {useVAT && p.vat > 0 && <span class="badge badge-warning gap-0 text-[9px] px-1 py-0 h-3.5">{p.vat}%</span>}
                         {p.is_service && <span class="badge badge-outline gap-0 text-[9px] px-1 py-0 h-3.5">{t('isService')}</span>}
+                        {canScale && p.is_weighable && <span class="badge badge-info badge-outline gap-0 text-[9px] px-1 py-0 h-3.5">{t('weighable')}</span>}
                       </div>
                     </div>
                   </div>
@@ -539,7 +642,10 @@ export default function Products({ path }) {
                 <td class="px-3 py-2 text-end">
                   {p.is_service
                     ? <span class="text-base-content/30">—</span>
-                    : <span class={`text-sm font-medium tabular-nums ${p.qty_available <= (p.qty_min || 0) && p.qty_available > 0 ? 'text-warning' : ''} ${p.qty_available <= 0 ? 'text-error' : ''}`}>{p.qty_available}</span>
+                    : <div class="flex flex-col items-end">
+                        <span class={`text-sm font-medium tabular-nums ${p.qty_available <= (p.qty_min || 0) && p.qty_available > 0 ? 'text-warning' : ''} ${p.qty_available <= 0 ? 'text-error' : ''}`}>{p.qty_available}</span>
+                        {p.has_variants && <span class="text-[9px] text-primary/50">{t('variants')}</span>}
+                      </div>
                   }
                 </td>
                 {/* Prix achat */}
@@ -581,14 +687,14 @@ export default function Products({ path }) {
                       </div>
                     )}
                     {/* More actions dropdown */}
-                    <div class={`dropdown dropdown-end ${_idx >= items.length - 2 ? 'dropdown-top' : ''}`}>
+                    <div class={`dropdown dropdown-end ${_idx >= items.length - 2 && items.length > 2 ? 'dropdown-top' : ''}`}>
                       <label tabIndex={0} class="btn btn-xs btn-ghost btn-square">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5zM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5zM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z" />
                         </svg>
                       </label>
                       <ul tabIndex={0} class="dropdown-content menu menu-sm bg-base-100 rounded-lg shadow-lg border border-base-200 w-48 z-50 p-1">
-                        {canLoss && (
+                        {canLoss && !p.has_variants && (
                           <li><a onClick={() => openLoss(p)} class="text-warning text-xs gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" /></svg>
                             {t('recordLoss')}
@@ -600,7 +706,7 @@ export default function Products({ path }) {
                             {t('stockMovements')}
                           </a></li>
                         )}
-                        {canAdjust && !p.is_service && (
+                        {canAdjust && !p.is_service && !p.has_variants && (
                           <li><a onClick={() => openAdjust(p)} class="text-xs gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></svg>
                             {t('adjustStock')}
@@ -693,7 +799,7 @@ export default function Products({ path }) {
       {/* Create / Edit Modal */}
       <Modal id="product-modal" title={editing ? t('editProduct') : t('newProductTitle')} size="xl">
         {/* Step indicator */}
-        <div class="flex items-center mb-6 bg-base-200/60 rounded-xl p-1.5 gap-1">
+        <div class="flex items-center mb-4 bg-base-200/60 rounded-lg p-1 gap-1">
           {[
             { label: t('basicInfo'), icon: <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg> },
             { label: t('pricing'), icon: <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg> },
@@ -720,31 +826,31 @@ export default function Products({ path }) {
         <form onSubmit={handleSubmit}>
           {/* Tab 0: Basic Info */}
           {tab === 0 && (
-            <div class="space-y-5">
+            <div class="space-y-3">
               {/* Product name + image side by side */}
-              <div class="flex gap-4 items-start">
-                <div class="flex-1 space-y-3">
-                  <label class="form-control">
-                    <span class="label-text text-xs font-semibold">{t('productName')} *</span>
+              <div class="flex gap-3 items-start">
+                <div class="flex-1 space-y-2">
+                  <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-base-content/50 mb-0.5">{t('productName')} *</span>
                     <input class="input input-bordered input-sm" value={form.name} required
                       onInput={(e) => setForm({ ...form, name: e.target.value })} />
-                  </label>
+                  </div>
                   <div class="grid grid-cols-2 gap-2">
-                    <label class="form-control">
-                      <span class="label-text text-xs">{t('ref')}</span>
+                    <div class="flex flex-col">
+                      <span class="text-xs text-base-content/50 mb-0.5">{t('ref')}</span>
                       <input class="input input-bordered input-sm" value={form.ref}
                         onInput={(e) => setForm({ ...form, ref: e.target.value })} />
-                    </label>
-                    <label class="form-control">
-                      <span class="label-text text-xs">{t('abbreviation')}</span>
+                    </div>
+                    <div class="flex flex-col">
+                      <span class="text-xs text-base-content/50 mb-0.5">{t('abbreviation')}</span>
                       <input class="input input-bordered input-sm" value={form.abbreviation}
                         onInput={(e) => setForm({ ...form, abbreviation: e.target.value })} />
-                    </label>
+                    </div>
                   </div>
                 </div>
                 {/* Image */}
-                <div class="shrink-0 flex flex-col items-center gap-1.5">
-                  <div class="w-24 h-24 rounded-xl border-2 border-dashed border-base-300 flex items-center justify-center overflow-hidden bg-base-200 transition-colors hover:border-primary/40">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                  <div class="w-20 h-20 rounded-lg border-2 border-dashed border-base-300 flex items-center justify-center overflow-hidden bg-base-200 transition-colors hover:border-primary/40">
                     {(imagePreview || form.image_url)
                       ? <img src={imagePreview || form.image_url} alt="product" class="w-full h-full object-cover" />
                       : <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" /></svg>
@@ -764,11 +870,11 @@ export default function Products({ path }) {
               </div>
 
               {/* Classification */}
-              <div class="bg-base-200/50 rounded-xl p-3 space-y-2">
-                <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">{t('categoriesPage')} / {t('brandsPage')} / {t('unitsPage')}</p>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <label class="form-control">
-                    <span class="label-text text-xs">{t('categoriesPage')}</span>
+              <div class="bg-base-200/50 rounded-lg p-2.5">
+                <p class="text-[10px] font-semibold text-base-content/40 uppercase tracking-wide mb-1.5">{t('categoriesPage')} / {t('brandsPage')} / {t('unitsPage')}</p>
+                <div class="grid grid-cols-3 gap-2">
+                  <div class="flex flex-col">
+                    <span class="text-xs text-base-content/50 mb-0.5">{t('categoriesPage')}</span>
                     <select class="select select-bordered select-sm" value={form.category_id}
                       onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
                       <option value="">{t('selectCategory')}</option>
@@ -776,9 +882,9 @@ export default function Products({ path }) {
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
-                  </label>
-                  <label class="form-control">
-                    <span class="label-text text-xs">{t('brandsPage')}</span>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="text-xs text-base-content/50 mb-0.5">{t('brandsPage')}</span>
                     <select class="select select-bordered select-sm" value={form.brand_id}
                       onChange={(e) => setForm({ ...form, brand_id: e.target.value })}>
                       <option value="">{t('selectBrand')}</option>
@@ -786,9 +892,9 @@ export default function Products({ path }) {
                         <option key={b.id} value={b.id}>{b.name}</option>
                       ))}
                     </select>
-                  </label>
-                  <label class="form-control">
-                    <span class="label-text text-xs">{t('unitsPage')}</span>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="text-xs text-base-content/50 mb-0.5">{t('unitsPage')}</span>
                     <select class="select select-bordered select-sm" value={form.unit_id}
                       onChange={(e) => setForm({ ...form, unit_id: e.target.value })}>
                       <option value="">{t('selectUnit')}</option>
@@ -796,13 +902,13 @@ export default function Products({ path }) {
                         <option key={u.id} value={u.id}>{u.name}</option>
                       ))}
                     </select>
-                  </label>
+                  </div>
                 </div>
               </div>
 
               {/* Barcodes */}
-              <div class="bg-base-200/50 rounded-xl p-3 space-y-2">
-                <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">{t('barcodes')}</p>
+              <div class="bg-base-200/50 rounded-lg p-2.5 space-y-1.5">
+                <p class="text-[10px] font-semibold text-base-content/40 uppercase tracking-wide">{t('barcodes')}</p>
                 <div class="flex gap-1">
                   <input class="input input-bordered input-sm flex-1" value={barcodeInput}
                     placeholder={t('addBarcode')}
@@ -837,6 +943,13 @@ export default function Products({ path }) {
                     onChange={(e) => setForm({ ...form, is_service: e.target.checked })} />
                   <span class="text-sm">{t('isService')}</span>
                 </label>
+                {canScale && (
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" class="checkbox checkbox-sm checkbox-info" checked={form.is_weighable || false}
+                      onChange={(e) => setForm({ ...form, is_weighable: e.target.checked })} />
+                    <span class="text-sm">{t('weighable')}</span>
+                  </label>
+                )}
                 {canBundles && (
                   <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" class="checkbox checkbox-sm checkbox-accent" checked={form.is_bundle || false}
@@ -853,6 +966,62 @@ export default function Products({ path }) {
                   </div>
                 )}
               </div>
+
+              {/* Scale (weighable product) — only on Windows with scale feature */}
+              {canScale && form.is_weighable && (
+                <div class="border border-info/30 rounded-xl p-3 space-y-2">
+                  <p class="text-xs font-semibold text-info">{t('scaleSettings')}</p>
+                  <div class="grid grid-cols-2 gap-2">
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('lfcode')}</span>
+                      <input type="number" min="1" max="999999" class="input input-bordered input-xs"
+                        value={form.lfcode || ''} onInput={(e) => setForm({ ...form, lfcode: parseInt(e.target.value) || 0 })} />
+                    </label>
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('weightUnit')}</span>
+                      <select class="select select-bordered select-xs" value={form.weight_unit}
+                        onChange={(e) => setForm({ ...form, weight_unit: parseInt(e.target.value) })}>
+                        <option value={4}>Kg</option>
+                        <option value={1}>g</option>
+                        <option value={5}>oz</option>
+                        <option value={6}>Lb</option>
+                        <option value={9}>PCS (g)</option>
+                        <option value={10}>PCS (Kg)</option>
+                      </select>
+                    </label>
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('tare')}</span>
+                      <input type="number" step="0.001" min="0" class="input input-bordered input-xs"
+                        value={form.tare || ''} onInput={(e) => setForm({ ...form, tare: parseFloat(e.target.value) || 0 })} />
+                    </label>
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('shelfLife')}</span>
+                      <input type="number" min="0" max="365" class="input input-bordered input-xs"
+                        value={form.shelf_life || ''} onInput={(e) => setForm({ ...form, shelf_life: parseInt(e.target.value) || 0 })} />
+                    </label>
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('packageType')}</span>
+                      <select class="select select-bordered select-xs" value={form.package_type}
+                        onChange={(e) => setForm({ ...form, package_type: parseInt(e.target.value) })}>
+                        <option value={0}>{t('pkgNormal')}</option>
+                        <option value={1}>{t('pkgFixedWeight')}</option>
+                        <option value={2}>{t('pkgPricing')}</option>
+                        <option value={3}>{t('pkgFixedPrice')}</option>
+                      </select>
+                    </label>
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('packageWeight')}</span>
+                      <input type="number" step="0.001" min="0" class="input input-bordered input-xs"
+                        value={form.package_weight || ''} onInput={(e) => setForm({ ...form, package_weight: parseFloat(e.target.value) || 0 })} />
+                    </label>
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('scaleDeptment')}</span>
+                      <input type="number" min="0" max="99" class="input input-bordered input-xs"
+                        value={form.scale_deptment || ''} onInput={(e) => setForm({ ...form, scale_deptment: parseInt(e.target.value) || 0 })} />
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* Bundle composition */}
               {canBundles && form.is_bundle && (
@@ -1036,38 +1205,37 @@ export default function Products({ path }) {
       <dialog id="loss-dialog" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box">
           <h3 class="font-bold text-lg mb-1">{t('recordLoss')}</h3>
-          <p class="text-sm text-base-content/60 mb-4">{lossTarget?.name}</p>
+          <p class="text-sm text-base-content/60 mb-3">{lossTarget?.name}</p>
 
           {lossError && (
             <div class="alert alert-error text-sm py-2 mb-3"><span>{lossError}</span></div>
           )}
 
-          <form onSubmit={handleLoss} class="space-y-3">
-            <label class="form-control">
-              <span class="label-text text-xs">{t('lossType')}</span>
-              <select class="select select-bordered select-sm" value={lossForm.type}
-                onChange={(e) => setLossForm({ ...lossForm, type: e.target.value })}>
-                <option value="perte">{t('lossPerte')}</option>
-                <option value="casse">{t('lossCasse')}</option>
-                <option value="vol">{t('lossVol')}</option>
-              </select>
-            </label>
-
-            <label class="form-control">
-              <span class="label-text text-xs">{t('lossQty')}</span>
-              <input type="number" min="1" step="1" class="input input-bordered input-sm"
-                value={lossForm.qty}
-                onInput={(e) => setLossForm({ ...lossForm, qty: parseInt(e.target.value) || 1 })} />
-            </label>
-
-            <label class="form-control">
-              <span class="label-text text-xs">{t('lossRemark')}</span>
+          <form onSubmit={handleLoss}>
+            <div class="flex gap-3 mb-3">
+              <div class="flex flex-col flex-1">
+                <span class="text-xs text-base-content/50 mb-0.5">{t('lossType')}</span>
+                <select class="select select-bordered select-sm" value={lossForm.type}
+                  onChange={(e) => setLossForm({ ...lossForm, type: e.target.value })}>
+                  <option value="perte">{t('lossPerte')}</option>
+                  <option value="casse">{t('lossCasse')}</option>
+                  <option value="vol">{t('lossVol')}</option>
+                </select>
+              </div>
+              <div class="flex flex-col w-28">
+                <span class="text-xs text-base-content/50 mb-0.5">{t('lossQty')}</span>
+                <input type="number" min="1" step="1" class="input input-bordered input-sm"
+                  value={lossForm.qty}
+                  onInput={(e) => setLossForm({ ...lossForm, qty: parseInt(e.target.value) || 1 })} />
+              </div>
+            </div>
+            <div class="flex flex-col mb-3">
+              <span class="text-xs text-base-content/50 mb-0.5">{t('lossRemark')}</span>
               <textarea class="textarea textarea-bordered textarea-sm resize-none" rows={2}
-                value={lossForm.remark}
+                value={lossForm.remark} placeholder={t('lossRemark')}
                 onInput={(e) => setLossForm({ ...lossForm, remark: e.target.value })} />
-            </label>
-
-            <div class="modal-action mt-4">
+            </div>
+            <div class="modal-action">
               <button type="button" class="btn btn-sm btn-ghost"
                 onClick={() => document.getElementById('loss-dialog')?.close()}>
                 {t('back')}
@@ -1091,18 +1259,30 @@ export default function Products({ path }) {
       <dialog id="adj-dialog" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box">
           <h3 class="font-bold text-lg mb-1">{t('adjustStock')}</h3>
-          <p class="text-sm text-base-content/60 mb-2">{adjTarget?.name} — {t('qtyBefore')}: {adjTarget?.qty_available}</p>
-          <form onSubmit={handleAdjust} class="space-y-3">
-            <label class="form-control">
-              <span class="label-text text-xs">{t('qtyAfter')}</span>
-              <input type="number" step="any" class="input input-bordered input-sm" value={adjForm.qty_after}
-                onInput={(e) => setAdjForm({ ...adjForm, qty_after: parseFloat(e.target.value) || 0 })} />
-            </label>
-            <label class="form-control">
-              <span class="label-text text-xs">{t('reason')}</span>
+          <p class="text-sm text-base-content/60 mb-3">{adjTarget?.name}</p>
+          <form onSubmit={handleAdjust}>
+            <div class="flex gap-3 items-center mb-3">
+              <div class="flex flex-col flex-1">
+                <span class="text-xs text-base-content/50 mb-0.5">{t('qtyBefore')}</span>
+                <input type="text" class="input input-bordered input-sm bg-base-200" value={adjTarget?.qty_available ?? 0} disabled />
+              </div>
+              <div class={`flex items-center pt-4 text-base-content/30 ${lang === 'ar' ? 'rotate-180' : ''}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </div>
+              <div class="flex flex-col flex-1">
+                <span class="text-xs text-base-content/50 mb-0.5">{t('qtyAfter')}</span>
+                <input type="number" step="any" class="input input-bordered input-sm" value={adjForm.qty_after}
+                  onInput={(e) => setAdjForm({ ...adjForm, qty_after: parseFloat(e.target.value) || 0 })} />
+              </div>
+            </div>
+            <div class="flex flex-col mb-3">
+              <span class="text-xs text-base-content/50 mb-0.5">{t('reason')}</span>
               <textarea class="textarea textarea-bordered textarea-sm resize-none" rows={2} value={adjForm.reason}
+                placeholder={t('reason')}
                 onInput={(e) => setAdjForm({ ...adjForm, reason: e.target.value })} />
-            </label>
+            </div>
             <div class="modal-action">
               <button type="button" class="btn btn-sm btn-ghost" onClick={() => document.getElementById('adj-dialog')?.close()}>{t('back')}</button>
               <button type="submit" class={`btn btn-secondary btn-sm ${adjLoading ? 'loading' : ''}`} disabled={adjLoading}>{t('adjustStock')}</button>
@@ -1114,37 +1294,81 @@ export default function Products({ path }) {
 
       {/* Valuation dialog */}
       <dialog id="valuation-dialog" class="modal modal-bottom sm:modal-middle">
-        <div class="modal-box">
-          <h3 class="font-bold text-lg mb-3">{t('valuation')}</h3>
+        <div class="modal-box w-full sm:max-w-md p-0 overflow-hidden">
+          {/* Header */}
+          <div class="bg-primary/5 px-6 pt-5 pb-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+              <h3 class="font-bold text-lg">{t('valuation')}</h3>
+            </div>
+            <form method="dialog">
+              <button class="btn btn-sm btn-ghost btn-square opacity-60 hover:opacity-100">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </form>
+          </div>
+          {/* Body */}
           {valuationData && (
-            <div class="stats stats-vertical shadow w-full">
-              <div class="stat"><div class="stat-title">{t('totalValue')}</div><div class="stat-value text-primary">{valuationData.total_value?.toFixed(2)}</div></div>
-              <div class="stat"><div class="stat-title">{t('totalQty')}</div><div class="stat-value">{valuationData.total_qty}</div></div>
-              <div class="stat"><div class="stat-title">{t('productCount')}</div><div class="stat-value">{valuationData.product_count}</div></div>
+            <div class="px-6 py-5 space-y-4">
+              {/* Total Value */}
+              <div class="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <div class="text-xs font-medium uppercase tracking-wider text-base-content/50 mb-1">{t('totalValue')}</div>
+                <div class="text-3xl font-extrabold text-primary tabular-nums">{Number(valuationData.total_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+              {/* Qty + Count row */}
+              <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-xl border border-base-300 bg-base-200/40 p-4">
+                  <div class="text-xs font-medium uppercase tracking-wider text-base-content/50 mb-1">{t('totalQty')}</div>
+                  <div class="text-2xl font-bold tabular-nums">{Number(valuationData.total_qty || 0).toLocaleString()}</div>
+                </div>
+                <div class="rounded-xl border border-base-300 bg-base-200/40 p-4">
+                  <div class="text-xs font-medium uppercase tracking-wider text-base-content/50 mb-1">{t('productCount')}</div>
+                  <div class="text-2xl font-bold tabular-nums">{Number(valuationData.product_count || 0).toLocaleString()}</div>
+                </div>
+              </div>
             </div>
           )}
-          <div class="modal-action"><form method="dialog"><button class="btn btn-sm btn-ghost">{t('back')}</button></form></div>
+          {!valuationData && (
+            <div class="px-6 py-10 flex justify-center"><span class="loading loading-spinner loading-md text-primary" /></div>
+          )}
         </div>
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
       </dialog>
 
       {/* Price History dialog */}
       <dialog id="pricehist-dialog" class="modal modal-bottom sm:modal-middle">
-        <div class="modal-box w-full sm:max-w-2xl">
+        <div class="modal-box w-full sm:max-w-3xl">
           <h3 class="font-bold text-lg mb-1">{t('priceHistory')}</h3>
           <p class="text-sm text-base-content/60 mb-3">{priceHistTarget?.name}</p>
           <div class="overflow-x-auto" style="max-height:350px; overflow-y:auto">
-            <table class="table table-sm">
-              <thead class="sticky top-0 bg-base-100"><tr><th>{t('purchaseDate')}</th><th>{t('prixAchat')}</th><th>{t('prixVente1')}</th><th>{t('prixVente2')}</th><th>{t('prixVente3')}</th><th>Source</th></tr></thead>
+            <table class="table table-xs w-full">
+              <thead class="sticky top-0 bg-base-200/60">
+                <tr>
+                  <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('purchaseDate')}</th>
+                  <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('prixAchat')}</th>
+                  <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('prixVente1')}</th>
+                  <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('prixVente2')}</th>
+                  <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('prixVente3')}</th>
+                  <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('source')}</th>
+                </tr>
+              </thead>
               <tbody>
                 {priceHistItems.map((r, i) => (
-                  <tr key={i}>
-                    <td class="text-sm">{new Date(r.created_at).toLocaleDateString()}</td>
-                    <td class="font-mono text-sm">{r.prix_achat?.toFixed(2)}</td>
-                    <td class="font-mono text-sm">{r.prix_vente_1?.toFixed(2)}</td>
-                    <td class="font-mono text-sm">{r.prix_vente_2?.toFixed(2)}</td>
-                    <td class="font-mono text-sm">{r.prix_vente_3?.toFixed(2)}</td>
-                    <td class="text-xs">{r.source}</td>
+                  <tr key={i} class="border-b border-base-200">
+                    <td class="text-sm whitespace-nowrap">{new Date(r.created_at).toLocaleDateString()}</td>
+                    <td class="font-mono text-sm text-end">{r.prix_achat?.toFixed(2)}</td>
+                    <td class="font-mono text-sm text-end">{r.prix_vente_1?.toFixed(2)}</td>
+                    <td class="font-mono text-sm text-end">{r.prix_vente_2?.toFixed(2)}</td>
+                    <td class="font-mono text-sm text-end">{r.prix_vente_3?.toFixed(2)}</td>
+                    <td class="text-xs">
+                      <span class="badge badge-xs badge-ghost">{r.source === 'purchase_validation' ? t('sourcePurchase') : r.source === 'manual' ? t('sourceManual') : r.source}</span>
+                    </td>
                   </tr>
                 ))}
                 {priceHistItems.length === 0 && (
@@ -1160,64 +1384,216 @@ export default function Products({ path }) {
 
       {/* Variants dialog */}
       <dialog id="variant-dialog" class="modal modal-bottom sm:modal-middle">
-        <div class="modal-box w-full sm:max-w-3xl">
-          <h3 class="font-bold text-lg mb-1">{t('variants')}</h3>
-          <p class="text-sm text-base-content/60 mb-3">{variantTarget?.name}</p>
-
-          {/* Existing variants */}
-          {variantItems.length > 0 && (
-            <div class="overflow-x-auto mb-4" style="max-height:200px; overflow-y:auto">
-              <table class="table table-xs">
-                <thead class="sticky top-0 bg-base-100"><tr><th>{t('attributes')}</th><th>{t('barcodes')}</th><th>{t('qtyAvailable')}</th><th>{t('prixAchat')}</th><th>{t('prixVente1')}</th><th></th></tr></thead>
-                <tbody>
-                  {variantItems.map(v => (
-                    <tr key={v.id}>
-                      <td class="text-xs">{Object.entries(v.attributes || {}).map(([k, val]) => `${k}: ${val}`).join(', ') || '—'}</td>
-                      <td class="text-xs">{(v.barcodes || []).join(', ') || '—'}</td>
-                      <td class="font-mono text-xs">{v.qty_available}</td>
-                      <td class="font-mono text-xs">{v.prix_achat}</td>
-                      <td class="font-mono text-xs">{v.prix_vente_1}</td>
-                      <td><button class="btn btn-xs btn-ghost text-error" onClick={() => deleteVariant(v.id)}>x</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div class="modal-box p-0 overflow-hidden flex flex-col" style="width: 90vw; max-width: 900px; height: 85vh; max-height: 85vh">
+          {/* Header */}
+          <div class="flex items-center justify-between px-6 py-4 border-b border-base-200 bg-base-100 shrink-0">
+            <div>
+              <h3 class="font-bold text-lg">{t('variants')}</h3>
+              <p class="text-sm text-base-content/50">{variantTarget?.name}</p>
             </div>
-          )}
+            <div class="flex items-center gap-2">
+              {canAdd && !variantFormOpen && (
+                <button class="btn btn-primary btn-sm gap-1.5" onClick={() => { setEditingVariant(null); setVariantForm(newVariantForm(variantTarget)); setVariantFormOpen(true) }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                  {t('add')}
+                </button>
+              )}
+              <form method="dialog"><button class="btn btn-sm btn-ghost btn-square" onClick={cancelEditVariant}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button></form>
+            </div>
+          </div>
 
-          {/* Add variant form */}
-          {canAdd && (
-            <form onSubmit={addVariant} class="space-y-2 border-t pt-3">
-              <p class="text-xs font-semibold">{t('add')} {t('variants')}</p>
-              <div class="grid grid-cols-2 gap-2">
-                <label class="form-control col-span-2">
-                  <span class="label-text text-xs">{t('attributes')} (size:L, color:Red)</span>
-                  <input class="input input-bordered input-xs" value={variantForm.attributes}
-                    onInput={(e) => setVariantForm({ ...variantForm, attributes: e.target.value })} />
-                </label>
-                <label class="form-control col-span-2">
-                  <span class="label-text text-xs">{t('barcodes')} (comma-separated)</span>
-                  <input class="input input-bordered input-xs" value={variantForm.barcodes}
+          {/* Content */}
+          <div class="flex-1 overflow-y-auto px-6 py-4">
+            {/* Add / Edit variant form */}
+            {variantFormOpen && canAdd && (
+              <form onSubmit={editingVariant ? saveEditVariant : addVariant} class="bg-base-200/40 rounded-xl p-4 mb-5 border border-base-200">
+                <p class="text-sm font-semibold mb-3">{editingVariant ? t('edit') : t('add')} {t('variants')}</p>
+
+                {/* Attributes as key/value pairs */}
+                <div class="mb-3">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-medium text-base-content/70">{t('attributes')}</span>
+                    <button type="button" class="btn btn-xs btn-ghost gap-1 text-primary" onClick={addAttrPair}>
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                      {t('add')}
+                    </button>
+                  </div>
+                  <div class="space-y-1.5">
+                    {variantForm.attrPairs.map((pair, i) => (
+                      <div key={i} class="flex items-center gap-2">
+                        <input class="input input-bordered input-sm flex-1" placeholder="size, color..." value={pair.key}
+                          onInput={(e) => updateAttrPair(i, 'key', e.target.value)} />
+                        <span class="text-base-content/30">:</span>
+                        <input class="input input-bordered input-sm flex-1" placeholder="L, Red..." value={pair.value}
+                          onInput={(e) => updateAttrPair(i, 'value', e.target.value)} />
+                        {variantForm.attrPairs.length > 1 && (
+                          <button type="button" class="btn btn-sm btn-ghost btn-square text-error/60 hover:text-error" onClick={() => removeAttrPair(i)}>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Barcodes */}
+                <label class="form-control mb-3">
+                  <span class="label-text text-xs font-medium text-base-content/70 mb-1">{t('barcodes')}</span>
+                  <input class="input input-bordered input-sm" placeholder={t('barcodes') + ' (comma-separated)'} value={variantForm.barcodes}
                     onInput={(e) => setVariantForm({ ...variantForm, barcodes: e.target.value })} />
                 </label>
-                <label class="form-control"><span class="label-text text-xs">{t('qtyAvailable')}</span>
-                  <input type="number" step="any" class="input input-bordered input-xs" value={variantForm.qty_available}
-                    onInput={(e) => setVariantForm({ ...variantForm, qty_available: parseFloat(e.target.value) || 0 })} /></label>
-                <label class="form-control"><span class="label-text text-xs">{t('prixAchat')}</span>
-                  <input type="number" step="any" class="input input-bordered input-xs" value={variantForm.prix_achat}
-                    onInput={(e) => setVariantForm({ ...variantForm, prix_achat: parseFloat(e.target.value) || 0 })} /></label>
-                <label class="form-control"><span class="label-text text-xs">{t('prixVente1')}</span>
-                  <input type="number" step="any" class="input input-bordered input-xs" value={variantForm.prix_vente_1}
-                    onInput={(e) => setVariantForm({ ...variantForm, prix_vente_1: parseFloat(e.target.value) || 0 })} /></label>
-                <label class="form-control"><span class="label-text text-xs">{t('prixVente2')}</span>
-                  <input type="number" step="any" class="input input-bordered input-xs" value={variantForm.prix_vente_2}
-                    onInput={(e) => setVariantForm({ ...variantForm, prix_vente_2: parseFloat(e.target.value) || 0 })} /></label>
-              </div>
-              <button type="submit" class="btn btn-xs btn-primary">{t('add')}</button>
-            </form>
-          )}
 
-          <div class="modal-action"><form method="dialog"><button class="btn btn-sm btn-ghost">{t('back')}</button></form></div>
+                {/* Qty + Prices grid */}
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                  <label class="form-control">
+                    <span class="label-text text-xs font-medium text-base-content/70 mb-1">{t('qtyAvailable')}</span>
+                    <input type="number" step="any" class="input input-bordered input-sm" value={variantForm.qty_available}
+                      onInput={(e) => setVariantForm({ ...variantForm, qty_available: parseFloat(e.target.value) || 0 })} />
+                  </label>
+                  <label class="form-control">
+                    <span class="label-text text-xs font-medium text-base-content/70 mb-1">{t('prixAchat')}</span>
+                    <input type="number" step="any" class="input input-bordered input-sm" value={variantForm.prix_achat}
+                      onInput={(e) => setVariantForm({ ...variantForm, prix_achat: parseFloat(e.target.value) || 0 })} />
+                  </label>
+                  <label class="form-control">
+                    <span class="label-text text-xs font-medium text-base-content/70 mb-1">{t('prixVente1')}</span>
+                    <input type="number" step="any" class="input input-bordered input-sm" value={variantForm.prix_vente_1}
+                      onInput={(e) => setVariantForm({ ...variantForm, prix_vente_1: parseFloat(e.target.value) || 0 })} />
+                  </label>
+                  <label class="form-control">
+                    <span class="label-text text-xs font-medium text-base-content/70 mb-1">{t('prixVente2')}</span>
+                    <input type="number" step="any" class="input input-bordered input-sm" value={variantForm.prix_vente_2}
+                      onInput={(e) => setVariantForm({ ...variantForm, prix_vente_2: parseFloat(e.target.value) || 0 })} />
+                  </label>
+                  <label class="form-control">
+                    <span class="label-text text-xs font-medium text-base-content/70 mb-1">{t('prixVente3')}</span>
+                    <input type="number" step="any" class="input input-bordered input-sm" value={variantForm.prix_vente_3}
+                      onInput={(e) => setVariantForm({ ...variantForm, prix_vente_3: parseFloat(e.target.value) || 0 })} />
+                  </label>
+                </div>
+
+                <div class="flex gap-2 justify-end">
+                  <button type="button" class="btn btn-sm btn-ghost" onClick={cancelEditVariant}>{t('back')}</button>
+                  <button type="submit" class="btn btn-sm btn-primary gap-1">
+                    {editingVariant ? t('save') : t('add')}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Existing variants list */}
+            {variantItems.length === 0 && !variantFormOpen ? (
+              <div class="flex flex-col items-center justify-center py-16 text-base-content/30">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" /></svg>
+                <p class="text-sm">{t('noVariant')}</p>
+              </div>
+            ) : (
+              <div class="space-y-2">
+                {variantItems.map(v => (
+                  <div key={v.id} class={`rounded-xl border bg-base-100 p-4 transition-all hover:shadow-sm ${editingVariant === v.id ? 'border-primary/40 ring-1 ring-primary/20' : 'border-base-200'}`}>
+                    <div class="flex items-start justify-between gap-3">
+                      {/* Attributes tags */}
+                      <div class="flex-1 min-w-0">
+                        <div class="flex flex-wrap gap-1.5 mb-2">
+                          {Object.entries(v.attributes || {}).map(([k, val]) => (
+                            <span key={k} class="badge badge-sm bg-primary/10 text-primary border-0 gap-1">
+                              <span class="font-medium">{k}:</span> {val}
+                            </span>
+                          ))}
+                          {(!v.attributes || Object.keys(v.attributes).length === 0) && (
+                            <span class="text-xs text-base-content/40">—</span>
+                          )}
+                        </div>
+                        {/* Barcodes */}
+                        {v.barcodes?.length > 0 && (
+                          <div class="flex items-center gap-1.5 mb-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-base-content/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5z" /></svg>
+                            <span class="text-[11px] font-mono text-base-content/40">{v.barcodes.join(', ')}</span>
+                          </div>
+                        )}
+                        {/* Prices row */}
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/60">
+                          <span>{t('qtyAvailable')}: <span class="font-semibold text-base-content">{v.qty_available}</span></span>
+                          <span>{t('prixAchat')}: <span class="font-mono">{v.prix_achat}</span></span>
+                          <span>{t('prixVente1')}: <span class="font-mono">{v.prix_vente_1}</span></span>
+                          <span>{t('prixVente2')}: <span class="font-mono">{v.prix_vente_2}</span></span>
+                          <span>{t('prixVente3')}: <span class="font-mono">{v.prix_vente_3}</span></span>
+                        </div>
+                      </div>
+                      {/* Actions */}
+                      <div class="flex items-center gap-1 shrink-0">
+                        {canAdjust && (
+                          <div class="tooltip tooltip-bottom" data-tip={t('adjustStock')}>
+                            <button class="btn btn-sm btn-ghost btn-square text-base-content/50" onClick={() => openVariantAdj(v)}>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></svg>
+                            </button>
+                          </div>
+                        )}
+                        {canLoss && (
+                          <div class="tooltip tooltip-bottom" data-tip={t('recordLoss')}>
+                            <button class="btn btn-sm btn-ghost btn-square text-warning" onClick={() => openVariantLoss(v)}>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" /></svg>
+                            </button>
+                          </div>
+                        )}
+                        <button class="btn btn-sm btn-ghost btn-square text-info" onClick={() => startEditVariant(v)}>
+                          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931z" /></svg>
+                        </button>
+                        <button class="btn btn-sm btn-ghost btn-square text-error" onClick={() => deleteVariant(v.id)}>
+                          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                    {/* Inline adjust form */}
+                    {variantAdjTarget?.id === v.id && (
+                      <form onSubmit={submitVariantAdj} class="flex items-end gap-2 mt-2 pt-2 border-t border-base-200">
+                        <label class="form-control flex-1">
+                          <span class="label-text text-xs">{t('qtyAvailable')}</span>
+                          <input type="number" step="any" class="input input-bordered input-sm" value={variantAdjForm.qty_after}
+                            onInput={(e) => setVariantAdjForm({ ...variantAdjForm, qty_after: parseFloat(e.target.value) || 0 })} />
+                        </label>
+                        <label class="form-control flex-1">
+                          <span class="label-text text-xs">{t('reason') || 'Reason'}</span>
+                          <input class="input input-bordered input-sm" value={variantAdjForm.reason}
+                            onInput={(e) => setVariantAdjForm({ ...variantAdjForm, reason: e.target.value })} />
+                        </label>
+                        <button type="submit" class="btn btn-sm btn-primary">{t('save')}</button>
+                        <button type="button" class="btn btn-sm btn-ghost" onClick={() => setVariantAdjTarget(null)}>{t('back')}</button>
+                      </form>
+                    )}
+                    {/* Inline loss form */}
+                    {variantLossTarget?.id === v.id && (
+                      <form onSubmit={submitVariantLoss} class="flex items-end gap-2 mt-2 pt-2 border-t border-base-200">
+                        <label class="form-control">
+                          <span class="label-text text-xs">{t('type')}</span>
+                          <select class="select select-bordered select-sm" value={variantLossForm.type}
+                            onChange={(e) => setVariantLossForm({ ...variantLossForm, type: e.target.value })}>
+                            <option value="perte">{t('lossPerte')}</option>
+                            <option value="casse">{t('lossCasse')}</option>
+                            <option value="vol">{t('lossVol')}</option>
+                          </select>
+                        </label>
+                        <label class="form-control w-20">
+                          <span class="label-text text-xs">{t('qty')}</span>
+                          <input type="number" min="1" class="input input-bordered input-sm" value={variantLossForm.qty}
+                            onInput={(e) => setVariantLossForm({ ...variantLossForm, qty: parseInt(e.target.value) || 1 })} />
+                        </label>
+                        <label class="form-control flex-1">
+                          <span class="label-text text-xs">{t('remark') || 'Remark'}</span>
+                          <input class="input input-bordered input-sm" value={variantLossForm.remark}
+                            onInput={(e) => setVariantLossForm({ ...variantLossForm, remark: e.target.value })} />
+                        </label>
+                        <button type="submit" class="btn btn-sm btn-warning">{t('save')}</button>
+                        <button type="button" class="btn btn-sm btn-ghost" onClick={() => setVariantLossTarget(null)}>{t('back')}</button>
+                      </form>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
       </dialog>
@@ -1353,97 +1729,140 @@ export default function Products({ path }) {
 
       {/* Stock Movements dialog */}
       <dialog id="mov-dialog" class="modal modal-bottom sm:modal-middle">
-        <div class="modal-box w-full sm:max-w-3xl">
-          <h3 class="font-bold text-lg mb-1">{t('stockMovements')}</h3>
-          <p class="text-sm text-base-content/60 mb-3">{movTarget?.name}</p>
-
-          {/* Date filter */}
-          <div class="flex gap-2 mb-4 flex-wrap items-end">
-            <label class="form-control">
-              <span class="label-text text-xs">{t('dateFrom')}</span>
-              <input type="date" class="input input-bordered input-sm"
-                value={movDateFrom} onInput={(e) => setMovDateFrom(e.target.value)} />
-            </label>
-            <label class="form-control">
-              <span class="label-text text-xs">{t('dateTo')}</span>
-              <input type="date" class="input input-bordered input-sm"
-                value={movDateTo} onInput={(e) => setMovDateTo(e.target.value)} />
-            </label>
-            <button class="btn btn-sm btn-primary btn-outline" onClick={applyMovFilter}>{t('search')}</button>
-          </div>
-
-          {movLoading ? (
-            <div class="flex justify-center py-8"><span class="loading loading-spinner loading-md" /></div>
-          ) : (
-            <>
-              <div class="overflow-x-auto" style="max-height: 320px; overflow-y: auto">
-                <table class="table table-sm">
-                  <thead class="sticky top-0 bg-base-100 z-10">
-                    <tr>
-                      <th>{t('purchaseDate')}</th>
-                      <th>{t('movementType')}</th>
-                      <th>{t('purchaseSupplier')}</th>
-                      <th class="text-end">{t('qty')}</th>
-                      <th class="text-end">{t('prixAchat')}</th>
-                      <th class="text-end">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {movResult.items.length === 0 && (
-                      <tr>
-                        <td colSpan={6} class="text-center text-base-content/40 py-8">{t('noMovements')}</td>
-                      </tr>
-                    )}
-                    {movResult.items.map((m, i) => (
-                      <tr key={i}>
-                        <td class="text-sm">{new Date(m.date).toLocaleDateString()}</td>
-                        <td>
-                          {m.type === 'loss'
-                            ? <span class="badge badge-xs badge-error">{t('loss' + (m.reference?.charAt(0).toUpperCase() + m.reference?.slice(1)) || 'loss')}</span>
-                            : m.type === 'sale'
-                            ? <span class="badge badge-xs badge-success">{t('movementSale')}</span>
-                            : m.type === 'return' || m.type === 'sale_return'
-                            ? <span class="badge badge-xs badge-warning">{t('movementReturn')}</span>
-                            : m.type === 'adjustment' || m.type === 'adjust'
-                            ? <span class="badge badge-xs badge-ghost">{t('movementAdjust')}</span>
-                            : m.type === 'transfer'
-                            ? <span class="badge badge-xs badge-accent">{t('movementTransfer')}</span>
-                            : m.type === 'purchase'
-                            ? <span class="badge badge-xs badge-info">{t('movementPurchase')}</span>
-                            : m.qty < 0
-                            ? <span class="badge badge-xs badge-success">{t('movementSale')}</span>
-                            : <span class="badge badge-xs badge-info">{t('movementPurchase')}</span>
-                          }
-                        </td>
-                        <td class="text-sm">{m.supplier_name || '—'}</td>
-                        <td class={`text-end font-mono text-sm ${m.qty < 0 ? 'text-error' : 'text-success'}`}>
-                          {m.qty >= 0 ? '+' : ''}{m.qty}
-                        </td>
-                        <td class="text-end font-mono text-sm">{m.prix_achat?.toFixed(2) ?? '—'}</td>
-                        <td class="text-end font-mono text-sm">{m.prix_achat ? (Math.abs(m.qty) * m.prix_achat).toFixed(2) : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {movResult.pages > 1 && (
-                <div class="flex justify-center gap-2 mt-3">
-                  <button class="btn btn-sm btn-ghost" disabled={movPage <= 1}
-                    onClick={() => loadMovPage(movTarget, movPage - 1, movDateFrom, movDateTo)}>‹</button>
-                  <span class="btn btn-sm btn-ghost no-animation">{movPage} / {movResult.pages}</span>
-                  <button class="btn btn-sm btn-ghost" disabled={movPage >= movResult.pages}
-                    onClick={() => loadMovPage(movTarget, movPage + 1, movDateFrom, movDateTo)}>›</button>
+        <div class="modal-box p-0 overflow-hidden flex flex-col" style="width: 80vw; max-width: 80vw; height: 80vh; max-height: 80vh">
+          {/* Header */}
+          <div class="bg-base-200/50 px-6 pt-5 pb-4 border-b border-base-300 shrink-0">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-info/10 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                  </svg>
                 </div>
-              )}
-            </>
-          )}
+                <div>
+                  <h3 class="font-bold text-lg leading-tight">{t('stockMovements')}</h3>
+                  <p class="text-sm text-base-content/50 mt-0.5">{movTarget?.name}</p>
+                </div>
+              </div>
+              <form method="dialog">
+                <button class="btn btn-sm btn-ghost btn-square opacity-60 hover:opacity-100">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </form>
+            </div>
 
-          <div class="modal-action">
-            <form method="dialog">
-              <button class="btn btn-sm btn-ghost">{t('back')}</button>
-            </form>
+            {/* Date filter */}
+            <div class="flex items-center gap-2 mt-4">
+              <span class="text-xs font-medium text-base-content/50">{t('dateFrom')}</span>
+              <input type="date" class="input input-bordered input-sm w-auto"
+                value={movDateFrom} onInput={(e) => setMovDateFrom(e.target.value)} />
+              <span class="text-xs font-medium text-base-content/50">{t('dateTo')}</span>
+              <input type="date" class="input input-bordered input-sm w-auto"
+                value={movDateTo} onInput={(e) => setMovDateTo(e.target.value)} />
+              <button class="btn btn-sm btn-primary gap-1.5" onClick={applyMovFilter}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
+                {t('search')}
+              </button>
+            </div>
           </div>
+
+          {/* Body */}
+          <div class="flex-1 overflow-y-auto px-6 py-4">
+            {movLoading ? (
+              <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary" /></div>
+            ) : (
+              <table class="table table-sm w-full">
+                <thead class="sticky top-0 bg-base-100 z-10">
+                  <tr>
+                    <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('purchaseDate')}</th>
+                    <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('movementType')}</th>
+                    <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('purchaseSupplier')}</th>
+                    <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('qty')}</th>
+                    <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('prixAchat')}</th>
+                    <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movAllItems.length === 0 && (
+                    <tr>
+                      <td colSpan={6} class="text-center text-base-content/30 py-16">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                        </svg>
+                        {t('noMovements')}
+                      </td>
+                    </tr>
+                  )}
+                  {movItems.map((m, i) => (
+                    <tr key={i} class="hover:bg-base-200/40 transition-colors">
+                      <td class="text-sm tabular-nums">{new Date(m.date).toLocaleDateString()}</td>
+                      <td>
+                        <div class="flex flex-col gap-0.5">
+                          {m.type === 'loss'
+                            ? <span class="badge badge-sm badge-error gap-1">{t('loss' + (m.reference?.charAt(0).toUpperCase() + m.reference?.slice(1)) || 'loss')}</span>
+                            : m.type === 'sale'
+                            ? <span class="badge badge-sm badge-success gap-1">{t('movementSale')}</span>
+                            : m.type === 'return' || m.type === 'sale_return'
+                            ? <span class="badge badge-sm badge-warning gap-1">{t('movementReturn')}</span>
+                            : m.type === 'adjustment' || m.type === 'adjust'
+                            ? <span class="badge badge-sm badge-ghost gap-1">{t('movementAdjust')}</span>
+                            : m.type === 'transfer'
+                            ? <span class="badge badge-sm badge-accent gap-1">{t('movementTransfer')}</span>
+                            : m.type === 'purchase'
+                            ? <span class="badge badge-sm badge-info gap-1">{t('movementPurchase')}</span>
+                            : m.qty < 0
+                            ? <span class="badge badge-sm badge-success gap-1">{t('movementSale')}</span>
+                            : <span class="badge badge-sm badge-info gap-1">{t('movementPurchase')}</span>
+                          }
+                          {m.variant_label && <span class="text-[10px] text-primary/60">{m.variant_label}</span>}
+                        </div>
+                      </td>
+                      <td class="text-sm text-base-content/70">{m.supplier_name || '—'}</td>
+                      <td class={`text-end font-mono text-sm font-semibold ${m.qty < 0 ? 'text-error' : 'text-success'}`}>
+                        {m.qty >= 0 ? '+' : ''}{m.qty}
+                      </td>
+                      <td class="text-end font-mono text-sm tabular-nums">{m.prix_achat?.toFixed(2) ?? '—'}</td>
+                      <td class="text-end font-mono text-sm font-semibold tabular-nums">{m.prix_achat ? (Math.abs(m.qty) * m.prix_achat).toFixed(2) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {movPages > 1 && (
+            <div class="flex items-center justify-between px-6 py-3 border-t border-base-300 shrink-0 bg-base-200/30">
+              <span class="text-xs text-base-content/50 tabular-nums">{movAllItems.length} {t('results')}</span>
+              <div class="join">
+                <button class="join-item btn btn-sm" disabled={movPage <= 1}
+                  onClick={() => setMovPage(1)}>«</button>
+                <button class="join-item btn btn-sm" disabled={movPage <= 1}
+                  onClick={() => setMovPage(movPage - 1)}>‹</button>
+                {Array.from({ length: movPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === movPages || Math.abs(p - movPage) <= 1)
+                  .reduce((acc, p, idx, arr) => {
+                    if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...')
+                    acc.push(p)
+                    return acc
+                  }, [])
+                  .map((p, i) =>
+                    p === '...'
+                      ? <span key={`e${i}`} class="join-item btn btn-sm btn-disabled">…</span>
+                      : <button key={p} class={`join-item btn btn-sm ${p === movPage ? 'btn-primary' : ''}`}
+                          onClick={() => setMovPage(p)}>{p}</button>
+                  )}
+                <button class="join-item btn btn-sm" disabled={movPage >= movPages}
+                  onClick={() => setMovPage(movPage + 1)}>›</button>
+                <button class="join-item btn btn-sm" disabled={movPage >= movPages}
+                  onClick={() => setMovPage(movPages)}>»</button>
+              </div>
+            </div>
+          )}
         </div>
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
       </dialog>

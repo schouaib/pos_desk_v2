@@ -14,16 +14,17 @@ const (
 )
 
 type User struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	TenantID    primitive.ObjectID `bson:"tenant_id"     json:"tenant_id"`
-	Name        string             `bson:"name"          json:"name"`
-	Email       string             `bson:"email"         json:"email"`
-	Password    string             `bson:"password"      json:"-"`
-	Role        string             `bson:"role"          json:"role"` // tenant_admin | cashier
-	Permissions jwt.Permissions    `bson:"permissions"   json:"permissions"`
-	Active      bool               `bson:"active"        json:"active"`
-	CreatedAt   time.Time          `bson:"created_at"    json:"created_at"`
-	UpdatedAt   time.Time          `bson:"updated_at"    json:"updated_at"`
+	ID                 primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	TenantID           primitive.ObjectID `bson:"tenant_id"     json:"tenant_id"`
+	Name               string             `bson:"name"          json:"name"`
+	Email              string             `bson:"email"         json:"email"`
+	Password           string             `bson:"password"      json:"-"`
+	Role               string             `bson:"role"          json:"role"` // tenant_admin | cashier
+	Permissions        jwt.Permissions    `bson:"permissions"   json:"permissions"`
+	Active             bool               `bson:"active"        json:"active"`
+	MustChangePassword bool               `bson:"must_change_password" json:"must_change_password"`
+	CreatedAt          time.Time          `bson:"created_at"    json:"created_at"`
+	UpdatedAt          time.Time          `bson:"updated_at"    json:"updated_at"`
 }
 
 type CreateInput struct {

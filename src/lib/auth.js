@@ -34,6 +34,7 @@ export function clearAuth() {
 
 export const isLoggedIn = () => !!authToken.value
 export const isTenantAdmin = () => authUser.value?.role === 'tenant_admin'
+export const mustChangePassword = () => !!authUser.value?.must_change_password
 
 export function hasPerm(module, action) {
   const user = authUser.value

@@ -576,6 +576,12 @@ export default function Pos({ path }) {
   const [scanToast, setScanToast] = useState('')
   const scanToastRef = useRef(null)
 
+  // Variant selection
+  const [variantPickerOpen, setVariantPickerOpen] = useState(false)
+  const [variantPickerProduct, setVariantPickerProduct] = useState(null)
+  const [variantPickerItems, setVariantPickerItems] = useState([])
+  const [variantPickerQty, setVariantPickerQty] = useState(1)
+
   // ── POS speed features ──────────────────────────────────────────────────────
 
   // Favorites (configurable by tenant admin)
@@ -626,6 +632,10 @@ export default function Pos({ path }) {
     osc.start()
     osc.stop(ctx.currentTime + 0.08)
   }
+
+  // Expiry warnings (batch_tracking feature)
+  const canBatches = hasFeature('batch_tracking')
+  const expiryMapRef = useRef(new Map()) // productId → { date, batch_number, days }
 
   // Fullscreen
   const posRef = useRef(null)
@@ -716,6 +726,24 @@ export default function Pos({ path }) {
             color: g.color || '',
             products: (g.product_ids || []).map(id => map[id]).filter(Boolean),
           })))
+        }).catch(() => {})
+      }
+      // Preload expiring batches for POS warnings (if batch_tracking + pos_expiry_warning enabled)
+      if (canBatches && d.pos_expiry_warning) {
+        api.listExpiringBatches({ days: 90 }).then((items) => {
+          if (cancelled) return
+          const map = new Map()
+          const now = Date.now()
+          for (const b of items || []) {
+            if (!b.expiry_date || b.qty <= 0) continue
+            const pid = b.product_id
+            const exp = new Date(b.expiry_date)
+            const daysLeft = Math.ceil((exp - now) / 86400000)
+            if (!map.has(pid) || daysLeft < map.get(pid).days) {
+              map.set(pid, { date: exp, batch_number: b.batch_number, days: daysLeft })
+            }
+          }
+          expiryMapRef.current = map
         }).catch(() => {})
       }
     }).catch(() => {})
@@ -834,37 +862,71 @@ export default function Pos({ path }) {
 
   // ── Ticket operations ────────────────────────────────────────────────────────
 
-  function addToTicketSelecting(product, qty = 1) {
+  function addToTicketSelecting(product, qty = 1, variantData = null) {
     playAddSound()
     setLines((prev) => {
-      const idx = prev.findIndex((l) => l.productId === product.id)
+      const lineKey = variantData ? `${product.id}-${variantData.id}` : product.id
+      const idx = prev.findIndex((l) => variantData ? l.variantId === variantData.id : (!l.variantId && l.productId === product.id))
       if (idx !== -1) {
         const updated = { ...prev[idx], qty: prev[idx].qty + qty }
         const next = [updated, ...prev.filter((_, i) => i !== idx)]
         setSelectedKey(updated._key)
         return next
       }
+      const vp1 = variantData?.prix_vente_1 ?? product.prix_vente_1
+      const vp2 = variantData?.prix_vente_2 ?? product.prix_vente_2
+      const vp3 = variantData?.prix_vente_3 ?? product.prix_vente_3
+      const attrStr = variantData?.attributes ? Object.entries(variantData.attributes).map(([k,v]) => `${v}`).join(', ') : ''
       const newLine = {
-        _key: `${product.id}-${Date.now()}`,
+        _key: `${lineKey}-${Date.now()}`,
         productId: product.id,
-        name: product.name,
-        barcode: product.barcodes?.[0] || '',
+        variantId: variantData?.id || '',
+        variantAttributes: variantData?.attributes || null,
+        name: variantData ? `${product.name} (${attrStr})` : product.name,
+        barcode: variantData?.barcodes?.[0] || product.barcodes?.[0] || '',
         ref: product.ref || '',
         qty,
-        unitPrice: (store.default_sale_price === 2 ? product.prix_vente_2 : store.default_sale_price === 3 ? product.prix_vente_3 : product.prix_vente_1) || 0,
+        unitPrice: (store.default_sale_price === 2 ? vp2 : store.default_sale_price === 3 ? vp3 : vp1) || 0,
         discount: 0,
         vat: product.vat || 0,
-        pv1: product.prix_vente_1 || 0,
-        pv2: product.prix_vente_2 || 0,
-        pv3: product.prix_vente_3 || 0,
+        pv1: vp1 || 0,
+        pv2: vp2 || 0,
+        pv3: vp3 || 0,
         pvMin: product.prix_minimum || 0,
         isService: product.is_service,
-        stockQty: product.qty_available ?? 0,
+        stockQty: variantData?.qty_available ?? product.qty_available ?? 0,
         stockMin: product.qty_min ?? 0,
+        expiryWarning: canBatches ? expiryMapRef.current.get(product.id) || null : null,
       }
       setSelectedKey(newLine._key)
       return [newLine, ...prev]
     })
+  }
+
+  async function openVariantPicker(product, qty = 1) {
+    try {
+      const variants = await api.listVariants(product.id)
+      if (!variants || variants.length === 0) {
+        addToTicketSelecting(product, qty)
+        return
+      }
+      setVariantPickerProduct(product)
+      setVariantPickerItems(variants)
+      setVariantPickerQty(qty)
+      setVariantPickerOpen(true)
+    } catch {
+      addToTicketSelecting(product, qty)
+    }
+  }
+
+  function selectVariant(variant) {
+    if (variantPickerProduct) {
+      addToTicketSelecting(variantPickerProduct, variantPickerQty, variant)
+    }
+    setVariantPickerOpen(false)
+    setVariantPickerProduct(null)
+    setVariantPickerItems([])
+    refocusScan()
   }
 
   function removeLine(key) {
@@ -992,13 +1054,31 @@ export default function Pos({ path }) {
       const data = await api.listProducts({ q: barcode, limit: 5 })
       const product = data.items?.find((p) => p.barcodes?.includes(barcode)) || data.items?.[0]
       if (!product) {
+        // Try variant barcode lookup
+        try {
+          const v = await api.findVariantByBarcode(barcode)
+          if (v) {
+            const parentData = await api.getProduct(v.parent_product_id)
+            if (parentData) {
+              addToTicketSelecting(parentData, qty, v)
+              setScanInput('')
+              playBeep()
+              refocusScan()
+              const attrStr = v.attributes ? Object.values(v.attributes).join(', ') : ''
+              clearTimeout(scanToastRef.current)
+              setScanToast(qty !== 1 ? `${qty} × ${parentData.name} (${attrStr})` : `${parentData.name} (${attrStr})`)
+              scanToastRef.current = setTimeout(() => setScanToast(''), 2000)
+              return
+            }
+          }
+        } catch {}
         setScanError(t('productNotFound'))
       } else {
-        addToTicketSelecting(product, qty)
+        // Always go through variant picker (if product has variants, user must select one)
+        await openVariantPicker(product, qty)
         setScanInput('')
         playBeep()
         refocusScan()
-        // Show scan success toast
         clearTimeout(scanToastRef.current)
         setScanToast(qty !== 1 ? `${qty} × ${product.name}` : product.name)
         scanToastRef.current = setTimeout(() => setScanToast(''), 2000)
@@ -1088,6 +1168,7 @@ export default function Pos({ path }) {
       const result = await api.createSale({
         lines: lines.map((l) => ({
           product_id: l.productId,
+          variant_id: l.variantId || '',
           qty: l.qty,
           unit_price: l.unitPrice,
           discount: l.discount,
@@ -1562,6 +1643,14 @@ export default function Pos({ path }) {
                               {t('lowStock')}
                             </span>
                           )}
+                          {line.expiryWarning && (
+                            <span
+                              class={`badge badge-xs gap-0.5 whitespace-nowrap ${line.expiryWarning.days <= 0 ? 'badge-error' : 'badge-warning'}`}
+                              title={`${line.expiryWarning.batch_number} — ${line.expiryWarning.date.toLocaleDateString()}`}
+                            >
+                              {line.expiryWarning.days <= 0 ? t('expired') : line.expiryWarning.days <= 1 ? t('expiresToday') : `${t('expiring')} ${line.expiryWarning.days}j`}
+                            </span>
+                          )}
                         </div>
                         {line.barcode && <div class="text-xs text-base-content/35 font-mono">{line.barcode}</div>}
                       </td>
@@ -1782,10 +1871,17 @@ export default function Pos({ path }) {
                 <button
                   key={p.id}
                   class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-base-200 text-start transition-colors"
-                  onClick={() => { addToTicketSelecting(p); setSearchOpen(false); refocusScan() }}
+                  onClick={() => { openVariantPicker(p); setSearchOpen(false); refocusScan() }}
                 >
                   <div class="min-w-0">
-                    <p class="font-medium text-sm truncate">{p.name}</p>
+                    <p class="font-medium text-sm truncate flex items-center gap-1.5">
+                      {p.name}
+                      {(() => { const ew = canBatches && expiryMapRef.current.get(p.id); return ew ? (
+                        <span class={`badge badge-xs ${ew.days <= 0 ? 'badge-error' : 'badge-warning'} whitespace-nowrap`}>
+                          {ew.days <= 0 ? t('expired') : `${t('expiring')} ${ew.days}j`}
+                        </span>
+                      ) : null })()}
+                    </p>
                     <p class="text-xs text-base-content/50">
                       {[p.ref, p.barcodes?.[0]].filter(Boolean).join(' · ')}
                     </p>
@@ -2014,7 +2110,7 @@ export default function Pos({ path }) {
                     <button
                       key={p.id}
                       class="btn btn-sm btn-outline h-auto py-2.5 flex flex-col items-center gap-0.5 min-h-0"
-                      onClick={() => { addToTicketSelecting(p); setCatalogOpen(false); setCatalogSearch('') }}
+                      onClick={() => { openVariantPicker(p); setCatalogOpen(false); setCatalogSearch('') }}
                     >
                       <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
                       <span class="text-[11px] font-mono font-bold text-primary">
@@ -2069,7 +2165,7 @@ export default function Pos({ path }) {
                           key={p.id}
                           class={`btn btn-sm h-auto py-2.5 flex flex-col items-center gap-0.5 min-h-0 ${fc ? '' : 'btn-outline'}`}
                           style={fc ? { backgroundColor: fc, borderColor: fc, color: '#fff' } : {}}
-                          onClick={() => { addToTicketSelecting(p); setCatalogOpen(false) }}
+                          onClick={() => { openVariantPicker(p); setCatalogOpen(false) }}
                         >
                           <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
                           <span class={`text-[11px] font-mono font-bold ${fc ? 'text-white/80' : 'text-primary'}`}>
@@ -2099,7 +2195,7 @@ export default function Pos({ path }) {
                             key={p.id}
                             class={`btn btn-sm h-auto py-2.5 flex flex-col items-center gap-0.5 min-h-0 ${pc ? '' : 'btn-outline'}`}
                             style={pc ? { backgroundColor: pc, borderColor: pc, color: '#fff' } : {}}
-                            onClick={() => { addToTicketSelecting(p); setCatalogOpen(false) }}
+                            onClick={() => { openVariantPicker(p); setCatalogOpen(false) }}
                           >
                             <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
                             <span class={`text-[11px] font-mono font-bold ${pc ? 'text-white/80' : 'text-primary'}`}>
@@ -2126,7 +2222,7 @@ export default function Pos({ path }) {
                         <button
                           key={p.id}
                           class="btn btn-sm btn-outline h-auto py-2.5 flex flex-col items-center gap-0.5 min-h-0"
-                          onClick={() => { addToTicketSelecting(p); setCatalogOpen(false) }}
+                          onClick={() => { openVariantPicker(p); setCatalogOpen(false) }}
                         >
                           <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
                           <span class="text-[11px] font-mono font-bold text-primary">
@@ -2304,6 +2400,38 @@ export default function Pos({ path }) {
             </div>
           </div>
           <div class="modal-backdrop" onClick={() => { setCaisseCloseOpen(false); refocusScan() }} />
+        </dialog>
+      )}
+
+      {/* ── Variant picker modal ──────────────────────────────────────────── */}
+      {variantPickerOpen && variantPickerProduct && (
+        <dialog class="modal modal-bottom sm:modal-middle" open>
+          <div class="modal-box max-w-md">
+            <h3 class="font-bold text-base mb-3">{variantPickerProduct.name} — {t('variants')}</h3>
+            <div class="flex flex-col gap-2 max-h-64 overflow-y-auto">
+              {variantPickerItems.map(v => {
+                const attrStr = v.attributes ? Object.entries(v.attributes).map(([k,val]) => `${k}: ${val}`).join(', ') : ''
+                const price = (store.default_sale_price === 2 ? v.prix_vente_2 : store.default_sale_price === 3 ? v.prix_vente_3 : v.prix_vente_1) || 0
+                return (
+                  <button
+                    key={v.id}
+                    class="btn btn-sm justify-between"
+                    onClick={() => selectVariant(v)}
+                  >
+                    <span class="text-left">{attrStr || '—'}</span>
+                    <span class="flex items-center gap-2">
+                      <span class="badge badge-ghost badge-sm">{t('qty')}: {v.qty_available}</span>
+                      <span class="font-mono text-primary font-bold">{fmt(price)}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            <div class="modal-action mt-3">
+              <button class="btn btn-sm btn-ghost" onClick={() => { setVariantPickerOpen(false); refocusScan() }}>{t('close')}</button>
+            </div>
+          </div>
+          <div class="modal-backdrop" onClick={() => { setVariantPickerOpen(false); refocusScan() }} />
         </dialog>
       )}
 

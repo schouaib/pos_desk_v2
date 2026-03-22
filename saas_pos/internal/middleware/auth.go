@@ -113,6 +113,8 @@ func hasFeature(claims *jwt.Claims, feature string) bool {
 		return f.ProductBundles
 	case "batch_tracking":
 		return f.BatchTracking
+	case "scale":
+		return f.Scale
 	}
 	return false
 }

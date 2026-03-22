@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks'
 import { Layout } from '../components/Layout'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
+import { hasFeature } from '../lib/auth'
 import { compressImage } from '../lib/imageCompress'
 
 const CURRENCIES = [
@@ -35,6 +36,7 @@ export default function Settings({ path }) {
     currency: 'DZD',
     default_sale_price: 1,
     use_vat: false,
+    pos_expiry_warning: false,
     rc: '', nif: '', nis: '', nart: '', compte_rib: '',
   })
   const [loading, setLoading] = useState(false)
@@ -64,6 +66,7 @@ export default function Settings({ path }) {
           currency:           data.currency           || 'DZD',
           default_sale_price: data.default_sale_price || 1,
           use_vat:            !!data.use_vat,
+          pos_expiry_warning: !!data.pos_expiry_warning,
           rc:         data.rc         || '',
           nif:        data.nif        || '',
           nis:        data.nis        || '',
@@ -316,6 +319,18 @@ export default function Settings({ path }) {
               </div>
             </label>
           </div>
+
+          {hasFeature('batch_tracking') && (
+            <div class="flex items-center justify-between bg-base-200 rounded-lg px-4 py-3 mt-3">
+              <div>
+                <p class="text-sm font-medium">{t('posExpiryWarning')}</p>
+                <p class="text-xs text-base-content/50">{t('posExpiryWarningDesc')}</p>
+              </div>
+              <input type="checkbox" class="toggle toggle-primary toggle-sm"
+                checked={form.pos_expiry_warning}
+                onChange={(e) => setForm({ ...form, pos_expiry_warning: e.target.checked })} />
+            </div>
+          )}
         </Section>
 
         {/* Save button at bottom too */}

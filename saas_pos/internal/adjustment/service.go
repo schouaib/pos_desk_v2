@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"saas_pos/internal/database"
+	"saas_pos/internal/variant"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -27,6 +28,11 @@ func Create(tenantID, userID, userEmail string, input CreateInput) (*StockAdjust
 	}
 
 	ctx := context.Background()
+
+	// Variant adjustment
+	if input.VariantID != "" {
+		return createVariantAdjustment(ctx, tenantID, tid, pid, input, userID, userEmail)
+	}
 
 	var product struct {
 		Name         string   `bson:"name"`
@@ -55,6 +61,66 @@ func Create(tenantID, userID, userEmail string, input CreateInput) (*StockAdjust
 		ProductName:    product.Name,
 		Barcode:        barcode,
 		QtyBefore:      product.QtyAvailable,
+		QtyAfter:       input.QtyAfter,
+		Reason:         input.Reason,
+		CreatedBy:      userID,
+		CreatedByEmail: userEmail,
+		CreatedAt:      time.Now(),
+	}
+	_, err = col().InsertOne(ctx, adj)
+	return adj, err
+}
+
+func createVariantAdjustment(ctx context.Context, tenantID string, tid, pid primitive.ObjectID, input CreateInput, userID, userEmail string) (*StockAdjustment, error) {
+	vid, err := primitive.ObjectIDFromHex(input.VariantID)
+	if err != nil {
+		return nil, errors.New("invalid variant_id")
+	}
+
+	// Get variant current state
+	v, err := variant.GetByID(tenantID, input.VariantID)
+	if err != nil {
+		return nil, errors.New("variant not found")
+	}
+
+	// Get parent product name
+	var product struct {
+		Name string `bson:"name"`
+	}
+	productCol().FindOne(ctx, bson.M{"_id": pid, "tenant_id": tid}).Decode(&product)
+
+	// Build variant label
+	variantLabel := ""
+	for k, val := range v.Attributes {
+		if variantLabel != "" {
+			variantLabel += ", "
+		}
+		variantLabel += k + ": " + val
+	}
+
+	barcode := ""
+	if len(v.Barcodes) > 0 {
+		barcode = v.Barcodes[0]
+	}
+
+	// Update variant qty
+	database.Col("product_variants").UpdateOne(ctx,
+		bson.M{"_id": vid, "tenant_id": tid},
+		bson.M{"$set": bson.M{"qty_available": input.QtyAfter, "updated_at": time.Now()}},
+	)
+
+	// Sync parent product qty
+	_ = variant.SyncParentStock(tenantID, pid)
+
+	adj := &StockAdjustment{
+		ID:             primitive.NewObjectID(),
+		TenantID:       tenantID,
+		ProductID:      pid,
+		VariantID:      &vid,
+		VariantLabel:   variantLabel,
+		ProductName:    product.Name,
+		Barcode:        barcode,
+		QtyBefore:      v.QtyAvailable,
 		QtyAfter:       input.QtyAfter,
 		Reason:         input.Reason,
 		CreatedBy:      userID,

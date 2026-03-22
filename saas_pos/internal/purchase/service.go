@@ -14,6 +14,7 @@ import (
 	"saas_pos/internal/expense"
 	"saas_pos/internal/price_history"
 	"saas_pos/internal/supplier_product"
+	"saas_pos/internal/variant"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -142,7 +143,7 @@ func buildLines(tenantID primitive.ObjectID, inputs []LineInput) ([]PurchaseLine
 		lineVAT := math.Round(lineHT*float64(p.VAT)/100*100) / 100
 		lineTTC := math.Round((lineHT+lineVAT)*100) / 100
 
-		lines = append(lines, PurchaseLine{
+		pl := PurchaseLine{
 			ProductID:   pid,
 			ProductName: p.Name,
 			Qty:         li.Qty,
@@ -158,7 +159,19 @@ func buildLines(tenantID primitive.ObjectID, inputs []LineInput) ([]PurchaseLine
 			PrixVente3:  li.PrixVente3,
 			Lot:         li.Lot,
 			ExpiryDate:  parseDate(li.ExpiryDate),
-		})
+		}
+
+		// Resolve variant if provided
+		if li.VariantID != "" {
+			v, verr := variant.GetByID(tenantID.Hex(), li.VariantID)
+			if verr != nil {
+				return nil, errors.New("variant not found: " + li.VariantID)
+			}
+			pl.VariantID = &v.ID
+			pl.VariantAttributes = v.Attributes
+		}
+
+		lines = append(lines, pl)
 	}
 	return lines, nil
 }
@@ -476,10 +489,15 @@ func Validate(tenantID, id, userID, userEmail string, input *ValidateInput) (*Pu
 	}
 
 	// Build a map of received quantities from input (partial validation)
+	// Key is "productID" or "productID:variantID" for variant lines
 	receivedMap := make(map[string]float64)
 	if input != nil && len(input.Lines) > 0 {
 		for _, vl := range input.Lines {
-			receivedMap[vl.ProductID] = vl.ReceivedQty
+			key := vl.ProductID
+			if vl.VariantID != "" {
+				key = vl.ProductID + ":" + vl.VariantID
+			}
+			receivedMap[key] = vl.ReceivedQty
 		}
 	}
 
@@ -495,7 +513,11 @@ func Validate(tenantID, id, userID, userEmail string, input *ValidateInput) (*Pu
 
 		// Determine how much to receive this time
 		receiveNow := remaining
-		if rq, ok := receivedMap[line.ProductID.Hex()]; ok {
+		lineKey := line.ProductID.Hex()
+		if line.VariantID != nil {
+			lineKey = line.ProductID.Hex() + ":" + line.VariantID.Hex()
+		}
+		if rq, ok := receivedMap[lineKey]; ok {
 			if rq < 0 {
 				rq = 0
 			}
@@ -540,44 +562,90 @@ func Validate(tenantID, id, userID, userEmail string, input *ValidateInput) (*Pu
 		effectivePrixAchat = math.Round(effectivePrixAchat*100) / 100
 
 		// Apply stock and price changes
-		var product struct {
-			QtyAvailable float64 `bson:"qty_available"`
-			PrixAchat    float64 `bson:"prix_achat"`
-		}
-		if err := database.Col("products").FindOne(ctx,
-			bson.M{"_id": line.ProductID, "tenant_id": tid},
-		).Decode(&product); err != nil {
-			return nil, errors.New("product not found: " + line.ProductID.Hex())
-		}
+		if line.VariantID != nil {
+			// Variant line: update variant stock and prices
+			var v struct {
+				QtyAvailable float64 `bson:"qty_available"`
+				PrixAchat    float64 `bson:"prix_achat"`
+			}
+			if err := database.Col("product_variants").FindOne(ctx,
+				bson.M{"_id": *line.VariantID, "tenant_id": tid},
+			).Decode(&v); err != nil {
+				return nil, errors.New("variant not found: " + line.VariantID.Hex())
+			}
 
-		var newPrixAchat float64
-		if product.QtyAvailable <= 0 {
-			newPrixAchat = effectivePrixAchat
+			var newPrixAchat float64
+			if v.QtyAvailable <= 0 {
+				newPrixAchat = effectivePrixAchat
+			} else {
+				newPrixAchat = (v.QtyAvailable*v.PrixAchat + receiveNow*effectivePrixAchat) /
+					(v.QtyAvailable + receiveNow)
+			}
+
+			vSet := bson.M{
+				"qty_available": v.QtyAvailable + receiveNow,
+				"prix_achat":    math.Round(newPrixAchat*100) / 100,
+				"updated_at":    time.Now(),
+			}
+			if line.PrixVente1 > 0 {
+				vSet["prix_vente_1"] = line.PrixVente1
+			}
+			if line.PrixVente2 > 0 {
+				vSet["prix_vente_2"] = line.PrixVente2
+			}
+			if line.PrixVente3 > 0 {
+				vSet["prix_vente_3"] = line.PrixVente3
+			}
+
+			if _, err := database.Col("product_variants").UpdateOne(ctx,
+				bson.M{"_id": *line.VariantID, "tenant_id": tid},
+				bson.M{"$set": vSet},
+			); err != nil {
+				return nil, err
+			}
+			// Sync parent product qty_available = sum of all variant quantities
+			_ = variant.SyncParentStock(tenantID, line.ProductID)
 		} else {
-			newPrixAchat = (product.QtyAvailable*product.PrixAchat + receiveNow*effectivePrixAchat) /
-				(product.QtyAvailable + receiveNow)
-		}
+			// Regular product line
+			var product struct {
+				QtyAvailable float64 `bson:"qty_available"`
+				PrixAchat    float64 `bson:"prix_achat"`
+			}
+			if err := database.Col("products").FindOne(ctx,
+				bson.M{"_id": line.ProductID, "tenant_id": tid},
+			).Decode(&product); err != nil {
+				return nil, errors.New("product not found: " + line.ProductID.Hex())
+			}
 
-		set := bson.M{
-			"qty_available": product.QtyAvailable + receiveNow,
-			"prix_achat":    math.Round(newPrixAchat*100) / 100,
-			"updated_at":    time.Now(),
-		}
-		if line.PrixVente1 > 0 {
-			set["prix_vente_1"] = line.PrixVente1
-		}
-		if line.PrixVente2 > 0 {
-			set["prix_vente_2"] = line.PrixVente2
-		}
-		if line.PrixVente3 > 0 {
-			set["prix_vente_3"] = line.PrixVente3
-		}
+			var newPrixAchat float64
+			if product.QtyAvailable <= 0 {
+				newPrixAchat = effectivePrixAchat
+			} else {
+				newPrixAchat = (product.QtyAvailable*product.PrixAchat + receiveNow*effectivePrixAchat) /
+					(product.QtyAvailable + receiveNow)
+			}
 
-		if _, err := database.Col("products").UpdateOne(ctx,
-			bson.M{"_id": line.ProductID, "tenant_id": tid},
-			bson.M{"$set": set},
-		); err != nil {
-			return nil, err
+			set := bson.M{
+				"qty_available": product.QtyAvailable + receiveNow,
+				"prix_achat":    math.Round(newPrixAchat*100) / 100,
+				"updated_at":    time.Now(),
+			}
+			if line.PrixVente1 > 0 {
+				set["prix_vente_1"] = line.PrixVente1
+			}
+			if line.PrixVente2 > 0 {
+				set["prix_vente_2"] = line.PrixVente2
+			}
+			if line.PrixVente3 > 0 {
+				set["prix_vente_3"] = line.PrixVente3
+			}
+
+			if _, err := database.Col("products").UpdateOne(ctx,
+				bson.M{"_id": line.ProductID, "tenant_id": tid},
+				bson.M{"$set": set},
+			); err != nil {
+				return nil, err
+			}
 		}
 
 		updatedLines[i].ReceivedQty += receiveNow

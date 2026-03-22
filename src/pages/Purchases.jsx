@@ -12,7 +12,7 @@ const STATUS_BADGE = {
   paid:                  'badge-success',
 }
 
-const emptyLine = { product_id: '', product_name: '', qty: 1, prix_achat: 0, remise: 0, prix_vente_1: 0, prix_vente_2: 0, prix_vente_3: 0, lot: '', expiry_date: '' }
+const emptyLine = { product_id: '', variant_id: '', variant_name: '', product_name: '', qty: 1, prix_achat: 0, remise: 0, prix_vente_1: 0, prix_vente_2: 0, prix_vente_3: 0, lot: '', expiry_date: '' }
 
 function NumInput({ label, value, onChange }) {
   return (
@@ -71,6 +71,10 @@ export default function Purchases({ path }) {
   const [dialogResults, setDialogResults] = useState([])
   const [dialogLoading, setDialogLoading] = useState(false)
   const lastDialogSearchRef = useRef('')
+
+  // Purchase variant picker
+  const [purchaseVariantProduct, setPurchaseVariantProduct] = useState(null)
+  const [purchaseVariants, setPurchaseVariants] = useState([])
 
   // Supplier search dialog state
   const [supplierDialogQ, setSupplierDialogQ] = useState('')
@@ -168,9 +172,22 @@ export default function Purchases({ path }) {
     document.getElementById('product-dialog')?.showModal()
   }
 
-  function selectProduct(p) {
+  async function selectProduct(p) {
+    // Check if product has variants
+    try {
+      const variants = await api.listVariants(p.id)
+      if (variants && variants.length > 0) {
+        setPurchaseVariantProduct(p)
+        setPurchaseVariants(variants)
+        document.getElementById('product-dialog')?.close()
+        document.getElementById('purchase-variant-dialog')?.showModal()
+        return
+      }
+    } catch {}
     setLineForm({
       product_id:   p.id,
+      variant_id:   '',
+      variant_name: '',
       product_name: p.name,
       qty:          1,
       prix_achat:   p.prix_achat,
@@ -183,10 +200,50 @@ export default function Purchases({ path }) {
     document.getElementById('product-dialog')?.close()
   }
 
+  function selectPurchaseVariant(v) {
+    const attrStr = v.attributes ? Object.values(v.attributes).join(', ') : ''
+    setLineForm({
+      product_id:   purchaseVariantProduct.id,
+      variant_id:   v.id,
+      variant_name: attrStr,
+      product_name: `${purchaseVariantProduct.name} (${attrStr})`,
+      qty:          1,
+      prix_achat:   v.prix_achat || purchaseVariantProduct.prix_achat,
+      prix_vente_1: v.prix_vente_1 || purchaseVariantProduct.prix_vente_1,
+      prix_vente_2: v.prix_vente_2 || purchaseVariantProduct.prix_vente_2,
+      prix_vente_3: v.prix_vente_3 || purchaseVariantProduct.prix_vente_3,
+      lot:          '',
+      expiry_date:  '',
+    })
+    document.getElementById('purchase-variant-dialog')?.close()
+    setPurchaseVariantProduct(null)
+    setPurchaseVariants([])
+  }
+
+  function selectPurchaseNoVariant() {
+    const p = purchaseVariantProduct
+    setLineForm({
+      product_id:   p.id,
+      variant_id:   '',
+      variant_name: '',
+      product_name: p.name,
+      qty:          1,
+      prix_achat:   p.prix_achat,
+      prix_vente_1: p.prix_vente_1,
+      prix_vente_2: p.prix_vente_2,
+      prix_vente_3: p.prix_vente_3,
+      lot:          '',
+      expiry_date:  '',
+    })
+    document.getElementById('purchase-variant-dialog')?.close()
+    setPurchaseVariantProduct(null)
+    setPurchaseVariants([])
+  }
+
   function addLine() {
     if (!lineForm.product_id || lineForm.qty <= 0) return
     setLines((prev) => {
-      const idx = prev.findIndex((l) => l.product_id === lineForm.product_id)
+      const idx = prev.findIndex((l) => l.product_id === lineForm.product_id && (l.variant_id || '') === (lineForm.variant_id || ''))
       if (idx >= 0) {
         const updated = [...prev]
         updated[idx] = { ...lineForm }
@@ -316,6 +373,7 @@ export default function Purchases({ path }) {
       note,
       lines: lines.map((l) => ({
         product_id:   l.product_id,
+        variant_id:   l.variant_id || '',
         qty:          l.qty,
         prix_achat:   l.prix_achat,
         remise:       l.remise || 0,
@@ -456,10 +514,12 @@ export default function Purchases({ path }) {
   }
 
   function addLowStockToForm(p) {
-    const exists = lines.find(l => l.product_id === p.id)
+    const exists = lines.find(l => l.product_id === p.id && !l.variant_id)
     if (exists) return
     setLines(prev => [...prev, {
       product_id: p.id,
+      variant_id: '',
+      variant_name: '',
       product_name: p.name,
       qty: Math.max(1, p.qty_min - p.qty_available),
       prix_achat: p.prix_achat,
@@ -803,6 +863,42 @@ export default function Purchases({ path }) {
           <form method="dialog" class="modal-backdrop">
             <button>close</button>
           </form>
+        </dialog>
+
+        {/* ── Purchase variant picker dialog ── */}
+        <dialog id="purchase-variant-dialog" class="modal modal-bottom sm:modal-middle">
+          <div class="modal-box max-w-md">
+            <h3 class="font-bold text-base mb-3">{purchaseVariantProduct?.name} — {t('variants')}</h3>
+            <div class="flex flex-col gap-2 max-h-64 overflow-y-auto">
+              <button
+                class="btn btn-outline btn-sm justify-between"
+                onClick={selectPurchaseNoVariant}
+              >
+                <span>{purchaseVariantProduct?.name} ({t('noVariant')})</span>
+                <span class="font-mono">{purchaseVariantProduct?.prix_achat?.toFixed(2)}</span>
+              </button>
+              {purchaseVariants.map(v => {
+                const attrStr = v.attributes ? Object.entries(v.attributes).map(([k, val]) => `${k}: ${val}`).join(', ') : ''
+                return (
+                  <button
+                    key={v.id}
+                    class="btn btn-sm justify-between"
+                    onClick={() => selectPurchaseVariant(v)}
+                  >
+                    <span class="text-left">{attrStr || '—'}</span>
+                    <span class="flex items-center gap-2">
+                      <span class="badge badge-ghost badge-sm">{t('qty')}: {v.qty_available}</span>
+                      <span class="font-mono font-bold">{v.prix_achat?.toFixed(2)}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            <div class="modal-action mt-3">
+              <form method="dialog"><button class="btn btn-sm btn-ghost">{t('back')}</button></form>
+            </div>
+          </div>
+          <form method="dialog" class="modal-backdrop"><button>close</button></form>
         </dialog>
 
         {/* ── Supplier search dialog ── */}

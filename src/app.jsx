@@ -7,11 +7,12 @@ import { loadConfig, appMode, getServerUrl, resetConfig } from './lib/config'
 import { useHotkeys } from './lib/hotkeys'
 import { ToastContainer } from './components/Toast'
 import { ShortcutsOverlay, shortcutsOpen } from './components/ShortcutsOverlay'
+import AdminPanel, { adminPanelOpen, initSaHeaders } from './admin/AdminPanel'
 
 const Setup = lazy(() => import('./pages/Setup'))
 const ModeSelect = lazy(() => import('./pages/ModeSelect'))
 const Login = lazy(() => import('./pages/Login'))
-const Signup = lazy(() => import('./pages/Signup'))
+// const Signup = lazy(() => import('./pages/Signup')) // removed — local desktop mode
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Users = lazy(() => import('./pages/Users'))
 const Products = lazy(() => import('./pages/Products'))
@@ -180,6 +181,7 @@ export function App() {
           return
         }
         setActivationHeaders(machineId, keyData)
+        initSaHeaders(machineId, keyData)
       } catch {
         setState('activation')
         return
@@ -314,15 +316,16 @@ export function App() {
     'ctrl+p': () => route('/pos'),
     'ctrl+f': () => { document.querySelector('[data-search]')?.focus() },
     '?': () => { shortcutsOpen.value = !shortcutsOpen.value },
+    'ctrl+shift+f12': () => { adminPanelOpen.value = !adminPanelOpen.value },
   }, [])
 
   return (
     <Suspense fallback={<Spinner />}>
       <ToastContainer />
       <ShortcutsOverlay />
+      <AdminPanel />
       <Router>
         <Login path="/login" />
-        <Signup path="/signup" />
         <Guard component={Dashboard} path="/dashboard" />
         <Guard component={Users} path="/users" adminOnly feat="access_management" />
         <Guard component={Products} path="/products" feat="products" perm={['products', 'view']} />

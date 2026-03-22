@@ -9,25 +9,27 @@ import (
 )
 
 type Plan struct {
-	ID          primitive.ObjectID    `bson:"_id,omitempty" json:"id"`
-	Name        string                `bson:"name"          json:"name"`
-	Description string                `bson:"description"   json:"description"`
-	Price       float64               `bson:"price"         json:"price"`
+	ID            primitive.ObjectID    `bson:"_id,omitempty"   json:"id"`
+	Name          string                `bson:"name"            json:"name"`
+	Description   string                `bson:"description"     json:"description"`
+	Price         float64               `bson:"price"           json:"price"`
 	MaxUsers      int                   `bson:"max_users"       json:"max_users"`       // 0 = unlimited
 	MaxProducts   int                   `bson:"max_products"    json:"max_products"`    // 0 = unlimited
 	MaxSalesMonth int                   `bson:"max_sales_month" json:"max_sales_month"` // 0 = unlimited
-	Features    features.PlanFeatures `bson:"features"      json:"features"`
-	Active      bool                  `bson:"active"        json:"active"`
-	CreatedAt   time.Time             `bson:"created_at"    json:"created_at"`
-	UpdatedAt   time.Time             `bson:"updated_at"    json:"updated_at"`
+	Features      features.PlanFeatures `bson:"features"        json:"features"`
+	FeaturePrices map[string]float64    `bson:"feature_prices"  json:"feature_prices"`
+	Active        bool                  `bson:"active"          json:"active"`
+	CreatedAt     time.Time             `bson:"created_at"      json:"created_at"`
+	UpdatedAt     time.Time             `bson:"updated_at"      json:"updated_at"`
 }
 
 type PlanInput struct {
-	Name        string                `json:"name"`
-	Description string                `json:"description"`
-	Price       float64               `json:"price"`
+	Name          string                `json:"name"`
+	Description   string                `json:"description"`
+	Price         float64               `json:"price"`
 	MaxUsers      int                   `json:"max_users"`
 	MaxProducts   int                   `json:"max_products"`
 	MaxSalesMonth int                   `json:"max_sales_month"`
-	Features    features.PlanFeatures `json:"features"`
+	Features      features.PlanFeatures `json:"features"`
+	FeaturePrices map[string]float64    `json:"feature_prices"`
 }

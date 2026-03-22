@@ -23,6 +23,7 @@ tauri-plugin-log = "2"
 tauri-plugin-store = "2"
 tauri-plugin-shell = "2"
 sha2 = "0.10"
+hmac = "0.12"
 hex = "0.4"
 hostname = "0.4"
 obfstr = "0.4"
@@ -49,7 +50,8 @@ codegen-units = 16
 
 [profile.release]
 strip = true
-lto = "thin"
+lto = "fat"
 panic = "abort"
 opt-level = "s"
 codegen-units = 1
+overflow-checks = true

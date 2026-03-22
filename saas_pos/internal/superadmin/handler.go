@@ -101,6 +101,24 @@ func HandleList(c *fiber.Ctx) error {
 	return response.OK(c, result)
 }
 
+// POST /api/super-admin/change-password  [super_admin only]
+func HandleChangePassword(c *fiber.Ctx) error {
+	claims := middleware.GetClaims(c)
+	var body struct {
+		NewPassword string `json:"new_password"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return response.BadRequest(c, "invalid body")
+	}
+	if body.NewPassword == "" {
+		return response.BadRequest(c, "new_password is required")
+	}
+	if err := ChangePassword(claims.ID, body.NewPassword); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"updated": true})
+}
+
 // PATCH /api/super-admin/admins/:id/active  [super_admin only]
 func HandleSetActive(c *fiber.Ctx) error {
 	id := c.Params("id")

@@ -81,11 +81,11 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} class="space-y-4">
             <label class="form-control">
-              <span class="label-text">{t('email')}</span>
-              <input ref={emailRef} type="email" class="input input-bordered w-full"
-                placeholder="name@store.com"
+              <span class="label-text">{t('username') || 'Username'}</span>
+              <input ref={emailRef} type="text" class="input input-bordered w-full"
+                placeholder="admin"
                 value={form.email} onInput={(e) => setForm({ ...form, email: e.target.value })}
-                data-search required autocomplete="email" />
+                data-search required autocomplete="username" />
             </label>
             <label class="form-control">
               <span class="label-text">{t('password')}</span>
@@ -106,10 +106,6 @@ export default function Login() {
               {t('signIn')}
             </button>
 
-            <p class="text-center text-sm text-base-content/50 pt-1">
-              {t('noAccount')}{' '}
-              <a href="/signup" class="link link-primary font-medium">{t('createStore')}</a>
-            </p>
           </form>
 
           <div class="text-center mt-3 pt-3 border-t border-base-200">

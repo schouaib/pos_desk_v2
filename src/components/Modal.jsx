@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'preact/hooks'
 
 export function Modal({ id, title, children, size }) {
-  const boxClass = size === 'xl' ? 'modal-box w-full sm:max-w-3xl max-h-[85vh] overflow-y-auto'
-    : size === 'lg' ? 'modal-box w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto'
-    : 'modal-box w-full sm:max-w-lg max-h-[85vh] overflow-y-auto'
+  const boxClass = size === 'xl' ? 'modal-box w-full sm:max-w-2xl max-h-[80vh] overflow-y-auto p-4'
+    : size === 'lg' ? 'modal-box w-full sm:max-w-xl max-h-[80vh] overflow-y-auto p-4'
+    : 'modal-box w-full sm:max-w-lg max-h-[80vh] overflow-y-auto p-4'
 
   const boxRef = useRef()
 
@@ -32,8 +32,8 @@ export function Modal({ id, title, children, size }) {
   return (
     <dialog id={id} class="modal modal-bottom sm:modal-middle" role="dialog" aria-labelledby={`${id}-title`}>
       <div class={boxClass} ref={boxRef}>
-        <div class="flex items-start justify-between mb-4 gap-2">
-          <h3 id={`${id}-title`} class="font-bold text-lg leading-tight">{title}</h3>
+        <div class="flex items-start justify-between mb-3 gap-2">
+          <h3 id={`${id}-title`} class="font-bold text-base leading-tight">{title}</h3>
           <form method="dialog">
             <button class="btn btn-sm btn-ghost btn-square -mt-0.5 -me-1 opacity-60 hover:opacity-100" aria-label="Close">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

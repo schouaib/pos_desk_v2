@@ -23,17 +23,18 @@ func Create(input PlanInput) (*Plan, error) {
 
 	now := time.Now()
 	plan := Plan{
-		ID:          primitive.NewObjectID(),
-		Name:        input.Name,
-		Description: input.Description,
-		Price:       input.Price,
+		ID:            primitive.NewObjectID(),
+		Name:          input.Name,
+		Description:   input.Description,
+		Price:         input.Price,
 		MaxUsers:      input.MaxUsers,
 		MaxProducts:   input.MaxProducts,
 		MaxSalesMonth: input.MaxSalesMonth,
 		Features:      input.Features,
-		Active:      true,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		FeaturePrices: input.FeaturePrices,
+		Active:        true,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 
 	if _, err := col().InsertOne(ctx, plan); err != nil {
@@ -90,14 +91,15 @@ func Update(id string, input PlanInput) (*Plan, error) {
 	}
 
 	update := bson.M{"$set": bson.M{
-		"name":         input.Name,
-		"description":  input.Description,
-		"price":        input.Price,
+		"name":            input.Name,
+		"description":     input.Description,
+		"price":           input.Price,
 		"max_users":       input.MaxUsers,
 		"max_products":    input.MaxProducts,
 		"max_sales_month": input.MaxSalesMonth,
 		"features":        input.Features,
-		"updated_at":   time.Now(),
+		"feature_prices":  input.FeaturePrices,
+		"updated_at":      time.Now(),
 	}}
 
 	after := options.After

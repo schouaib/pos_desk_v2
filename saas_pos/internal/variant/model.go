@@ -33,11 +33,12 @@ type CreateInput struct {
 }
 
 type UpdateInput struct {
-	Attributes map[string]string `json:"attributes"`
-	Barcodes   []string          `json:"barcodes"`
-	PrixAchat  float64           `json:"prix_achat"`
-	PrixVente1 float64           `json:"prix_vente_1"`
-	PrixVente2 float64           `json:"prix_vente_2"`
-	PrixVente3 float64           `json:"prix_vente_3"`
-	IsActive   bool              `json:"is_active"`
+	Attributes   map[string]string `json:"attributes"`
+	Barcodes     []string          `json:"barcodes"`
+	QtyAvailable float64           `json:"qty_available"`
+	PrixAchat    float64           `json:"prix_achat"`
+	PrixVente1   float64           `json:"prix_vente_1"`
+	PrixVente2   float64           `json:"prix_vente_2"`
+	PrixVente3   float64           `json:"prix_vente_3"`
+	IsActive     bool              `json:"is_active"`
 }

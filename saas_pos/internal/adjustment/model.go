@@ -7,21 +7,24 @@ import (
 )
 
 type StockAdjustment struct {
-	ID             primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	TenantID       string             `bson:"tenant_id"     json:"-"`
-	ProductID      primitive.ObjectID `bson:"product_id"    json:"product_id"`
-	ProductName    string             `bson:"product_name"  json:"product_name"`
-	Barcode        string             `bson:"barcode"       json:"barcode"`
-	QtyBefore      float64            `bson:"qty_before"    json:"qty_before"`
-	QtyAfter       float64            `bson:"qty_after"     json:"qty_after"`
-	Reason         string             `bson:"reason"        json:"reason"`
-	CreatedBy      string             `bson:"created_by"    json:"created_by"`
-	CreatedByEmail string             `bson:"created_by_email" json:"created_by_email"`
-	CreatedAt      time.Time          `bson:"created_at"    json:"created_at"`
+	ID             primitive.ObjectID  `bson:"_id,omitempty" json:"id"`
+	TenantID       string              `bson:"tenant_id"     json:"-"`
+	ProductID      primitive.ObjectID  `bson:"product_id"    json:"product_id"`
+	VariantID      *primitive.ObjectID `bson:"variant_id,omitempty" json:"variant_id,omitempty"`
+	VariantLabel   string              `bson:"variant_label,omitempty" json:"variant_label,omitempty"`
+	ProductName    string              `bson:"product_name"  json:"product_name"`
+	Barcode        string              `bson:"barcode"       json:"barcode"`
+	QtyBefore      float64             `bson:"qty_before"    json:"qty_before"`
+	QtyAfter       float64             `bson:"qty_after"     json:"qty_after"`
+	Reason         string              `bson:"reason"        json:"reason"`
+	CreatedBy      string              `bson:"created_by"    json:"created_by"`
+	CreatedByEmail string              `bson:"created_by_email" json:"created_by_email"`
+	CreatedAt      time.Time           `bson:"created_at"    json:"created_at"`
 }
 
 type CreateInput struct {
 	ProductID string  `json:"product_id"`
+	VariantID string  `json:"variant_id,omitempty"`
 	QtyAfter  float64 `json:"qty_after"`
 	Reason    string  `json:"reason"`
 }

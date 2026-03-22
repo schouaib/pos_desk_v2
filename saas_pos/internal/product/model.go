@@ -31,8 +31,19 @@ type Product struct {
 	ArchivedAt   *time.Time         `bson:"archived_at" json:"archived_at,omitempty"`
 	IsBundle     bool               `bson:"is_bundle" json:"is_bundle"`
 	BundleItems  []BundleItem       `bson:"bundle_items" json:"bundle_items"`
+	// Scale (Rongta RL1000) fields
+	IsWeighable   bool    `bson:"is_weighable" json:"is_weighable"`
+	LFCode        int     `bson:"lfcode" json:"lfcode"`                 // Fresh code 1-999999, unique per scale PLU
+	WeightUnit    int     `bson:"weight_unit" json:"weight_unit"`       // 0:50g,1:g,2:10g,3:100g,4:Kg,5:oz,6:Lb,7:500g,8:600g,9:PCS(g),10:PCS(Kg),11:PCS(oz),12:PCS(Lb)
+	Tare          float64 `bson:"tare" json:"tare"`                     // Tare weight (max 15Kg)
+	ShelfLife     int     `bson:"shelf_life" json:"shelf_life"`         // Shelf life in days 0-365
+	PackageType   int     `bson:"package_type" json:"package_type"`     // 0:Normal,1:FixedWeight,2:Pricing,3:FixedPrice,4:QRCode
+	PackageWeight float64 `bson:"package_weight" json:"package_weight"` // Package/limit weight (max 15Kg)
+	ScaleDeptment int     `bson:"scale_deptment" json:"scale_deptment"` // Department 2 digits for barcode
 	CreatedAt    time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt    time.Time          `bson:"updated_at" json:"updated_at"`
+	// Computed field (not stored in DB) — true when product has at least one variant
+	HasVariants  bool               `bson:"-" json:"has_variants"`
 }
 
 type BundleItem struct {
@@ -76,6 +87,15 @@ type CreateInput struct {
 	ImageURL         string       `json:"image_url"`
 	IsBundle         bool         `json:"is_bundle"`
 	BundleItems      []BundleItem `json:"bundle_items"`
+	// Scale fields
+	IsWeighable   bool    `json:"is_weighable"`
+	LFCode        int     `json:"lfcode"`
+	WeightUnit    int     `json:"weight_unit"`
+	Tare          float64 `json:"tare"`
+	ShelfLife     int     `json:"shelf_life"`
+	PackageType   int     `json:"package_type"`
+	PackageWeight float64 `json:"package_weight"`
+	ScaleDeptment int     `json:"scale_deptment"`
 }
 
 // UpdateInput is identical to CreateInput but qty_available is excluded —
@@ -100,6 +120,15 @@ type UpdateInput struct {
 	ImageURL        string       `json:"image_url"`
 	IsBundle        bool         `json:"is_bundle"`
 	BundleItems     []BundleItem `json:"bundle_items"`
+	// Scale fields
+	IsWeighable   bool    `json:"is_weighable"`
+	LFCode        int     `json:"lfcode"`
+	WeightUnit    int     `json:"weight_unit"`
+	Tare          float64 `json:"tare"`
+	ShelfLife     int     `json:"shelf_life"`
+	PackageType   int     `json:"package_type"`
+	PackageWeight float64 `json:"package_weight"`
+	ScaleDeptment int     `json:"scale_deptment"`
 }
 
 type ListResult struct {
@@ -111,7 +140,6 @@ type ListResult struct {
 }
 
 // Movement represents a single stock movement event for a product.
-// Type is "purchase" for now; future values: "sale", "loss", "return".
 type Movement struct {
 	Date         time.Time `bson:"date"          json:"date"`
 	Type         string    `bson:"type"          json:"type"`
@@ -119,6 +147,7 @@ type Movement struct {
 	PrixAchat    float64   `bson:"prix_achat"    json:"prix_achat"`
 	Reference    string    `bson:"reference"     json:"reference"`
 	SupplierName string    `bson:"supplier_name" json:"supplier_name"`
+	VariantLabel string    `bson:"-"             json:"variant_label,omitempty"`
 }
 
 // BulkImportRow is one parsed row from a TSV product import.

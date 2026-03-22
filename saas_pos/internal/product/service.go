@@ -125,6 +125,14 @@ func Create(tenantID string, input CreateInput) (*Product, error) {
 		ImageURL:         input.ImageURL,
 		IsBundle:         input.IsBundle,
 		BundleItems:      input.BundleItems,
+		IsWeighable:      input.IsWeighable,
+		LFCode:           input.LFCode,
+		WeightUnit:       input.WeightUnit,
+		Tare:             input.Tare,
+		ShelfLife:         input.ShelfLife,
+		PackageType:      input.PackageType,
+		PackageWeight:    input.PackageWeight,
+		ScaleDeptment:    input.ScaleDeptment,
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
@@ -195,6 +203,31 @@ func List(tenantID string, query string, page, limit int, categoryID ...string) 
 	items := []Product{}
 	if err = cursor.All(ctx, &items); err != nil {
 		return nil, err
+	}
+
+	// Enrich with has_variants flag
+	if len(items) > 0 {
+		productIDs := make(bson.A, len(items))
+		for i, p := range items {
+			productIDs[i] = p.ID
+		}
+		variantCursor, vErr := database.Col("product_variants").Aggregate(ctx, mongo.Pipeline{
+			{{Key: "$match", Value: bson.M{"tenant_id": tid, "parent_product_id": bson.M{"$in": productIDs}}}},
+			{{Key: "$group", Value: bson.M{"_id": "$parent_product_id"}}},
+		})
+		if vErr == nil {
+			defer variantCursor.Close(ctx)
+			hasVarSet := make(map[primitive.ObjectID]bool)
+			for variantCursor.Next(ctx) {
+				var doc struct{ ID primitive.ObjectID `bson:"_id"` }
+				if variantCursor.Decode(&doc) == nil {
+					hasVarSet[doc.ID] = true
+				}
+			}
+			for i := range items {
+				items[i].HasVariants = hasVarSet[items[i].ID]
+			}
+		}
 	}
 
 	pages := int(math.Ceil(float64(total) / float64(limit)))
@@ -296,9 +329,17 @@ func Update(tenantID, id string, input UpdateInput) (*Product, error) {
 		"is_service":         input.IsService,
 		"expiry_alert_days":  input.ExpiryAlertDays,
 		"image_url":          input.ImageURL,
-		"is_bundle":     input.IsBundle,
-		"bundle_items":  bundleItems,
-		"updated_at":    time.Now(),
+		"is_bundle":       input.IsBundle,
+		"bundle_items":    bundleItems,
+		"is_weighable":    input.IsWeighable,
+		"lfcode":          input.LFCode,
+		"weight_unit":     input.WeightUnit,
+		"tare":            input.Tare,
+		"shelf_life":      input.ShelfLife,
+		"package_type":    input.PackageType,
+		"package_weight":  input.PackageWeight,
+		"scale_deptment":  input.ScaleDeptment,
+		"updated_at":      time.Now(),
 	}
 
 	// Capture old prices before update for price history
@@ -364,6 +405,32 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 		}
 	}
 
+	// Build variant lookup map for labeling movements
+	variantLabels := map[string]string{} // variantID hex → "size: L, color: Red"
+	if varCur, vErr := database.Col("product_variants").Find(ctx, bson.M{"tenant_id": tid, "parent_product_id": pid}); vErr == nil {
+		defer varCur.Close(ctx)
+		for varCur.Next(ctx) {
+			var vDoc struct {
+				ID         primitive.ObjectID `bson:"_id"`
+				Attributes map[string]string  `bson:"attributes"`
+			}
+			if varCur.Decode(&vDoc) == nil {
+				parts := make([]string, 0, len(vDoc.Attributes))
+				for k, v := range vDoc.Attributes {
+					parts = append(parts, k+": "+v)
+				}
+				label := ""
+				for i, p := range parts {
+					if i > 0 {
+						label += ", "
+					}
+					label += p
+				}
+				variantLabels[vDoc.ID.Hex()] = label
+			}
+		}
+	}
+
 	// ── 1. Purchase movements ─────────────────────────────────────────────────
 	purchaseFilter := bson.M{
 		"tenant_id":        tid,
@@ -374,28 +441,51 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 		purchaseFilter["created_at"] = dateFilter
 	}
 
-	matchPurchase := bson.D{{Key: "$match", Value: purchaseFilter}}
-	unwindLines  := bson.D{{Key: "$unwind", Value: "$lines"}}
-	matchLine    := bson.D{{Key: "$match", Value: bson.M{"lines.product_id": pid}}}
-	projectStage := bson.D{{Key: "$project", Value: bson.M{
-		"date":          bson.M{"$ifNull": bson.A{"$validated_at", "$created_at"}},
-		"type":          bson.M{"$literal": "purchase"},
-		"qty":           "$lines.qty",
-		"prix_achat":    "$lines.prix_achat",
-		"reference":     bson.M{"$toString": "$_id"},
-		"supplier_name": "$supplier_name",
-	}}}
+	type purchaseMovDoc struct {
+		Date         time.Time          `bson:"date"`
+		Qty          float64            `bson:"qty"`
+		PrixAchat    float64            `bson:"prix_achat"`
+		Reference    string             `bson:"reference"`
+		SupplierName string             `bson:"supplier_name"`
+		VariantID    *primitive.ObjectID `bson:"variant_id"`
+	}
+	purchasePipeline := mongo.Pipeline{
+		bson.D{{Key: "$match", Value: purchaseFilter}},
+		bson.D{{Key: "$unwind", Value: "$lines"}},
+		bson.D{{Key: "$match", Value: bson.M{"lines.product_id": pid}}},
+		bson.D{{Key: "$project", Value: bson.M{
+			"date":          bson.M{"$ifNull": bson.A{"$validated_at", "$created_at"}},
+			"qty":           "$lines.qty",
+			"prix_achat":    "$lines.prix_achat",
+			"reference":     bson.M{"$toString": "$_id"},
+			"supplier_name": "$supplier_name",
+			"variant_id":    "$lines.variant_id",
+		}}},
+	}
 
-	cursor, err := database.Col("purchases").Aggregate(ctx, mongo.Pipeline{
-		matchPurchase, unwindLines, matchLine, projectStage,
-	})
+	cursor, err := database.Col("purchases").Aggregate(ctx, purchasePipeline)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
-	var allItems []Movement
-	if err = cursor.All(ctx, &allItems); err != nil {
+	var purchaseDocs []purchaseMovDoc
+	if err = cursor.All(ctx, &purchaseDocs); err != nil {
 		return nil, err
+	}
+	var allItems []Movement
+	for _, pd := range purchaseDocs {
+		m := Movement{
+			Date:         pd.Date,
+			Type:         "purchase",
+			Qty:          pd.Qty,
+			PrixAchat:    pd.PrixAchat,
+			Reference:    pd.Reference,
+			SupplierName: pd.SupplierName,
+		}
+		if pd.VariantID != nil {
+			m.VariantLabel = variantLabels[pd.VariantID.Hex()]
+		}
+		allItems = append(allItems, m)
 	}
 
 	// ── 2. Loss movements ─────────────────────────────────────────────────────
@@ -414,23 +504,33 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 	defer lossCur.Close(ctx)
 
 	type lossDoc struct {
-		Type      string    `bson:"type"`
-		Qty       int       `bson:"qty"`
-		Remark    string    `bson:"remark"`
-		CreatedAt time.Time `bson:"created_at"`
+		Type         string              `bson:"type"`
+		Qty          int                 `bson:"qty"`
+		Remark       string              `bson:"remark"`
+		VariantID    *primitive.ObjectID  `bson:"variant_id"`
+		VariantLabel string              `bson:"variant_label"`
+		CreatedAt    time.Time           `bson:"created_at"`
 	}
 	var losses []lossDoc
 	lossCur.All(ctx, &losses)
 
 	for _, l := range losses {
-		allItems = append(allItems, Movement{
+		m := Movement{
 			Date:         l.CreatedAt,
 			Type:         "loss",
 			Qty:          -float64(l.Qty), // negative = stock reduction
 			PrixAchat:    0,
 			Reference:    l.Type,
 			SupplierName: l.Remark,
-		})
+		}
+		if l.VariantID != nil {
+			if label := l.VariantLabel; label != "" {
+				m.VariantLabel = label
+			} else {
+				m.VariantLabel = variantLabels[l.VariantID.Hex()]
+			}
+		}
+		allItems = append(allItems, m)
 	}
 
 	// ── 3. Sale movements ─────────────────────────────────────────────────────
@@ -441,25 +541,43 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 	if len(dateFilter) > 0 {
 		saleFilter["created_at"] = dateFilter
 	}
+	type saleMovDoc struct {
+		Date      time.Time          `bson:"date"`
+		Qty       float64            `bson:"qty"`
+		PrixAchat float64            `bson:"prix_achat"`
+		Reference string             `bson:"reference"`
+		VariantID *primitive.ObjectID `bson:"variant_id"`
+	}
 	salePipeline := mongo.Pipeline{
 		bson.D{{Key: "$match", Value: saleFilter}},
 		bson.D{{Key: "$unwind", Value: "$lines"}},
 		bson.D{{Key: "$match", Value: bson.M{"lines.product_id": pid}}},
 		bson.D{{Key: "$project", Value: bson.M{
-			"date":          "$created_at",
-			"type":          bson.M{"$literal": "sale"},
-			"qty":           bson.M{"$multiply": bson.A{"$lines.qty", -1}},
-			"prix_achat":    "$lines.unit_price",
-			"reference":     bson.M{"$toString": "$_id"},
-			"supplier_name": bson.M{"$literal": ""},
+			"date":       "$created_at",
+			"qty":        bson.M{"$multiply": bson.A{"$lines.qty", -1}},
+			"prix_achat": "$lines.unit_price",
+			"reference":  bson.M{"$toString": "$_id"},
+			"variant_id": "$lines.variant_id",
 		}}},
 	}
 	saleCur, err := database.Col("sales").Aggregate(ctx, salePipeline)
 	if err == nil {
 		defer saleCur.Close(ctx)
-		var saleMovs []Movement
-		saleCur.All(ctx, &saleMovs)
-		allItems = append(allItems, saleMovs...)
+		var saleDocs []saleMovDoc
+		saleCur.All(ctx, &saleDocs)
+		for _, sd := range saleDocs {
+			m := Movement{
+				Date:      sd.Date,
+				Type:      "sale",
+				Qty:       sd.Qty,
+				PrixAchat: sd.PrixAchat,
+				Reference: sd.Reference,
+			}
+			if sd.VariantID != nil {
+				m.VariantLabel = variantLabels[sd.VariantID.Hex()]
+			}
+			allItems = append(allItems, m)
+		}
 	}
 
 	// ── 4. Adjustment movements ─────────────────────────────────────────────
@@ -474,20 +592,30 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 	if adjErr == nil {
 		defer adjCur.Close(ctx)
 		type adjDoc struct {
-			QtyBefore float64   `bson:"qty_before"`
-			QtyAfter  float64   `bson:"qty_after"`
-			Reason    string    `bson:"reason"`
-			CreatedAt time.Time `bson:"created_at"`
+			QtyBefore    float64             `bson:"qty_before"`
+			QtyAfter     float64             `bson:"qty_after"`
+			Reason       string              `bson:"reason"`
+			VariantID    *primitive.ObjectID  `bson:"variant_id"`
+			VariantLabel string              `bson:"variant_label"`
+			CreatedAt    time.Time           `bson:"created_at"`
 		}
 		var adjs []adjDoc
 		adjCur.All(ctx, &adjs)
 		for _, a := range adjs {
-			allItems = append(allItems, Movement{
-				Date:         a.CreatedAt,
-				Type:         "adjustment",
-				Qty:          a.QtyAfter - a.QtyBefore,
-				Reference:    a.Reason,
-			})
+			m := Movement{
+				Date:      a.CreatedAt,
+				Type:      "adjustment",
+				Qty:       a.QtyAfter - a.QtyBefore,
+				Reference: a.Reason,
+			}
+			if a.VariantID != nil {
+				if label := a.VariantLabel; label != "" {
+					m.VariantLabel = label
+				} else {
+					m.VariantLabel = variantLabels[a.VariantID.Hex()]
+				}
+			}
+			allItems = append(allItems, m)
 		}
 	}
 
@@ -499,25 +627,43 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 	if len(dateFilter) > 0 {
 		retFilter["created_at"] = dateFilter
 	}
+	type retMovDoc struct {
+		Date      time.Time          `bson:"date"`
+		Qty       float64            `bson:"qty"`
+		PrixAchat float64            `bson:"prix_achat"`
+		Reference string             `bson:"reference"`
+		VariantID *primitive.ObjectID `bson:"variant_id"`
+	}
 	retPipeline := mongo.Pipeline{
 		bson.D{{Key: "$match", Value: retFilter}},
 		bson.D{{Key: "$unwind", Value: "$lines"}},
 		bson.D{{Key: "$match", Value: bson.M{"lines.product_id": pid}}},
 		bson.D{{Key: "$project", Value: bson.M{
-			"date":          "$created_at",
-			"type":          bson.M{"$literal": "sale_return"},
-			"qty":           "$lines.qty",
-			"prix_achat":    "$lines.prix_achat",
-			"reference":     "$ref",
-			"supplier_name": bson.M{"$literal": ""},
+			"date":       "$created_at",
+			"qty":        "$lines.qty",
+			"prix_achat": "$lines.prix_achat",
+			"reference":  "$ref",
+			"variant_id": "$lines.variant_id",
 		}}},
 	}
 	retCur, retErr := database.Col("sale_returns").Aggregate(ctx, retPipeline)
 	if retErr == nil {
 		defer retCur.Close(ctx)
-		var retMovs []Movement
-		retCur.All(ctx, &retMovs)
-		allItems = append(allItems, retMovs...)
+		var retDocs []retMovDoc
+		retCur.All(ctx, &retDocs)
+		for _, rd := range retDocs {
+			m := Movement{
+				Date:      rd.Date,
+				Type:      "sale_return",
+				Qty:       rd.Qty,
+				PrixAchat: rd.PrixAchat,
+				Reference: rd.Reference,
+			}
+			if rd.VariantID != nil {
+				m.VariantLabel = variantLabels[rd.VariantID.Hex()]
+			}
+			allItems = append(allItems, m)
+		}
 	}
 
 	// ── 6. Sort by date desc, paginate in Go ──────────────────────────────────
@@ -772,7 +918,7 @@ func Duplicate(tenantID, id string) (*Product, error) {
 		CategoryID:   p.CategoryID.Hex(),
 		BrandID:      p.BrandID.Hex(),
 		UnitID:       p.UnitID.Hex(),
-		Ref:          p.Ref,
+		Ref:          "",
 		Abbreviation: p.Abbreviation,
 		QtyAvailable: 0,
 		QtyMin:       p.QtyMin,
@@ -782,8 +928,16 @@ func Duplicate(tenantID, id string) (*Product, error) {
 		PrixVente3:   p.PrixVente3,
 		PrixMinimum:  p.PrixMinimum,
 		VAT:          p.VAT,
-		IsService:    p.IsService,
-		ImageURL:     p.ImageURL,
+		IsService:     p.IsService,
+		ImageURL:      p.ImageURL,
+		IsWeighable:   p.IsWeighable,
+		LFCode:        0, // LFCode must be unique, don't copy
+		WeightUnit:    p.WeightUnit,
+		Tare:          p.Tare,
+		ShelfLife:      p.ShelfLife,
+		PackageType:   p.PackageType,
+		PackageWeight: p.PackageWeight,
+		ScaleDeptment: p.ScaleDeptment,
 	}
 	return Create(tenantID, input)
 }

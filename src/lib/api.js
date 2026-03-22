@@ -79,6 +79,9 @@ async function request(method, path, body, { timeout = 15000 } = {}) {
     clearAuth()
     throw new Error('Session expired')
   }
+  if (res.status === 400 && json.error && json.error.includes('product limit')) {
+    throw new Error('product_limit')
+  }
   if (!res.ok) throw new Error(json.error || 'Request failed')
   return json.data
 }
@@ -94,12 +97,14 @@ export const api = {
   login: (body) => request('POST', '/tenant/auth/login', body),
   logout: () => request('POST', '/tenant/auth/logout'),
   me: () => request('GET', '/tenant/auth/me'),
+  changePassword: (body) => request('POST', '/tenant/auth/change-password', body),
 
   // Users
   listUsers: (page = 1) => request('GET', `/tenant/users/?page=${encodeURIComponent(page)}`),
   createUser: (body) => request('POST', '/tenant/users/', body),
   updateUser: (id, body) => request('PUT', `/tenant/users/${encodeURIComponent(id)}`, body),
   setUserActive: (id, active) => request('PATCH', `/tenant/users/${encodeURIComponent(id)}/active`, { active }),
+  resetUserPassword: (id, newPassword) => request('PATCH', `/tenant/users/${encodeURIComponent(id)}/password`, { new_password: newPassword }),
 
   // Units
   listUnits: () => cachedGet('/tenant/units?limit=500').then(r => r.items || []),
@@ -189,6 +194,7 @@ export const api = {
   createVariant: (productId, body) => request('POST', `/tenant/products/${encodeURIComponent(productId)}/variants`, body),
   updateVariant: (id, body) => request('PUT', `/tenant/variants/${encodeURIComponent(id)}`, body),
   deleteVariant: (id) => request('DELETE', `/tenant/variants/${encodeURIComponent(id)}`),
+  findVariantByBarcode: (barcode) => request('GET', `/tenant/variants/barcode/${encodeURIComponent(barcode)}`),
 
   // Stock transfers
   listLocations: () => request('GET', '/tenant/locations'),
@@ -325,6 +331,16 @@ export const api = {
   markChatRead: () => request('PUT', '/tenant/chat/read'),
   getChatUnread: () => request('GET', '/tenant/chat/unread'),
 
+  // Scale (Rongta RL1000)
+  scaleConnect: (body) => request('POST', '/tenant/scale/connect', body),
+  scaleDisconnect: () => request('POST', '/tenant/scale/disconnect'),
+  scaleGetStatus: () => request('GET', '/tenant/scale/status'),
+  scaleGetWeight: () => request('GET', '/tenant/scale/weight'),
+  scaleSyncPLU: () => request('POST', '/tenant/scale/plu/sync'),
+  scaleClearPLU: () => request('DELETE', '/tenant/scale/plu'),
+  saveScaleSettings: (body) => request('PUT', '/tenant/scale/settings', body),
+  getScaleSettings: () => request('GET', '/tenant/scale/settings'),
+
   // Folders
   listFolders: () => request('GET', '/tenant/folders'),
   listFolderRequests: () => request('GET', '/tenant/folders/requests'),
@@ -332,26 +348,4 @@ export const api = {
   switchFolder: (body) => request('POST', '/tenant/folders/switch', body),
   copyFolderData: (body) => request('POST', '/tenant/folders/copy', body),
 
-  // Activation
-  activate: (activationServerUrl, key, fingerprint) =>
-    fetch(`${activationServerUrl}/api/activation/activate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, fingerprint }),
-    }).then(async r => {
-      const json = await r.json()
-      if (!r.ok) throw new Error(json.error || 'Activation failed')
-      return json.data
-    }),
-
-  validateActivation: (activationServerUrl, key, fingerprint) =>
-    fetch(`${activationServerUrl}/api/activation/validate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, fingerprint }),
-    }).then(async r => {
-      const json = await r.json()
-      if (!r.ok) throw new Error(json.error || 'Validation failed')
-      return json.data
-    }),
 }

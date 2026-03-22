@@ -12,6 +12,7 @@ import (
 	"saas_pos/internal/database"
 	"saas_pos/internal/metrics"
 	"saas_pos/internal/middleware"
+	"saas_pos/internal/seed"
 	"saas_pos/internal/activation"
 	"saas_pos/internal/adjustment"
 	"saas_pos/internal/batch"
@@ -41,6 +42,7 @@ import (
 	"saas_pos/internal/transfer"
 	"saas_pos/internal/unit"
 	"saas_pos/internal/user"
+	"saas_pos/internal/scale"
 	"saas_pos/internal/variant"
 
 	"github.com/gofiber/fiber/v2"
@@ -88,6 +90,8 @@ func main() {
 	config.Load()
 	database.Connect()
 	database.EnsureIndexes()
+	seed.InitMongoAuth()
+	seed.RunDesktopSeed()
 	done := make(chan struct{})
 	metrics.Init(done)
 	startPlanExpiryJob(done)
@@ -185,6 +189,9 @@ func registerRoutes(app *fiber.App) {
 	sa.Post("/login", authLimiter, superadmin.HandleLogin)
 	sa.Post("/logout", middleware.Auth(), superadmin.HandleLogout)
 
+	// Password change (requires auth)
+	sa.Post("/change-password", middleware.Auth(), middleware.RequireRole("super_admin"), superadmin.HandleChangePassword)
+
 	// Protected super-admin routes
 	saAuth := sa.Group("", middleware.Auth(), middleware.RequireRole("super_admin"))
 
@@ -242,6 +249,7 @@ func registerRoutes(app *fiber.App) {
 	// Authenticated user info
 	tp.Get("/auth/me", user.HandleMe)
 	tp.Post("/auth/logout", user.HandleLogout)
+	tp.Post("/auth/change-password", user.HandleChangePassword)
 
 	// Folders (requires multi_folders feature + folder permissions)
 	tpFolders := tp.Group("/folders", middleware.RequireFeature("multi_folders"))
@@ -282,6 +290,7 @@ func registerRoutes(app *fiber.App) {
 	tpAdmin.Get("/:id", user.HandleGetByID)
 	tpAdmin.Put("/:id", user.HandleUpdate)
 	tpAdmin.Patch("/:id/active", user.HandleSetActive)
+	tpAdmin.Patch("/:id/password", user.HandleResetPassword)
 
 	// Category management (gated behind products feature)
 	tpProducts := tp.Group("", middleware.RequireFeature("products"))
@@ -410,6 +419,7 @@ func registerRoutes(app *fiber.App) {
 	tpVariants := tp.Group("", middleware.RequireFeature("product_variants"), middleware.RequireFeature("products"))
 	tpVariants.Get("/products/:id/variants", middleware.RequirePermission("products", "view"), variant.HandleList)
 	tpVariants.Post("/products/:id/variants", middleware.RequirePermission("products", "add"), variant.HandleCreate)
+	tpVariants.Get("/variants/barcode/:barcode", middleware.RequirePermission("products", "view"), variant.HandleFindByBarcode)
 	tpVariants.Put("/variants/:id", middleware.RequirePermission("products", "edit"), variant.HandleUpdate)
 	tpVariants.Delete("/variants/:id", middleware.RequirePermission("products", "delete"), variant.HandleDelete)
 
@@ -430,6 +440,17 @@ func registerRoutes(app *fiber.App) {
 	tpDiscounts.Post("/discounts", middleware.RequirePermission("products", "edit"), discount.HandleCreate)
 	tpDiscounts.Put("/discounts/:id", middleware.RequirePermission("products", "edit"), discount.HandleUpdate)
 	tpDiscounts.Delete("/discounts/:id", middleware.RequirePermission("products", "delete"), discount.HandleDelete)
+
+	// Scale (Rongta RL1000) — requires scale feature + tenant_admin
+	tpScale := tp.Group("/scale", middleware.RequireFeature("scale"), middleware.RequireRole("tenant_admin"))
+	tpScale.Post("/connect", scale.HandleConnect)
+	tpScale.Post("/disconnect", scale.HandleDisconnect)
+	tpScale.Get("/status", scale.HandleGetStatus)
+	tpScale.Get("/weight", scale.HandleGetWeight)
+	tpScale.Post("/plu/sync", scale.HandleSyncPLU)
+	tpScale.Delete("/plu", scale.HandleClearPLU)
+	tpScale.Put("/settings", scale.HandleSaveSettings)
+	tpScale.Get("/settings", scale.HandleGetSettings)
 
 	// Batch/lot tracking (plan-gated)
 	tpBatch := tp.Group("", middleware.RequireFeature("batch_tracking"), middleware.RequireFeature("products"))

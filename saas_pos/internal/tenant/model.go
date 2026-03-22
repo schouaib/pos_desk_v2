@@ -30,6 +30,7 @@ type Tenant struct {
 	NART             string                `bson:"nart"               json:"nart"`
 	CompteRIB        string                `bson:"compte_rib"         json:"compte_rib"`
 	UseVAT           bool                  `bson:"use_vat"            json:"use_vat"`
+	PosExpiryWarning bool                 `bson:"pos_expiry_warning" json:"pos_expiry_warning"`
 	PosFavorites     []primitive.ObjectID  `bson:"pos_favorites"      json:"pos_favorites"`
 	PosFavGroups     []PosFavGroup         `bson:"pos_fav_groups"     json:"pos_fav_groups"`
 	PosFavColors     map[string]string     `bson:"pos_fav_colors"     json:"pos_fav_colors"`
@@ -60,7 +61,8 @@ type SettingsInput struct {
 	NIS       string `json:"nis"`
 	NART      string `json:"nart"`
 	CompteRIB string `json:"compte_rib"`
-	UseVAT    bool   `json:"use_vat"`
+	UseVAT           bool `json:"use_vat"`
+	PosExpiryWarning bool `json:"pos_expiry_warning"`
 }
 
 type ListResult struct {

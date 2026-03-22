@@ -7,6 +7,8 @@ export const lanIp = signal('')
 export const configLoaded = signal(false)
 
 const isTauri = !!window.__TAURI_INTERNALS__
+export const isDesktop = isTauri
+export const isWindows = isTauri && navigator.userAgent.includes('Windows')
 
 let _store = null
 async function getStore() {

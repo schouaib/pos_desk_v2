@@ -8,18 +8,20 @@ import (
 
 // SaleLine is one product line inside a sale.
 type SaleLine struct {
-	ProductID   primitive.ObjectID `bson:"product_id"   json:"product_id"`
-	ProductName string             `bson:"product_name" json:"product_name"`
-	Barcode     string             `bson:"barcode"      json:"barcode"`
-	Ref         string             `bson:"ref"          json:"ref"`
-	Qty         float64            `bson:"qty"          json:"qty"`
-	UnitPrice   float64            `bson:"unit_price"   json:"unit_price"` // HT
-	PrixAchat   float64            `bson:"prix_achat"   json:"prix_achat"` // purchase cost at time of sale
-	Discount    float64            `bson:"discount"     json:"discount"`   // fixed HT discount on the line
-	VAT         int                `bson:"vat"          json:"vat"`
-	TotalHT     float64            `bson:"total_ht"     json:"total_ht"`     // qty*unit_price - discount
-	TotalTTC    float64            `bson:"total_ttc"    json:"total_ttc"`    // total_ht * (1 + vat/100)
-	LineEarning float64            `bson:"line_earning" json:"line_earning"` // total_ht - qty*prix_achat
+	ProductID        primitive.ObjectID  `bson:"product_id"                  json:"product_id"`
+	VariantID        *primitive.ObjectID `bson:"variant_id,omitempty"        json:"variant_id,omitempty"`
+	VariantAttributes map[string]string  `bson:"variant_attributes,omitempty" json:"variant_attributes,omitempty"`
+	ProductName      string              `bson:"product_name"                json:"product_name"`
+	Barcode          string              `bson:"barcode"                     json:"barcode"`
+	Ref              string              `bson:"ref"                         json:"ref"`
+	Qty              float64             `bson:"qty"                         json:"qty"`
+	UnitPrice        float64             `bson:"unit_price"                  json:"unit_price"` // HT
+	PrixAchat        float64             `bson:"prix_achat"                  json:"prix_achat"` // purchase cost at time of sale
+	Discount         float64             `bson:"discount"                    json:"discount"`   // fixed HT discount on the line
+	VAT              int                 `bson:"vat"                         json:"vat"`
+	TotalHT          float64             `bson:"total_ht"                    json:"total_ht"`     // qty*unit_price - discount
+	TotalTTC         float64             `bson:"total_ttc"                   json:"total_ttc"`    // total_ht * (1 + vat/100)
+	LineEarning      float64             `bson:"line_earning"                json:"line_earning"` // total_ht - qty*prix_achat
 }
 
 // Sale is a completed point-of-sale transaction.
@@ -47,6 +49,7 @@ type Sale struct {
 // SaleLineInput is the per-line payload sent by the client.
 type SaleLineInput struct {
 	ProductID string  `json:"product_id"`
+	VariantID string  `json:"variant_id,omitempty"`
 	Qty       float64 `json:"qty"`
 	UnitPrice float64 `json:"unit_price"`
 	Discount  float64 `json:"discount"`

@@ -145,6 +145,24 @@ export default function Users({ path }) {
     try { await api.setUserActive(u.id, !u.active); reload() } catch {}
   }
 
+  // Reset password
+  const [resetTarget, setResetTarget] = useState(null)
+  const [resetPw, setResetPw] = useState('')
+  const [resetError, setResetError] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+
+  function openResetPw(u) {
+    setResetTarget(u); setResetPw(''); setResetError(''); openModal('reset-pw-modal')
+  }
+  async function handleResetPw(e) {
+    e.preventDefault(); setResetError(''); setResetLoading(true)
+    try {
+      await api.resetUserPassword(resetTarget.id, resetPw)
+      closeModal('reset-pw-modal'); setResetTarget(null)
+    } catch (err) { setResetError(err.message) }
+    finally { setResetLoading(false) }
+  }
+
   const moduleLabel = (m) => t('perm' + m.charAt(0).toUpperCase() + m.slice(1))
   const actionLabel = (a) => {
     if (a === 'movement') return t('permMovement')
@@ -209,6 +227,13 @@ export default function Users({ path }) {
                         </svg>
                       </button>
                     </div>
+                    <div class="tooltip tooltip-left" data-tip={t('changePassword') || 'Reset Password'}>
+                      <button class="btn btn-xs btn-ghost btn-square text-warning" onClick={() => openResetPw(u)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+                        </svg>
+                      </button>
+                    </div>
                     <div class="tooltip tooltip-left" data-tip={u.active ? t('disable') : t('enable')}>
                       <button
                         class={`btn btn-xs btn-ghost btn-square ${u.active ? 'text-error' : 'text-success'}`}
@@ -252,8 +277,8 @@ export default function Users({ path }) {
           {!editing && (
             <>
               <label class="form-control">
-                <span class="label-text text-sm">{t('email')}</span>
-                <input type="email" class="input input-bordered input-sm" value={form.email}
+                <span class="label-text text-sm">{t('username') || 'Username'}</span>
+                <input type="text" class="input input-bordered input-sm" value={form.email}
                   onInput={(e) => setForm({ ...form, email: e.target.value })} required />
               </label>
               <label class="form-control">
@@ -324,6 +349,23 @@ export default function Users({ path }) {
           <div class="modal-action">
             <button type="submit" class={`btn btn-primary btn-sm ${loading ? 'loading' : ''}`} disabled={loading}>
               {editing ? t('saveChanges') : t('createStaff')}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal id="reset-pw-modal" title={`${t('changePassword')} — ${resetTarget?.name || ''}`}>
+        {resetError && <div class="alert alert-error text-sm py-2 mb-3"><span>{resetError}</span></div>}
+        <form onSubmit={handleResetPw} class="space-y-3">
+          <label class="form-control">
+            <span class="label-text text-sm">{t('newPassword')}</span>
+            <input type="password" class="input input-bordered input-sm" value={resetPw}
+              onInput={(e) => setResetPw(e.target.value)} required minLength={8} autoFocus />
+          </label>
+          <div class="modal-action">
+            <button type="submit" class={`btn btn-warning btn-sm ${resetLoading ? 'loading' : ''}`} disabled={resetLoading}>
+              {t('changePassword')}
             </button>
           </div>
         </form>

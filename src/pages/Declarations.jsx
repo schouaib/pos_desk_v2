@@ -1,7 +1,61 @@
-import { useState, useEffect, useCallback } from 'preact/hooks'
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { Layout } from '../components/Layout'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
+
+/** Print HTML content (works in Tauri WebView) */
+async function printViaHtml(html) {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke('print_html', { html })
+  } catch {
+    const w = window.open('', '_blank')
+    if (w) { w.document.write(html); w.document.close(); w.focus(); w.print() }
+  }
+}
+
+/** Build a standalone A4 HTML document from a declaration element */
+function buildPrintHtml(title, contentEl) {
+  const content = contentEl?.innerHTML || ''
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${title}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20mm 15mm; color: #222; font-size: 12px; }
+  h2 { font-size: 18px; margin-bottom: 4px; }
+  .subtitle { font-size: 11px; color: #888; margin-bottom: 16px; }
+  .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #999; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin: 16px 0 8px; }
+  .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; }
+  .row.bold .label, .row.bold .value { font-weight: 700; }
+  .row.highlight { background: #f0fdf4; border-radius: 4px; padding: 8px 6px; border: none; margin: 4px 0; }
+  .row.highlight.negative { background: #fef2f2; }
+  .row .label { color: #555; }
+  .row .value { font-variant-numeric: tabular-nums; }
+  .row.highlight .value { font-size: 14px; font-weight: 700; }
+  .row.highlight .value.positive { color: #16a34a; }
+  .row.highlight .value.negative { color: #dc2626; }
+  .total-box { background: #eff6ff; border-radius: 6px; padding: 12px; margin-top: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .total-box .label { font-size: 13px; font-weight: 700; }
+  .total-box .value { font-size: 18px; font-weight: 700; color: #2563eb; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+  th, td { padding: 6px 8px; text-align: start; border-bottom: 1px solid #eee; font-size: 11px; }
+  th { background: #f5f5f5; font-weight: 600; font-size: 10px; text-transform: uppercase; }
+  td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; }
+  tfoot td { font-weight: 700; background: #f9f9f9; }
+  .print-date { text-align: end; font-size: 10px; color: #aaa; margin-bottom: 12px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { border: 1px solid #ddd; border-radius: 6px; padding: 12px; }
+  .card-title { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .card-subtitle { font-size: 10px; color: #888; margin-bottom: 10px; }
+  .brackets { font-size: 10px; color: #888; margin-top: 8px; }
+  .brackets p { margin: 2px 0; }
+  @media print { body { padding: 10mm; } }
+</style>
+</head><body>
+<div class="print-date">${new Date().toLocaleDateString('fr-FR')}</div>
+${content}
+</body></html>`
+}
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -66,10 +120,17 @@ function DecRowHighlight({ label, value, positive, loading }) {
   )
 }
 
-function PrintButton({ onClick }) {
+function PrintButton({ onClick, printRef, printTitle }) {
   const { t } = useI18n()
+  const handleClick = () => {
+    if (onClick) return onClick()
+    if (printRef?.current) {
+      const html = buildPrintHtml(printTitle || 'Déclaration', printRef.current)
+      printViaHtml(html)
+    }
+  }
   return (
-    <button class="btn btn-sm btn-outline gap-1" onClick={onClick}>
+    <button class="btn btn-sm btn-outline gap-1" onClick={handleClick}>
       <Icon d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m0 0a48.163 48.163 0 0112.5 0m-12.5 0V5.625c0-1.036.84-1.875 1.875-1.875h8.25c1.036 0 1.875.84 1.875 1.875v3.034" className="w-4 h-4" />
       {t('print')}
     </button>
@@ -85,6 +146,7 @@ function G50Tab() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [tapRate, setTapRate] = useState(2) // TAP rate: 1% production, 2% services/commerce
+  const printRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -118,7 +180,27 @@ function G50Tab() {
   const totalAPayer = tvaAPayer + tap + timbreFiscal
 
   function handlePrint() {
-    window.print()
+    if (!printRef.current) return
+    const fmtVal = v => (v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const html = buildPrintHtml(`G50 — ${month}`, {
+      innerHTML: `
+        <h2>G50 — ${t('declG50Title')}</h2>
+        <p class="subtitle">${t('declG50Subtitle')} — ${month}</p>
+        <div class="section-title">TVA — ${t('declTVA')}</div>
+        <div class="row"><span class="label">${t('declCAHT')}</span><span class="value">${fmtVal(salesHT)}</span></div>
+        <div class="row"><span class="label">${t('declTVACollectee')}</span><span class="value">${fmtVal(tvaCollectee)}</span></div>
+        <div class="row"><span class="label">${t('declTVADeductible')}</span><span class="value">${fmtVal(tvaDeductible)}</span></div>
+        ${precompte > 0 ? `<div class="row"><span class="label">${t('declPrecompte')}</span><span class="value">${fmtVal(precompte)}</span></div>` : ''}
+        <div class="row highlight"><span class="label">${t('declTVAAPayer')}</span><span class="value positive">${fmtVal(tvaAPayer)}</span></div>
+        <div class="section-title">TAP — ${t('declTAP')}</div>
+        <div class="row"><span class="label">${t('declCAHT')} x ${tapRate}%</span><span class="value">${fmtVal(tap)}</span></div>
+        <div class="row highlight"><span class="label">${t('declTAPAPayer')}</span><span class="value positive">${fmtVal(tap)}</span></div>
+        <div class="section-title">${t('declTimbre')}</div>
+        <div class="row"><span class="label">${t('declTimbreFiscal')}</span><span class="value">${fmtVal(timbreFiscal)}</span></div>
+        <div class="total-box"><span class="label">${t('declTotalAPayer')}</span><span class="value">${fmtVal(totalAPayer)}</span></div>
+      `
+    })
+    printViaHtml(html)
   }
 
   return (
@@ -139,7 +221,7 @@ function G50Tab() {
         <PrintButton onClick={handlePrint} />
       </div>
 
-      <div class="card bg-base-100 shadow-sm border border-base-200" id="g50-print">
+      <div class="card bg-base-100 shadow-sm border border-base-200" id="g50-print" ref={printRef}>
         <div class="card-body p-0">
           {/* Header */}
           <div class="bg-primary/5 p-4 rounded-t-xl border-b border-base-200">
@@ -200,6 +282,7 @@ function G50ATab() {
   const [month, setMonth] = useState(currentMonth)
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(false)
+  const printRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -247,10 +330,24 @@ function G50ATab() {
           <input type="month" class="input input-bordered input-sm" value={month} onInput={e => setMonth(e.target.value)} />
         </label>
         <div class="flex-1" />
-        <PrintButton onClick={() => window.print()} />
+        <PrintButton onClick={() => {
+          const fmtVal = v => (v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          const rows = clients.map((c, i) => `<tr><td>${i + 1}</td><td>${c.name}</td><td>${c.nif || '—'}</td><td class="num">${c.count}</td><td class="num">${fmtVal(c.totalHT)}</td><td class="num">${fmtVal(c.totalVAT)}</td><td class="num">${fmtVal(c.totalTTC)}</td></tr>`).join('')
+          const html = buildPrintHtml(`G50A — ${month}`, {
+            innerHTML: `
+              <h2>G50A — ${t('declG50ATitle')}</h2>
+              <p class="subtitle">${t('declG50ASubtitle')} — ${month}</p>
+              <table><thead><tr><th>#</th><th>${t('clientName')}</th><th>NIF</th><th class="num">${t('salesCount')}</th><th class="num">${t('htLabel')}</th><th class="num">TVA</th><th class="num">${t('ttcLabel')}</th></tr></thead>
+              <tbody>${rows || `<tr><td colspan="7" style="text-align:center">${t('noData')}</td></tr>`}</tbody>
+              ${clients.length > 0 ? `<tfoot><tr><td colspan="4" class="num">${t('grandTotal')}</td><td class="num">${fmtVal(totalHT)}</td><td class="num">${fmtVal(totalVAT)}</td><td class="num">${fmtVal(totalTTC)}</td></tr></tfoot>` : ''}
+              </table>
+            `
+          })
+          printViaHtml(html)
+        }} />
       </div>
 
-      <div class="card bg-base-100 shadow-sm border border-base-200">
+      <div class="card bg-base-100 shadow-sm border border-base-200" ref={printRef}>
         <div class="card-body p-0">
           <div class="bg-primary/5 p-4 rounded-t-xl border-b border-base-200">
             <h3 class="text-lg font-bold">G50A — {t('declG50ATitle')}</h3>
@@ -313,6 +410,7 @@ function G11Tab() {
   const [year, setYear] = useState(currentYear)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
+  const printRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -361,7 +459,44 @@ function G11Tab() {
             onInput={e => setYear(Number(e.target.value))} />
         </label>
         <div class="flex-1" />
-        <PrintButton onClick={() => window.print()} />
+        <PrintButton onClick={() => {
+          const fmtVal = v => (v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          const html = buildPrintHtml(`G11 — ${year}`, {
+            innerHTML: `
+              <h2>G11 — ${t('declBilan')} ${year}</h2>
+              <div class="grid-2">
+                <div class="card">
+                  <div class="card-title">${t('declTCR')}</div>
+                  <div class="card-subtitle">${t('declTCRSubtitle')}</div>
+                  <div class="section-title">${t('declRevenues')}</div>
+                  <div class="row"><span class="label">${t('revenueTTC')}</span><span class="value">${fmtVal(revenueTTC)}</span></div>
+                  <div class="row"><span class="label">${t('revenueHT')}</span><span class="value">${fmtVal(revenueHT)}</span></div>
+                  <div class="row"><span class="label">${t('statsTotalVAT')}</span><span class="value">${fmtVal(totalVAT)}</span></div>
+                  <div class="section-title">${t('declCharges')}</div>
+                  <div class="row"><span class="label">${t('totalCost')}</span><span class="value">${fmtVal(costOfGoods)}</span></div>
+                  <div class="row"><span class="label">${t('lossCost')}</span><span class="value">${fmtVal(lossCost)}</span></div>
+                  <div class="row"><span class="label">${t('expenseCost')}</span><span class="value">${fmtVal(expenses)}</span></div>
+                  <div class="section-title">${t('declResult')}</div>
+                  <div class="row bold"><span class="label">${t('grossEarning')}</span><span class="value">${fmtVal(grossMargin)}</span></div>
+                  <div class="row highlight ${netResult >= 0 ? '' : 'negative'}"><span class="label">${t('declNetResult')}</span><span class="value ${netResult >= 0 ? 'positive' : 'negative'}">${fmtVal(netResult)}</span></div>
+                </div>
+                <div class="card">
+                  <div class="card-title">${t('declBilan')}</div>
+                  <div class="card-subtitle">${t('declBilanSubtitle')}</div>
+                  <div class="section-title">${t('declActif')}</div>
+                  <div class="row"><span class="label">${t('declStockValue')}</span><span class="value">${fmtVal(stockValue)}</span></div>
+                  <div class="section-title">${t('declPassif')}</div>
+                  <div class="row"><span class="label">${t('declSupplierDebt')}</span><span class="value">${fmtVal(purchaseRemaining)}</span></div>
+                  <div class="row"><span class="label">${t('declTotalPurchases')}</span><span class="value">${fmtVal(purchaseTotal)}</span></div>
+                  <div class="row"><span class="label">${t('declPurchasesPaid')}</span><span class="value">${fmtVal(purchasePaid)}</span></div>
+                  <div class="section-title">${t('declSummary')}</div>
+                  <div class="row highlight ${netResult >= 0 ? '' : 'negative'}"><span class="label">${t('declNetResult')}</span><span class="value ${netResult >= 0 ? 'positive' : 'negative'}">${fmtVal(netResult)}</span></div>
+                </div>
+              </div>
+            `
+          })
+          printViaHtml(html)
+        }} />
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -426,6 +561,7 @@ function G12Tab() {
   const [year, setYear] = useState(currentYear)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
+  const printRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -476,7 +612,38 @@ function G12Tab() {
             onInput={e => setYear(Number(e.target.value))} />
         </label>
         <div class="flex-1" />
-        <PrintButton onClick={() => window.print()} />
+        <PrintButton onClick={() => {
+          const fmtVal = v => (v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          const html = buildPrintHtml(`G12 — ${year}`, {
+            innerHTML: `
+              <h2>G12 — ${t('declG12Title')}</h2>
+              <p class="subtitle">${t('declG12Subtitle')} — ${year}</p>
+              <div class="section-title">${t('declRevenues')}</div>
+              <div class="row"><span class="label">${t('revenueHT')}</span><span class="value">${fmtVal(revenueHT)}</span></div>
+              <div class="row"><span class="label">${t('totalCost')}</span><span class="value">${fmtVal(costOfGoods)}</span></div>
+              <div class="row bold"><span class="label">${t('grossEarning')}</span><span class="value">${fmtVal(grossMargin)}</span></div>
+              <div class="section-title">${t('declCharges')}</div>
+              <div class="row"><span class="label">${t('lossCost')}</span><span class="value">${fmtVal(lossCost)}</span></div>
+              <div class="row"><span class="label">${t('expenseCost')}</span><span class="value">${fmtVal(expenses)}</span></div>
+              <div class="section-title">${t('declNetProfit')}</div>
+              <div class="row bold"><span class="label">${t('declNetResult')}</span><span class="value">${fmtVal(netProfit)}</span></div>
+              <div class="section-title">IRG — ${t('declIRGCalc')}</div>
+              <div class="row"><span class="label">${t('declTaxableIncome')}</span><span class="value">${fmtVal(netProfit > 0 ? netProfit : 0)}</span></div>
+              <div class="row"><span class="label">${t('declEffectiveRate')}: ${effectiveRate}%</span><span class="value">${fmtVal(irgAmount)}</span></div>
+              <div class="row highlight negative"><span class="label">${t('declIRGAPayer')}</span><span class="value negative">${fmtVal(irgAmount)}</span></div>
+              <div class="brackets">
+                <p style="font-weight:600;margin-bottom:4px">${t('declIRGBrackets')}</p>
+                <p>0 - 240,000 DA: 0%</p>
+                <p>240,001 - 480,000 DA: 23%</p>
+                <p>480,001 - 960,000 DA: 27%</p>
+                <p>960,001 - 1,920,000 DA: 30%</p>
+                <p>1,920,001 - 3,840,000 DA: 33%</p>
+                <p>&gt; 3,840,000 DA: 35%</p>
+              </div>
+            `
+          })
+          printViaHtml(html)
+        }} />
       </div>
 
       <div class="card bg-base-100 shadow-sm border border-base-200">
@@ -535,6 +702,7 @@ function G20Tab() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [ibsRate, setIbsRate] = useState(19) // 19% production, 23% BTP/tourism, 26% other
+  const printRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -584,7 +752,31 @@ function G20Tab() {
           </select>
         </label>
         <div class="flex-1" />
-        <PrintButton onClick={() => window.print()} />
+        <PrintButton onClick={() => {
+          const fmtVal = v => (v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          const html = buildPrintHtml(`G20 — ${year}`, {
+            innerHTML: `
+              <h2>G20 — ${t('declG20Title')}</h2>
+              <p class="subtitle">${t('declG20Subtitle')} — ${year}</p>
+              <div class="section-title">${t('declProfitCalc')}</div>
+              <div class="row"><span class="label">${t('revenueHT')}</span><span class="value">${fmtVal(revenueHT)}</span></div>
+              <div class="row"><span class="label">${t('totalCost')}</span><span class="value">${fmtVal(costOfGoods)}</span></div>
+              <div class="row bold"><span class="label">${t('grossEarning')}</span><span class="value">${fmtVal(grossMargin)}</span></div>
+              <div class="row"><span class="label">${t('lossCost')}</span><span class="value">${fmtVal(lossCost)}</span></div>
+              <div class="row"><span class="label">${t('expenseCost')}</span><span class="value">${fmtVal(expenses)}</span></div>
+              <div class="row bold"><span class="label">${t('declNetResult')}</span><span class="value">${fmtVal(netProfit)}</span></div>
+              <div class="section-title">IBS — ${t('declIBSCalc')}</div>
+              <div class="row"><span class="label">${t('declTaxableIncome')} x ${ibsRate}%</span><span class="value">${fmtVal(ibsAmount)}</span></div>
+              <div class="section-title">${t('declAcomptes')}</div>
+              <div class="row"><span class="label">${t('declAcompte')} 1 (20 mars) — 30%</span><span class="value">${fmtVal(acompte1)}</span></div>
+              <div class="row"><span class="label">${t('declAcompte')} 2 (20 juin) — 30%</span><span class="value">${fmtVal(acompte2)}</span></div>
+              <div class="row"><span class="label">${t('declAcompte')} 3 (20 nov.) — 30%</span><span class="value">${fmtVal(acompte3)}</span></div>
+              <div class="row"><span class="label">${t('declSolde')}</span><span class="value">${fmtVal(solde)}</span></div>
+              <div class="row highlight negative"><span class="label">${t('declIBSTotal')}</span><span class="value negative">${fmtVal(ibsAmount)}</span></div>
+            `
+          })
+          printViaHtml(html)
+        }} />
       </div>
 
       <div class="card bg-base-100 shadow-sm border border-base-200">

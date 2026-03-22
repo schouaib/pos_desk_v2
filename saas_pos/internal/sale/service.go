@@ -13,6 +13,7 @@ import (
 	"saas_pos/internal/counter"
 	"saas_pos/internal/database"
 	"saas_pos/internal/retrait"
+	"saas_pos/internal/variant"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -101,6 +102,23 @@ func Create(tenantID, cashierID, cashierEmail string, input CreateInput) (*Sale,
 			barcode = p.Barcodes[0]
 		}
 
+		// Resolve variant if provided
+		var variantOID *primitive.ObjectID
+		var variantAttrs map[string]string
+		prixAchat := p.PrixAchat
+		if li.VariantID != "" {
+			v, verr := variant.GetByID(tenantID, li.VariantID)
+			if verr != nil {
+				return nil, errors.New("variant not found: " + li.VariantID)
+			}
+			variantOID = &v.ID
+			variantAttrs = v.Attributes
+			prixAchat = v.PrixAchat
+			if len(v.Barcodes) > 0 {
+				barcode = v.Barcodes[0]
+			}
+		}
+
 		discount := li.Discount
 		if discount < 0 {
 			discount = 0
@@ -110,25 +128,27 @@ func Create(tenantID, cashierID, cashierEmail string, input CreateInput) (*Sale,
 		lineHT := li.Qty*li.UnitPrice - discount
 		vatAmt := lineHT * float64(p.VAT) / 100
 		lineTTC := lineHT + vatAmt
-		lineEarning := lineHT - li.Qty*p.PrixAchat
+		lineEarning := lineHT - li.Qty*prixAchat
 
 		totalHT += lineHT
 		totalVAT += vatAmt
 		totalEarning += lineEarning
 
 		lines = append(lines, SaleLine{
-			ProductID:   pid,
-			ProductName: p.Name,
-			Barcode:     barcode,
-			Ref:         p.Ref,
-			Qty:         li.Qty,
-			UnitPrice:   li.UnitPrice,
-			PrixAchat:   p.PrixAchat,
-			Discount:    discount,
-			VAT:         p.VAT,
-			TotalHT:     math.Round(lineHT*100) / 100,
-			TotalTTC:    math.Round(lineTTC*100) / 100,
-			LineEarning: math.Round(lineEarning*100) / 100,
+			ProductID:         pid,
+			VariantID:         variantOID,
+			VariantAttributes: variantAttrs,
+			ProductName:       p.Name,
+			Barcode:           barcode,
+			Ref:               p.Ref,
+			Qty:               li.Qty,
+			UnitPrice:         li.UnitPrice,
+			PrixAchat:         prixAchat,
+			Discount:          discount,
+			VAT:               p.VAT,
+			TotalHT:           math.Round(lineHT*100) / 100,
+			TotalTTC:          math.Round(lineTTC*100) / 100,
+			LineEarning:       math.Round(lineEarning*100) / 100,
 		})
 
 		// Adjust stock for physical products: decrement for sales, increment for returns.
@@ -145,6 +165,9 @@ func Create(tenantID, cashierID, cashierEmail string, input CreateInput) (*Sale,
 						batch.DecrementFIFO(tenantID, bi.ProductID, li.Qty*bi.Qty)
 					}
 				}
+			} else if variantOID != nil {
+				// Variant: decrement variant stock
+				variant.AdjustStock(tenantID, li.VariantID, -li.Qty)
 			} else {
 				productCol().UpdateOne(ctx,
 					bson.M{"_id": pid},

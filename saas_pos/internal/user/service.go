@@ -71,7 +71,7 @@ func Create(tenantID string, input CreateInput) (*User, error) {
 		Password:    string(hash),
 		Role:        input.Role,
 		Permissions: input.Permissions,
-		Active:      false,
+		Active:      true,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -202,6 +202,36 @@ func SetActive(tenantID, id string, active bool) error {
 	_, err = col().UpdateOne(ctx,
 		bson.M{"_id": oid, "tenant_id": tid},
 		bson.M{"$set": bson.M{"active": active, "updated_at": time.Now()}},
+	)
+	return err
+}
+
+func ChangePassword(tenantID, userID string, newPassword string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	tid, _ := primitive.ObjectIDFromHex(tenantID)
+	oid, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return errors.New("invalid id")
+	}
+
+	if err := validate.Password(newPassword); err != nil {
+		return err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	_, err = col().UpdateOne(ctx,
+		bson.M{"_id": oid, "tenant_id": tid},
+		bson.M{"$set": bson.M{
+			"password":             string(hash),
+			"must_change_password": false,
+			"updated_at":           time.Now(),
+		}},
 	)
 	return err
 }
