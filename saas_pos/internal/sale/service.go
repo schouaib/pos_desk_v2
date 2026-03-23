@@ -24,8 +24,8 @@ import (
 func col() *mongo.Collection        { return database.Col("sales") }
 func productCol() *mongo.Collection { return database.Col("products") }
 
-// CalcTimbre computes the Algerian droit de timbre (LF 2025) for cash payments.
-// Rate per tranche of 100 DA: ≤300 DA → 0, ≤30000 → 1 DA, ≤100000 → 1.5 DA, >100000 → 2 DA.
+// CalcTimbre computes the Algerian droit de timbre (Art. 46 LF 2025, Art. 100 code du timbre).
+// Rates: ≤300 DA → 0, ≤30,000 DA → 1%, ≤100,000 DA → 1.5%, >100,000 DA → 2%.
 // Minimum 5 DA. Non-cash payments → 0.
 func CalcTimbre(totalTTC float64, paymentMethod string) float64 {
 	if paymentMethod != "cash" && paymentMethod != "especes" {
@@ -34,16 +34,15 @@ func CalcTimbre(totalTTC float64, paymentMethod string) float64 {
 	if totalTTC <= 300 {
 		return 0
 	}
-	tranches := math.Ceil(totalTTC / 100)
 	var rate float64
 	if totalTTC <= 30000 {
-		rate = 1
+		rate = 0.01
 	} else if totalTTC <= 100000 {
-		rate = 1.5
+		rate = 0.015
 	} else {
-		rate = 2
+		rate = 0.02
 	}
-	timbre := tranches * rate
+	timbre := totalTTC * rate
 	if timbre < 5 {
 		timbre = 5
 	}
@@ -248,7 +247,7 @@ func Create(tenantID, cashierID, cashierEmail string, input CreateInput) (*Sale,
 		Total:         totalTTC,
 		TotalEarning:  totalEarning,
 		PaymentMethod: input.PaymentMethod,
-		Timbre:        0,
+		Timbre:        CalcTimbre(totalTTC, input.PaymentMethod),
 		AmountPaid:    input.AmountPaid,
 		Change:        change,
 		ClientID:      clientID,
@@ -256,6 +255,7 @@ func Create(tenantID, cashierID, cashierEmail string, input CreateInput) (*Sale,
 		SaleType:      saleType,
 		CashierID:     cashierID,
 		CashierEmail:  cashierEmail,
+		CaisseID:      input.CaisseID,
 		CreatedAt:     time.Now(),
 	}
 
@@ -418,14 +418,25 @@ func SalesStatistics(tenantID string, from, to time.Time, includeLosses bool) (*
 			"credit_revenue_ttc": bson.M{"$sum": bson.M{
 				"$cond": bson.A{bson.M{"$eq": bson.A{"$sale_type", "credit"}}, "$total", 0},
 			}},
+			// Payment method totals: only count non-credit sales (actual cash/cheque/virement received).
+			// Credit sales are not yet paid at POS — payment tracked via facturation module.
 			"cash_payment_ttc": bson.M{"$sum": bson.M{
-				"$cond": bson.A{bson.M{"$in": bson.A{"$payment_method", bson.A{"cash", ""}}}, "$total", 0},
+				"$cond": bson.A{bson.M{"$and": bson.A{
+					bson.M{"$in": bson.A{"$payment_method", bson.A{"cash", ""}}},
+					bson.M{"$ne": bson.A{"$sale_type", "credit"}},
+				}}, "$total", 0},
 			}},
 			"cheque_payment_ttc": bson.M{"$sum": bson.M{
-				"$cond": bson.A{bson.M{"$eq": bson.A{"$payment_method", "cheque"}}, "$total", 0},
+				"$cond": bson.A{bson.M{"$and": bson.A{
+					bson.M{"$eq": bson.A{"$payment_method", "cheque"}},
+					bson.M{"$ne": bson.A{"$sale_type", "credit"}},
+				}}, "$total", 0},
 			}},
 			"virement_payment_ttc": bson.M{"$sum": bson.M{
-				"$cond": bson.A{bson.M{"$eq": bson.A{"$payment_method", "virement"}}, "$total", 0},
+				"$cond": bson.A{bson.M{"$and": bson.A{
+					bson.M{"$eq": bson.A{"$payment_method", "virement"}},
+					bson.M{"$ne": bson.A{"$sale_type", "credit"}},
+				}}, "$total", 0},
 			}},
 			"total_timbre": bson.M{"$sum": bson.M{"$ifNull": bson.A{"$timbre", 0}}},
 		}}},
@@ -504,12 +515,17 @@ func SalesStatistics(tenantID string, from, to time.Time, includeLosses bool) (*
 
 // UserSummary aggregates sales, returns and retraits per user for a date range.
 // If userID is non-empty, only that user's data is included.
-func UserSummary(tenantID string, from, to time.Time, userID string) (*UserSummaryResult, error) {
+// If caisseID is non-empty, filter by caisse session.
+func UserSummary(tenantID string, from, to time.Time, userID, caisseID string) (*UserSummaryResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	filter := bson.M{
-		"tenant_id":  tenantID,
-		"created_at": bson.M{"$gte": from, "$lte": to},
+		"tenant_id": tenantID,
+	}
+	if caisseID != "" {
+		filter["caisse_id"] = caisseID
+	} else {
+		filter["created_at"] = bson.M{"$gte": from, "$lte": to}
 	}
 	if userID != "" {
 		filter["cashier_id"] = userID
@@ -517,8 +533,11 @@ func UserSummary(tenantID string, from, to time.Time, userID string) (*UserSumma
 
 	// Aggregate sales per cashier, splitting positive (sales) and negative (returns),
 	// and breaking down positive sales by payment method for caisse calculation.
+	// Payment method totals only count non-credit sales (cash that actually entered the drawer).
+	// Credit sales (factures) are tracked via the facturation module payments.
 	isSale := bson.M{"$gte": bson.A{"$total", 0}}
 	isReturn := bson.M{"$lt": bson.A{"$total", 0}}
+	isNotCredit := bson.M{"$ne": bson.A{"$sale_type", "credit"}}
 	isCash := bson.M{"$in": bson.A{"$payment_method", bson.A{"cash", ""}}}
 	isCheque := bson.M{"$eq": bson.A{"$payment_method", "cheque"}}
 	isVirement := bson.M{"$eq": bson.A{"$payment_method", "virement"}}
@@ -530,9 +549,9 @@ func UserSummary(tenantID string, from, to time.Time, userID string) (*UserSumma
 			"user_email":           bson.M{"$first": "$cashier_email"},
 			"sales_count":          bson.M{"$sum": bson.M{"$cond": bson.A{isSale, 1, 0}}},
 			"sales_total":          bson.M{"$sum": bson.M{"$cond": bson.A{isSale, "$total", 0}}},
-			"cash_sales_total":     bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$and": bson.A{isSale, isCash}}, "$total", 0}}},
-			"cheque_sales_total":   bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$and": bson.A{isSale, isCheque}}, "$total", 0}}},
-			"virement_sales_total": bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$and": bson.A{isSale, isVirement}}, "$total", 0}}},
+			"cash_sales_total":     bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$and": bson.A{isSale, isCash, isNotCredit}}, "$total", 0}}},
+			"cheque_sales_total":   bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$and": bson.A{isSale, isCheque, isNotCredit}}, "$total", 0}}},
+			"virement_sales_total": bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$and": bson.A{isSale, isVirement, isNotCredit}}, "$total", 0}}},
 			"returns_count":        bson.M{"$sum": bson.M{"$cond": bson.A{isReturn, 1, 0}}},
 			"returns_total":        bson.M{"$sum": bson.M{"$cond": bson.A{isReturn, "$total", 0}}},
 			"timbre_total":         bson.M{"$sum": bson.M{"$ifNull": bson.A{"$timbre", 0}}},

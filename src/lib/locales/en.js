@@ -872,6 +872,16 @@ export default {
   // VAT Settings
   useVAT: 'Enable VAT (TVA)',
   useVATDesc: 'Show VAT fields in products, purchases, sales, and declarations',
+  maxCashAmount: 'Max Cash Payment',
+  maxCashAmountDesc: 'Maximum amount allowed for cash payments (0 = no limit)',
+  cashLimitExceeded: 'Cash payment not allowed — amount exceeds the limit',
+  tapRate: 'TAP Rate',
+  tapProduction: 'Production',
+  tapCommerce: 'Commerce / Services',
+  ibsRate: 'IBS Rate',
+  ibsProduction: 'Production',
+  ibsBTP: 'BTP / Tourism',
+  ibsOther: 'Other activities',
   // Scale (Rongta RL1000)
   weighable: 'Weighable',
   scaleSettings: 'Scale Settings',

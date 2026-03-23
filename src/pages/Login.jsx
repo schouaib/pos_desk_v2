@@ -30,6 +30,18 @@ export default function Login() {
     try {
       const data = await api.login(form)
       setAuth(data.token, data.user)
+      // Auto-switch to preferred folder if saved
+      const preferredFolder = localStorage.getItem('preferred_folder')
+      if (preferredFolder && preferredFolder !== data.user?.tenant_id) {
+        try {
+          const res = await api.switchFolder({ folder_id: preferredFolder })
+          const payload = JSON.parse(atob(res.token.split('.')[1]))
+          setAuth(res.token, { ...data.user, tenant_id: preferredFolder, ...payload })
+        } catch {
+          // Preferred folder no longer accessible — clear preference
+          localStorage.removeItem('preferred_folder')
+        }
+      }
       if (isTenantAdmin() && hasFeature('batch_tracking')) {
         api.listBatchAlerts().then(items => { batchAlerts.value = items || [] }).catch(() => {})
       }

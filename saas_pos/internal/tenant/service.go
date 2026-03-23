@@ -229,6 +229,9 @@ func UpdateSettings(tenantID string, input SettingsInput) (*Tenant, error) {
 		"compte_rib":         input.CompteRIB,
 		"use_vat":              input.UseVAT,
 		"pos_expiry_warning":  input.PosExpiryWarning,
+		"max_cash_amount":     input.MaxCashAmount,
+		"tap_rate":            input.TapRate,
+		"ibs_rate":            input.IbsRate,
 		"updated_at":          time.Now(),
 	}
 

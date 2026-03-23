@@ -262,7 +262,25 @@ func AddPayment(tenantID, clientID string, input PaymentInput) (*Payment, error)
 	// Apply payment to oldest unpaid factures (FIFO)
 	applyPaymentToFactures(tenantID, clientID, p.Amount)
 
+	// Apply payment to oldest unpaid credit sales (FIFO)
+	applyPaymentToSales(tenantID, clientID, p.Amount)
+
 	return p, nil
+}
+
+// RecordPayment inserts a payment record into client_payments for stats tracking,
+// without adjusting client balance or applying to factures.
+func RecordPayment(tenantID, clientID string, amount float64, note string) error {
+	p := &Payment{
+		ID:        primitive.NewObjectID(),
+		TenantID:  tenantID,
+		ClientID:  clientID,
+		Amount:    math.Round(amount*100) / 100,
+		Note:      note,
+		CreatedAt: time.Now(),
+	}
+	_, err := paymentCol().InsertOne(context.Background(), p)
+	return err
 }
 
 // applyPaymentToFactures distributes a client payment across unpaid factures (oldest first).
@@ -316,22 +334,20 @@ func applyPaymentToFactures(tenantID, clientID string, amount float64) {
 			newPaid = doc.Total
 		}
 
-		// Calculate timbre for this payment
+		// Calculate timbre for this payment (Art. 46 LF 2025)
 		payMethod := doc.PaymentMethod
 		if payMethod == "" {
 			payMethod = "cash"
 		}
 		var payTimbre float64
 		if payMethod == "cash" && apply > 300 {
-			tr := math.Ceil(apply / 100)
-			rate := 1.0
-			if apply > 30000 {
-				rate = 1.5
-			}
+			rate := 0.01
 			if apply > 100000 {
-				rate = 2.0
+				rate = 0.02
+			} else if apply > 30000 {
+				rate = 0.015
 			}
-			payTimbre = math.Max(5, math.Round(tr*rate*100)/100)
+			payTimbre = math.Max(5, math.Round(apply*rate*100)/100)
 		}
 		newTimbre := math.Round((doc.Timbre+payTimbre)*100) / 100
 
@@ -354,6 +370,66 @@ func applyPaymentToFactures(tenantID, clientID string, amount float64) {
 					},
 				},
 			},
+		)
+
+		remaining = math.Round((remaining-apply)*100) / 100
+	}
+}
+
+// applyPaymentToSales distributes a client payment across unpaid credit sales (oldest first).
+func applyPaymentToSales(tenantID, clientID string, amount float64) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	salesCol := database.Col("sales")
+
+	// Find credit sales where amount_paid < total, oldest first
+	cursor, err := salesCol.Find(ctx, bson.M{
+		"tenant_id": tenantID,
+		"client_id": clientID,
+		"sale_type": "credit",
+		"$expr":     bson.M{"$gt": bson.A{"$total", "$amount_paid"}},
+	}, options.Find().SetSort(bson.M{"created_at": 1}))
+	if err != nil {
+		return
+	}
+	defer cursor.Close(ctx)
+
+	remaining := amount
+
+	for cursor.Next(ctx) && remaining > 0 {
+		var s struct {
+			ID         primitive.ObjectID `bson:"_id"`
+			Total      float64            `bson:"total"`
+			AmountPaid float64            `bson:"amount_paid"`
+		}
+		if err := cursor.Decode(&s); err != nil {
+			continue
+		}
+
+		owed := math.Round((s.Total-s.AmountPaid)*100) / 100
+		if owed <= 0 {
+			continue
+		}
+
+		apply := remaining
+		if apply > owed {
+			apply = owed
+		}
+
+		newPaid := math.Round((s.AmountPaid+apply)*100) / 100
+		newChange := 0.0
+		if newPaid >= s.Total {
+			newPaid = s.Total
+			newChange = 0
+		}
+
+		salesCol.UpdateOne(ctx,
+			bson.M{"_id": s.ID},
+			bson.M{"$set": bson.M{
+				"amount_paid": newPaid,
+				"change":      newChange,
+			}},
 		)
 
 		remaining = math.Round((remaining-apply)*100) / 100

@@ -44,6 +44,7 @@ type Sale struct {
 	SaleType      string             `bson:"sale_type"             json:"sale_type"` // "cash" | "credit"
 	CashierID     string             `bson:"cashier_id"     json:"cashier_id"`
 	CashierEmail  string             `bson:"cashier_email"  json:"cashier_email"`
+	CaisseID      string             `bson:"caisse_id,omitempty" json:"caisse_id,omitempty"`
 	CreatedAt     time.Time          `bson:"created_at"     json:"created_at"`
 }
 
@@ -63,6 +64,7 @@ type CreateInput struct {
 	AmountPaid    float64         `json:"amount_paid"`
 	ClientID      string          `json:"client_id"`
 	SaleType      string          `json:"sale_type"` // "cash" | "credit"
+	CaisseID      string          `json:"caisse_id"`
 }
 
 // ListResult holds a paginated list of sales.

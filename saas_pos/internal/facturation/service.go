@@ -189,6 +189,27 @@ func Create(tenantID, userID, userEmail string, input CreateInput) (*Document, e
 		payMethod = "cash"
 	}
 
+	// Cash facture = paid immediately
+	isCashPaid := input.DocType == DocFacture && payMethod == "cash"
+	var paidAmount float64
+	var timbre float64
+	var payments []DocPayment
+	if isCashPaid {
+		status = StatusPaid
+		paidAmount = ttc
+		// Only calculate timbre if NOT linked to a sale (sale already records timbre)
+		if input.SaleID == "" {
+			timbre = sale.CalcTimbre(ttc, "cash")
+		}
+		payments = []DocPayment{{
+			Amount:        ttc,
+			PaymentMethod: "cash",
+			Timbre:        timbre,
+			Note:          "auto",
+			CreatedAt:     time.Now(),
+		}}
+	}
+
 	now := time.Now()
 	doc := Document{
 		ID:             primitive.NewObjectID(),
@@ -203,7 +224,9 @@ func Create(tenantID, userID, userEmail string, input CreateInput) (*Document, e
 		TotalVAT:       vat,
 		Total:          ttc,
 		PaymentMethod:  payMethod,
-		Timbre:         0,
+		PaidAmount:     paidAmount,
+		Timbre:         timbre,
+		Payments:       payments,
 		ValidUntil:     parseOptionalTime(input.ValidUntil),
 		DueDate:        parseOptionalTime(input.DueDate),
 		PaymentTerms:   input.PaymentTerms,
@@ -232,6 +255,18 @@ func Create(tenantID, userID, userEmail string, input CreateInput) (*Document, e
 	if err != nil {
 		return nil, err
 	}
+
+	// Standalone facture (not linked to a sale):
+	if input.SaleID == "" && input.ClientID != "" && input.DocType == DocFacture {
+		if isCashPaid {
+			// Cash facture: record payment for stats (no balance change — paid immediately)
+			_ = client.RecordPayment(tenantID, input.ClientID, ttc, fmt.Sprintf("Facture %s", ref))
+		} else {
+			// Credit facture: increase client balance (they now owe this amount)
+			_ = client.AdjustBalance(tenantID, input.ClientID, ttc)
+		}
+	}
+
 	return &doc, nil
 }
 
@@ -705,20 +740,50 @@ func CreateAvoir(tenantID, factureID, userID, userEmail string, input AvoirInput
 		_ = client.AdjustBalance(tenantID, facture.ClientID, -ttc)
 	}
 
-	// 2. Return stock for each avoir line
-	for _, line := range avoirLines {
-		if line.VariantID != nil {
-			// Increment variant stock
-			database.Col("product_variants").UpdateOne(ctx,
-				bson.M{"_id": *line.VariantID},
+	// 1b. Create a return sale (negative qty) so the avoir appears in sales stats
+	// The return sale also handles stock restoration via negative qty
+	if facture.SaleID != "" {
+		// Look up original sale type
+		origSaleType := "cash"
+		if sid, serr := primitive.ObjectIDFromHex(facture.SaleID); serr == nil {
+			var origSale struct {
+				SaleType string `bson:"sale_type"`
+			}
+			if database.Col("sales").FindOne(ctx, bson.M{"_id": sid}).Decode(&origSale) == nil && origSale.SaleType != "" {
+				origSaleType = origSale.SaleType
+			}
+		}
+		var returnLines []sale.SaleLineInput
+		for _, al := range avoirLines {
+			returnLines = append(returnLines, sale.SaleLineInput{
+				ProductID: al.ProductID.Hex(),
+				VariantID: func() string { if al.VariantID != nil { return al.VariantID.Hex() }; return "" }(),
+				Qty:       -al.Qty,
+				UnitPrice: al.UnitPrice,
+				Discount:  al.Discount,
+			})
+		}
+		_, _ = sale.Create(tenantID, userID, userEmail, sale.CreateInput{
+			Lines:         returnLines,
+			PaymentMethod: facture.PaymentMethod,
+			AmountPaid:    0,
+			ClientID:      facture.ClientID,
+			SaleType:      origSaleType,
+		})
+	} else {
+		// No linked sale — return stock manually
+		for _, line := range avoirLines {
+			if line.VariantID != nil {
+				database.Col("product_variants").UpdateOne(ctx,
+					bson.M{"_id": *line.VariantID},
+					bson.M{"$inc": bson.M{"qty_available": line.Qty}},
+				)
+			}
+			database.Col("products").UpdateOne(ctx,
+				bson.M{"_id": line.ProductID},
 				bson.M{"$inc": bson.M{"qty_available": line.Qty}},
 			)
 		}
-		// Increment product stock
-		database.Col("products").UpdateOne(ctx,
-			bson.M{"_id": line.ProductID},
-			bson.M{"$inc": bson.M{"qty_available": line.Qty}},
-		)
 	}
 
 	return &avoir, nil
@@ -794,9 +859,21 @@ func Pay(tenantID, id string, input PayInput) (*Document, error) {
 		return nil, err
 	}
 
-	// Reduce client balance by payment amount
+	// Reduce client balance and record payment for stats
 	if doc.ClientID != "" {
 		_ = client.AdjustBalance(tenantID, doc.ClientID, -input.Amount)
+		_ = client.RecordPayment(tenantID, doc.ClientID, input.Amount, fmt.Sprintf("Facture %s", doc.Ref))
+	}
+
+	// Update linked sale's amount_paid if facture was created from a sale
+	if doc.SaleID != "" {
+		sid, serr := primitive.ObjectIDFromHex(doc.SaleID)
+		if serr == nil {
+			database.Col("sales").UpdateOne(ctx,
+				bson.M{"_id": sid, "tenant_id": tenantID},
+				bson.M{"$inc": bson.M{"amount_paid": input.Amount}},
+			)
+		}
 	}
 
 	return &updated, nil

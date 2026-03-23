@@ -178,8 +178,8 @@ export default function SalesStats({ path }) {
     : '0.0'
 
   const finalEarning = (data?.net_earning ?? 0) - expenseSum
-  const cashInRegister = caisseOpening + (data?.cash_payment_ttc ?? 0) + paymentsCollected - retraitSum
-  const ecart = caisseClosing > 0 ? caisseClosing - cashInRegister : 0
+  const cashInRegister = caisseOpening + (data?.cash_payment_ttc ?? 0) + (data?.total_timbre ?? 0) + paymentsCollected - retraitSum
+  const ecart = caisseClosing !== null && caisseClosing !== undefined ? caisseClosing - cashInRegister : 0
 
   return (
     <Layout currentPath={path}>
@@ -268,7 +268,7 @@ export default function SalesStats({ path }) {
 
       {/* ── Cash vs Credit ── */}
       <SectionTitle>{t('cashRevenueTTC')} / {t('creditRevenueTTC')}</SectionTitle>
-      <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <KpiCard
           label={t('cashRevenueTTC')}
           value={data?.cash_revenue_ttc}
@@ -292,6 +292,14 @@ export default function SalesStats({ path }) {
           color="text-info"
           bg="bg-info/10"
           icon="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+        />
+        <KpiCard
+          label={t('remaining')}
+          value={Math.max(0, (data?.credit_revenue_ttc ?? 0) - paymentsCollected)}
+          loading={loading}
+          color="text-error"
+          bg="bg-error/10"
+          icon="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
         />
       </div>
 
@@ -321,6 +329,14 @@ export default function SalesStats({ path }) {
           color="text-secondary"
           bg="bg-secondary/10"
           icon="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"
+        />
+        <KpiCard
+          label={t('timbreFiscal')}
+          value={data?.total_timbre}
+          loading={loading}
+          color="text-warning"
+          bg="bg-warning/10"
+          icon="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185zM9.75 9h.008v.008H9.75V9zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 4.5h.008v.008h-.008V13.5zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
         />
       </div>
 
@@ -405,7 +421,7 @@ export default function SalesStats({ path }) {
           loading={loading}
           icon="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"
         />
-        {caisseClosing > 0 && (
+        {caisseClosing != null && (
           <KpiCard
             label={t('closingAmount')}
             value={caisseClosing}
@@ -415,7 +431,7 @@ export default function SalesStats({ path }) {
             icon="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
           />
         )}
-        {caisseClosing > 0 && (
+        {caisseClosing != null && (
           <BigCard
             label={t('caisseDifference')}
             value={ecart}

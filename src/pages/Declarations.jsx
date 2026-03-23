@@ -145,8 +145,13 @@ function G50Tab() {
   const [month, setMonth] = useState(currentMonth)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [tapRate, setTapRate] = useState(2) // TAP rate: 1% production, 2% services/commerce
+  const [tapRate, setTapRate] = useState(2)
   const printRef = useRef(null)
+
+  // Load TAP rate from store settings
+  useEffect(() => {
+    api.getStoreSettings().then(s => { if (s?.tap_rate) setTapRate(s.tap_rate) }).catch(() => {})
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -701,8 +706,13 @@ function G20Tab() {
   const [year, setYear] = useState(currentYear)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [ibsRate, setIbsRate] = useState(19) // 19% production, 23% BTP/tourism, 26% other
+  const [ibsRate, setIbsRate] = useState(19)
   const printRef = useRef(null)
+
+  // Load IBS rate from store settings
+  useEffect(() => {
+    api.getStoreSettings().then(s => { if (s?.ibs_rate) setIbsRate(s.ibs_rate) }).catch(() => {})
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)

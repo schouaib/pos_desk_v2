@@ -849,6 +849,16 @@ export default {
   // Paramètres TVA
   useVAT: 'Activer la TVA',
   useVATDesc: 'Afficher les champs TVA dans les produits, achats, ventes et déclarations',
+  maxCashAmount: 'Montant max espèces',
+  maxCashAmountDesc: 'Montant maximum autorisé pour les paiements en espèces (0 = sans limite)',
+  cashLimitExceeded: 'Paiement en espèces non autorisé — le montant dépasse la limite',
+  tapRate: 'Taux TAP',
+  tapProduction: 'Production',
+  tapCommerce: 'Commerce / Services',
+  ibsRate: 'Taux IBS',
+  ibsProduction: 'Production',
+  ibsBTP: 'BTP / Tourisme',
+  ibsOther: 'Autres activités',
   // Balance (Rongta RL1000)
   weighable: 'Pesable',
   scaleSettings: 'Paramètres Balance',

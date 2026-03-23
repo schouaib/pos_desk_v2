@@ -3,6 +3,7 @@ package folder
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"saas_pos/internal/database"
@@ -57,7 +58,14 @@ func RequestFolder(tenantID string, input RequestInput) (*FolderRequest, error) 
 	if _, err := col().InsertOne(ctx, req); err != nil {
 		return nil, err
 	}
-	return &req, nil
+
+	// Auto-approve: create the folder immediately without admin intervention
+	approved, err := Approve(req.ID.Hex())
+	if err != nil {
+		log.Printf("folder auto-approve failed: %v", err)
+		return &req, nil // fallback to pending if auto-approve fails
+	}
+	return approved, nil
 }
 
 // ListPending returns all pending folder requests (super admin view).

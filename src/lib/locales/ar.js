@@ -849,6 +849,16 @@ export default {
   // إعدادات الرسم على القيمة المضافة
   useVAT: 'تفعيل الرسم على القيمة المضافة (TVA)',
   useVATDesc: 'إظهار حقول TVA في المنتجات والمشتريات والمبيعات والتصريحات',
+  maxCashAmount: 'الحد الأقصى للدفع نقداً',
+  maxCashAmountDesc: 'أقصى مبلغ مسموح للدفع نقداً (0 = بدون حد)',
+  cashLimitExceeded: 'الدفع نقداً غير مسموح — المبلغ يتجاوز الحد المسموح',
+  tapRate: 'نسبة TAP',
+  tapProduction: 'إنتاج',
+  tapCommerce: 'تجارة / خدمات',
+  ibsRate: 'نسبة IBS',
+  ibsProduction: 'إنتاج',
+  ibsBTP: 'بناء / سياحة',
+  ibsOther: 'أنشطة أخرى',
   // الميزان (Rongta RL1000)
   weighable: 'قابل للوزن',
   scaleSettings: 'إعدادات الميزان',

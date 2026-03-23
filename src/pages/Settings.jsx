@@ -37,6 +37,9 @@ export default function Settings({ path }) {
     default_sale_price: 1,
     use_vat: false,
     pos_expiry_warning: false,
+    max_cash_amount: 0,
+    tap_rate: 2,
+    ibs_rate: 19,
     rc: '', nif: '', nis: '', nart: '', compte_rib: '',
   })
   const [loading, setLoading] = useState(false)
@@ -67,6 +70,9 @@ export default function Settings({ path }) {
           default_sale_price: data.default_sale_price || 1,
           use_vat:            !!data.use_vat,
           pos_expiry_warning: !!data.pos_expiry_warning,
+          max_cash_amount:    data.max_cash_amount || 0,
+          tap_rate:           data.tap_rate || 2,
+          ibs_rate:           data.ibs_rate || 19,
           rc:         data.rc         || '',
           nif:        data.nif        || '',
           nis:        data.nis        || '',
@@ -232,6 +238,34 @@ export default function Settings({ path }) {
             <input type="checkbox" class="toggle toggle-primary toggle-sm"
               checked={form.use_vat}
               onChange={(e) => setForm({ ...form, use_vat: e.target.checked })} />
+          </div>
+
+          <label class="form-control mb-4">
+            <span class="label-text text-xs font-medium">{t('maxCashAmount')}</span>
+            <span class="label-text-alt text-xs text-base-content/50 mb-1">{t('maxCashAmountDesc')}</span>
+            <input type="number" step="any" min="0" class="input input-bordered input-sm font-mono w-full sm:w-64"
+              value={form.max_cash_amount}
+              onInput={(e) => setForm({ ...form, max_cash_amount: parseFloat(e.target.value) || 0 })} />
+          </label>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <label class="form-control">
+              <span class="label-text text-xs font-medium">{t('tapRate')}</span>
+              <select class="select select-bordered select-sm" value={form.tap_rate}
+                onChange={(e) => setForm({ ...form, tap_rate: Number(e.target.value) })}>
+                <option value={1}>1% — {t('tapProduction')}</option>
+                <option value={2}>2% — {t('tapCommerce')}</option>
+              </select>
+            </label>
+            <label class="form-control">
+              <span class="label-text text-xs font-medium">{t('ibsRate')}</span>
+              <select class="select select-bordered select-sm" value={form.ibs_rate}
+                onChange={(e) => setForm({ ...form, ibs_rate: Number(e.target.value) })}>
+                <option value={19}>19% — {t('ibsProduction')}</option>
+                <option value={23}>23% — {t('ibsBTP')}</option>
+                <option value={26}>26% — {t('ibsOther')}</option>
+              </select>
+            </label>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

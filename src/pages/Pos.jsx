@@ -23,16 +23,15 @@ function round2(v) {
   return Math.round(v * 100) / 100
 }
 
-// Droit de timbre LF 2025 — cash only, per tranche of 100 DA
+// Droit de timbre (Art. 46 LF 2025, Art. 100 code du timbre) — cash only
 function calcTimbre(totalTTC, paymentMethod) {
   if (paymentMethod !== 'cash') return 0
   if (totalTTC <= 300) return 0
-  const tranches = Math.ceil(totalTTC / 100)
   let rate
-  if (totalTTC <= 30000) rate = 1
-  else if (totalTTC <= 100000) rate = 1.5
-  else rate = 2
-  return Math.max(5, round2(tranches * rate))
+  if (totalTTC <= 30000) rate = 0.01
+  else if (totalTTC <= 100000) rate = 0.015
+  else rate = 0.02
+  return Math.max(5, round2(totalTTC * rate))
 }
 function fmt(v) {
   return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -1232,6 +1231,7 @@ export default function Pos({ path }) {
         amount_paid: amountPaid,
         client_id: selectedClient?.id ?? '',
         sale_type: saleType,
+        caisse_id: caisseSession?.id || '',
       })
       // Save lines for repeat-last-sale
       lastSaleItemsRef.current = [...lines]
@@ -1277,18 +1277,23 @@ export default function Pos({ path }) {
 
       if (docType === 'facture') {
         // Create sale first, then create facture linked to it
+        const isCash = (paymentMethod || 'cash') === 'cash'
+        const saleLines = lines.map((l) => ({
+          product_id: l.productId,
+          variant_id: l.variantId || '',
+          qty: l.qty,
+          unit_price: l.unitPrice,
+          discount: l.discount,
+        }))
+        // Compute TTC total for cash sales
+        const saleTotal = isCash ? round2(lines.reduce((sum, l) => sum + lineTTC(l), 0)) : 0
         const result = await api.createSale({
-          lines: lines.map((l) => ({
-            product_id: l.productId,
-            variant_id: l.variantId || '',
-            qty: l.qty,
-            unit_price: l.unitPrice,
-            discount: l.discount,
-          })),
+          lines: saleLines,
           payment_method: paymentMethod || 'cash',
-          amount_paid: 0,
+          amount_paid: isCash ? Math.round(saleTotal * 100) / 100 : 0,
           client_id: selectedClient.id,
-          sale_type: 'credit',
+          sale_type: isCash ? 'cash' : 'credit',
+          caisse_id: caisseSession?.id || '',
         })
         const sale = result.data ?? result
         // Create facture linked to the sale
@@ -1575,20 +1580,16 @@ export default function Pos({ path }) {
           <button class="btn btn-sm btn-outline btn-error gap-1.5" onClick={() => {
             setCaisseCloseOpen(true)
             setCaisseStats(null)
-            if (caisseSession?.opened_at) {
-              const opened = new Date(caisseSession.opened_at)
-              const uid = authUser.value?.id || ''
+            if (caisseSession?.id) {
               api.getUserSummary({
-                from: opened.toISOString().slice(0, 10),
-                to: new Date().toISOString().slice(0, 10),
-                hour_from: opened.getHours(),
-                user_id: uid,
+                caisse_id: caisseSession.id,
               }).then(summary => {
                 const u = summary?.users?.[0]
                 setCaisseStats({
-                  sales: u?.sales_total || 0,
+                  sales: u?.cash_sales_total || 0,
                   returns: u?.returns_total || 0,
                   retraits: u?.retraits_total || 0,
+                  timbre: u?.timbre_total || 0,
                 })
               }).catch(() => {})
             }
@@ -1952,7 +1953,12 @@ export default function Pos({ path }) {
                 <button
                   class="btn btn-sm btn-accent btn-outline flex-1 text-xs"
                   disabled={lines.length === 0 || payLoading || !selectedClient}
-                  onClick={() => { setFactPayMethod('cash'); setFactPayOpen(true) }}
+                  onClick={() => {
+                    const totalTTC = round2(lines.reduce((sum, l) => sum + lineTTC(l), 0))
+                    const cashOk = !(store.max_cash_amount > 0 && totalTTC > store.max_cash_amount)
+                    setFactPayMethod(cashOk ? 'cash' : 'cheque')
+                    setFactPayOpen(true)
+                  }}
                   title={!selectedClient ? t('selectClient') : ''}
                 >{t('facture')}</button>
               </div>
@@ -2173,15 +2179,25 @@ export default function Pos({ path }) {
       )}
 
       {/* ── Facture payment method picker ───────────────────────────────────── */}
-      {factPayOpen && (
+      {factPayOpen && (() => {
+        const totalTTC = round2(lines.reduce((sum, l) => sum + lineTTC(l), 0))
+        const cashDisabled = store.max_cash_amount > 0 && totalTTC > store.max_cash_amount
+        return (
         <dialog class="modal modal-bottom sm:modal-middle" open>
           <div class="modal-box max-w-sm">
             <h3 class="font-bold text-base mb-4">{t('blPaymentMethod')}</h3>
+            {cashDisabled && (
+              <div class="alert alert-warning text-xs mb-3 py-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <span>{t('cashLimitExceeded')} ({fmt(store.max_cash_amount)})</span>
+              </div>
+            )}
             <div class="flex flex-col gap-2">
               {['cash', 'cheque', 'virement'].map((m) => (
                 <button
                   key={m}
-                  class={`btn btn-lg ${factPayMethod === m ? 'btn-primary' : 'btn-outline'}`}
+                  class={`btn btn-lg ${factPayMethod === m ? 'btn-primary' : 'btn-outline'} ${m === 'cash' && cashDisabled ? 'btn-disabled opacity-40' : ''}`}
+                  disabled={m === 'cash' && cashDisabled}
                   onClick={() => setFactPayMethod(m)}
                 >
                   {t('payMethod_' + m)}
@@ -2192,7 +2208,7 @@ export default function Pos({ path }) {
               <button class="btn btn-ghost" onClick={() => setFactPayOpen(false)}>{t('cancel')}</button>
               <button
                 class="btn btn-primary"
-                disabled={payLoading}
+                disabled={payLoading || (factPayMethod === 'cash' && cashDisabled)}
                 onClick={() => { setFactPayOpen(false); handleFacturationDoc('facture', factPayMethod) }}
               >
                 {payLoading ? <span class="loading loading-spinner loading-sm" /> : t('confirm')}
@@ -2201,7 +2217,8 @@ export default function Pos({ path }) {
           </div>
           <form method="dialog" class="modal-backdrop"><button onClick={() => setFactPayOpen(false)}>close</button></form>
         </dialog>
-      )}
+        )
+      })()}
 
       {/* ── Help overlay ──────────────────────────────────────────────────────── */}
       {helpOpen && (
@@ -2497,10 +2514,11 @@ export default function Pos({ path }) {
             <h3 class="font-bold text-lg mb-4">{t('closeCaisse')}</h3>
             {(() => {
               const opening = caisseSession?.opening_amount || 0
-              const sales = caisseStats?.sales || 0
-              const returns = caisseStats?.returns || 0
+              const sales = caisseStats?.sales || 0       // cash sales only (not credit/cheque/virement)
+              const returns = caisseStats?.returns || 0  // absolute value (positive)
               const retraits = caisseStats?.retraits || 0
-              const expected = round2(opening + sales - returns - retraits)
+              const timbre = caisseStats?.timbre || 0
+              const expected = round2(opening + sales - returns + timbre - retraits)
               const closing = parseFloat(caisseCloseAmount) || 0
               const ecart = round2(closing - expected)
               return (<>
@@ -2542,7 +2560,6 @@ export default function Pos({ path }) {
               <label class="label"><span class="label-text">{t('closingAmount')}</span></label>
               <input
                 type="number"
-                min="0"
                 step="0.01"
                 class="input input-bordered w-full"
                 value={caisseCloseAmount}

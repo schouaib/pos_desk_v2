@@ -60,6 +60,8 @@ export default function Folders() {
       // Update auth with new token
       const payload = JSON.parse(atob(res.token.split('.')[1]))
       setAuth(res.token, { ...authUser.value, tenant_id: folderId, ...payload })
+      // Remember selected folder for next login
+      localStorage.setItem('preferred_folder', folderId)
       window.location.reload()
     } catch (e) {
       setError(e.message)

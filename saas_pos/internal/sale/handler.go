@@ -126,37 +126,56 @@ func HandleSalesStatistics(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"data": result})
 }
 
-// GET /api/tenant/sales/user-summary?from=&to=&hour_from=&hour_to=&user_id=
+// GET /api/tenant/sales/user-summary?since=&from=&to=&hour_from=&hour_to=&user_id=
 func HandleUserSummary(c *fiber.Ctx) error {
 	claims := middleware.GetClaims(c)
 	now := time.Now()
-	fromDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	toDate := fromDate
+	loc := now.Location()
 
-	if f := c.Query("from"); f != "" {
-		if parsed, err := time.Parse("2006-01-02", f); err == nil {
-			fromDate = parsed
+	var from, to time.Time
+
+	// "since" parameter: exact timestamp for session-based queries
+	if s := c.Query("since"); s != "" {
+		if parsed, err := time.Parse(time.RFC3339, s); err == nil {
+			from = parsed
+			to = now
+		} else if parsed, err := time.Parse(time.RFC3339Nano, s); err == nil {
+			from = parsed
+			to = now
 		}
 	}
-	if t := c.Query("to"); t != "" {
-		if parsed, err := time.Parse("2006-01-02", t); err == nil {
-			toDate = parsed
+
+	// Fallback to date range if "since" not provided
+	if from.IsZero() {
+		fromDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+		toDate := fromDate
+
+		if f := c.Query("from"); f != "" {
+			if parsed, err := time.ParseInLocation("2006-01-02", f, loc); err == nil {
+				fromDate = parsed
+			}
 		}
-	}
+		if t := c.Query("to"); t != "" {
+			if parsed, err := time.ParseInLocation("2006-01-02", t, loc); err == nil {
+				toDate = parsed
+			}
+		}
 
-	from := fromDate
-	to := toDate.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+		from = fromDate
+		to = toDate.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
 
-	if h := c.QueryInt("hour_from", -1); h >= 0 && h <= 23 {
-		from = time.Date(fromDate.Year(), fromDate.Month(), fromDate.Day(), h, 0, 0, 0, fromDate.Location())
-	}
-	if h := c.QueryInt("hour_to", -1); h >= 0 && h <= 23 {
-		to = time.Date(toDate.Year(), toDate.Month(), toDate.Day(), h, 59, 59, 0, toDate.Location())
+		if h := c.QueryInt("hour_from", -1); h >= 0 && h <= 23 {
+			from = time.Date(fromDate.Year(), fromDate.Month(), fromDate.Day(), h, 0, 0, 0, loc)
+		}
+		if h := c.QueryInt("hour_to", -1); h >= 0 && h <= 23 {
+			to = time.Date(toDate.Year(), toDate.Month(), toDate.Day(), h, 59, 59, 0, loc)
+		}
 	}
 
 	userID := c.Query("user_id")
+	caisseID := c.Query("caisse_id")
 
-	result, err := UserSummary(claims.TenantID, from, to, userID)
+	result, err := UserSummary(claims.TenantID, from, to, userID, caisseID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
