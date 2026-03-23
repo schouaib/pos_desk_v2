@@ -193,9 +193,13 @@ export default function UserSummary({ path }) {
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('userEmail')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-center">{t('summSalesCount')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('summSalesTotal')}</th>
+                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-success/70 text-end">{t('payMethod_cash')}</th>
+                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-info/70 text-end">{t('payMethod_cheque')}</th>
+                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-secondary/70 text-end">{t('payMethod_virement')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-center">{t('summReturnsCount')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-error/70 text-end">{t('summReturnsTotal')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-warning/70 text-end">{t('summRetraitsTotal')}</th>
+                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-warning/70 text-end">{t('timbreFiscal')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-info/70 text-end">{t('summOpeningAmount')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-info/70 text-end">{t('summClosingAmount')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('summEcart')}</th>
@@ -204,12 +208,12 @@ export default function UserSummary({ path }) {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={10} class="py-16 text-center">
+                <tr><td colSpan={14} class="py-16 text-center">
                   <span class="loading loading-spinner loading-md text-primary" />
                 </td></tr>
               )}
               {!loading && (!data || data.users.length === 0) && (
-                <tr><td colSpan={10} class="py-16 text-center">
+                <tr><td colSpan={14} class="py-16 text-center">
                   <div class="flex flex-col items-center gap-2">
                     <Icon d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" className="w-8 h-8 text-base-content/20" />
                     <span class="text-sm text-base-content/30">{t('noData')}</span>
@@ -230,11 +234,15 @@ export default function UserSummary({ path }) {
                     <span class="badge badge-sm bg-primary/10 text-primary border-0 font-semibold">{u.sales_count}</span>
                   </td>
                   <td class="px-4 py-3 text-end font-mono text-sm font-semibold tabular-nums">{fmt(u.sales_total)}</td>
+                  <td class="px-4 py-3 text-end font-mono text-sm text-success tabular-nums">{fmt(u.cash_sales_total || 0)}</td>
+                  <td class="px-4 py-3 text-end font-mono text-sm text-info tabular-nums">{fmt(u.cheque_sales_total || 0)}</td>
+                  <td class="px-4 py-3 text-end font-mono text-sm text-secondary tabular-nums">{fmt(u.virement_sales_total || 0)}</td>
                   <td class="px-4 py-3 text-center">
                     <span class="badge badge-sm bg-error/10 text-error border-0 font-semibold">{u.returns_count}</span>
                   </td>
                   <td class="px-4 py-3 text-end font-mono text-sm text-error tabular-nums">{fmt(u.returns_total)}</td>
                   <td class="px-4 py-3 text-end font-mono text-sm text-warning tabular-nums">{fmt(u.retraits_total)}</td>
+                  <td class="px-4 py-3 text-end font-mono text-sm text-warning tabular-nums">{fmt(u.timbre_total || 0)}</td>
                   <td class="px-4 py-3 text-end font-mono text-sm text-info tabular-nums">{fmt(u.opening_amount || 0)}</td>
                   <td class="px-4 py-3 text-end font-mono text-sm text-info tabular-nums">{fmt(u.closing_amount || 0)}</td>
                   <td class={`px-4 py-3 text-end font-mono text-sm font-bold tabular-nums ${(u.ecart || 0) >= 0 ? 'text-success' : 'text-error'}`}>
@@ -252,9 +260,13 @@ export default function UserSummary({ path }) {
                   <td class="px-4 py-3.5 text-sm font-bold uppercase tracking-wide">{t('grandTotal')}</td>
                   <td class="px-4 py-3.5"></td>
                   <td class="px-4 py-3.5 text-end font-mono text-sm font-bold tabular-nums">{fmt(grandSales)}</td>
+                  <td class="px-4 py-3.5 text-end font-mono text-sm font-bold text-success tabular-nums">{fmt(data.users.reduce((s, u) => s + (u.cash_sales_total || 0), 0))}</td>
+                  <td class="px-4 py-3.5 text-end font-mono text-sm font-bold text-info tabular-nums">{fmt(data.users.reduce((s, u) => s + (u.cheque_sales_total || 0), 0))}</td>
+                  <td class="px-4 py-3.5 text-end font-mono text-sm font-bold text-secondary tabular-nums">{fmt(data.users.reduce((s, u) => s + (u.virement_sales_total || 0), 0))}</td>
                   <td class="px-4 py-3.5"></td>
                   <td class="px-4 py-3.5 text-end font-mono text-sm font-bold text-error tabular-nums">{fmt(grandReturns)}</td>
                   <td class="px-4 py-3.5 text-end font-mono text-sm font-bold text-warning tabular-nums">{fmt(grandRetraits)}</td>
+                  <td class="px-4 py-3.5 text-end font-mono text-sm font-bold text-warning tabular-nums">{fmt(data.users.reduce((s, u) => s + (u.timbre_total || 0), 0))}</td>
                   <td class="px-4 py-3.5 text-end font-mono text-sm font-bold text-info tabular-nums">{fmt(data.grand_opening || 0)}</td>
                   <td class="px-4 py-3.5 text-end font-mono text-sm font-bold text-info tabular-nums">{fmt(data.grand_closing || 0)}</td>
                   <td class={`px-4 py-3.5 text-end font-mono text-sm font-bold tabular-nums ${grandEcart >= 0 ? 'text-success' : 'text-error'}`}>

@@ -208,6 +208,7 @@ export const api = {
 
   // Discount rules
   listProductDiscounts: (productId) => request('GET', `/tenant/products/${encodeURIComponent(productId)}/discounts`),
+  getApplicableDiscount: (productId, qty) => request('GET', `/tenant/products/${encodeURIComponent(productId)}/discount-applicable?qty=${qty}`),
   createDiscount: (body) => request('POST', '/tenant/discounts', body),
   updateDiscount: (id, body) => request('PUT', `/tenant/discounts/${encodeURIComponent(id)}`, body),
   deleteDiscount: (id) => request('DELETE', `/tenant/discounts/${encodeURIComponent(id)}`),
@@ -226,6 +227,8 @@ export const api = {
   createSupplier: (body) => request('POST', '/tenant/suppliers/', body).then(r => { bust('/tenant/suppliers?limit=500'); return r }),
   updateSupplier: (id, body) => request('PUT', `/tenant/suppliers/${encodeURIComponent(id)}`, body).then(r => { bust('/tenant/suppliers?limit=500'); return r }),
   deleteSupplier: (id) => request('DELETE', `/tenant/suppliers/${encodeURIComponent(id)}`).then(r => { bust('/tenant/suppliers?limit=500'); return r }),
+  listArchivedSuppliers: (params) => request('GET', `/tenant/suppliers/archived?${new URLSearchParams(params)}`),
+  unarchiveSupplier: (id) => request('POST', `/tenant/suppliers/${encodeURIComponent(id)}/unarchive`).then(r => { bust('/tenant/suppliers?limit=500'); return r }),
   adjustSupplierBalance: (id, body) => request('PATCH', `/tenant/suppliers/${encodeURIComponent(id)}/balance`, body).then(r => { bust('/tenant/suppliers?limit=500'); return r }),
   paySupplierBalance: (id, body) => request('POST', `/tenant/suppliers/${encodeURIComponent(id)}/pay`, body).then(r => { bust('/tenant/suppliers?limit=500'); return r }),
   listSupplierPayments: (id, params) => request('GET', `/tenant/suppliers/${encodeURIComponent(id)}/payments?${new URLSearchParams(params)}`),
@@ -296,6 +299,8 @@ export const api = {
   createClient: (body) => request('POST', '/tenant/clients/', body),
   updateClient: (id, body) => request('PUT', `/tenant/clients/${encodeURIComponent(id)}`, body),
   deleteClient: (id) => request('DELETE', `/tenant/clients/${encodeURIComponent(id)}`),
+  listArchivedClients: (params) => request('GET', `/tenant/clients/archived?${new URLSearchParams(params)}`),
+  unarchiveClient: (id) => request('POST', `/tenant/clients/${encodeURIComponent(id)}/unarchive`),
   listClientPayments: (id, params) => request('GET', `/tenant/clients/${encodeURIComponent(id)}/payments?${new URLSearchParams(params)}`),
   addClientPayment: (id, body) => request('POST', `/tenant/clients/${encodeURIComponent(id)}/payments`, body),
   getClientStatement: (id) => request('GET', `/tenant/clients/${encodeURIComponent(id)}/statement`),
@@ -340,6 +345,17 @@ export const api = {
   scaleClearPLU: () => request('DELETE', '/tenant/scale/plu'),
   saveScaleSettings: (body) => request('PUT', '/tenant/scale/settings', body),
   getScaleSettings: () => request('GET', '/tenant/scale/settings'),
+
+  // Facturation (BC / Devis / Facture / Avoir)
+  listFacturation: (params) => request('GET', `/tenant/facturation?${new URLSearchParams(params)}`),
+  getFacturationDoc: (id) => request('GET', `/tenant/facturation/${encodeURIComponent(id)}`),
+  createFacturationDoc: (body) => request('POST', '/tenant/facturation', body),
+  updateFacturationDoc: (id, body) => request('PUT', `/tenant/facturation/${encodeURIComponent(id)}`, body),
+  deleteFacturationDoc: (id) => request('DELETE', `/tenant/facturation/${encodeURIComponent(id)}`),
+  convertFacturationDoc: (id, body) => request('POST', `/tenant/facturation/${encodeURIComponent(id)}/convert`, body),
+  updateFacturationStatus: (id, body) => request('PATCH', `/tenant/facturation/${encodeURIComponent(id)}/status`, body),
+  createAvoir: (id, body) => request('POST', `/tenant/facturation/${encodeURIComponent(id)}/avoir`, body),
+  payFacture: (id, body) => request('POST', `/tenant/facturation/${encodeURIComponent(id)}/pay`, body),
 
   // Folders
   listFolders: () => request('GET', '/tenant/folders'),

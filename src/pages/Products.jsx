@@ -332,9 +332,12 @@ export default function Products({ path }) {
   async function confirmDelete() {
     if (!deleteTarget) return
     try {
-      await api.deleteProduct(deleteTarget.id)
+      const res = await api.deleteProduct(deleteTarget.id)
       setDeleteTarget(null)
       closeModal('delete-modal')
+      if (res?.archived) {
+        alert(t('product_archived_instead'))
+      }
       load()
     } catch {}
   }
@@ -1600,59 +1603,140 @@ export default function Products({ path }) {
 
       {/* Discount Rules dialog */}
       <dialog id="discount-dialog" class="modal modal-bottom sm:modal-middle">
-        <div class="modal-box w-full sm:max-w-2xl">
-          <h3 class="font-bold text-lg mb-1">{t('discountRules')}</h3>
-          <p class="text-sm text-base-content/60 mb-3">{discountTarget?.name}</p>
+        <div class="modal-box w-full sm:max-w-2xl p-0">
+          {/* Header */}
+          <div class="px-6 pt-5 pb-4 border-b border-base-200">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-bold text-lg">{t('discountRules')}</h3>
+                <p class="text-sm text-base-content/50">{discountTarget?.name}</p>
+              </div>
+            </div>
+            <p class="text-xs text-success mt-2 flex items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              {t('autoAppliedInPos')}
+            </p>
+          </div>
 
-          {discountItems.length > 0 && (
-            <div class="overflow-x-auto mb-4">
-              <table class="table table-xs">
-                <thead><tr><th>{t('discountType')}</th><th>{t('discountValue')}</th><th>{t('minQty')}</th><th>{t('dateFrom')}</th><th>{t('dateTo')}</th><th>{t('status')}</th><th></th></tr></thead>
-                <tbody>
-                  {discountItems.map(d => (
-                    <tr key={d.id}>
-                      <td class="text-xs">{d.type === 'percentage' ? t('percentage') : t('fixed')}</td>
-                      <td class="font-mono text-xs">{d.value}{d.type === 'percentage' ? '%' : ''}</td>
-                      <td class="font-mono text-xs">{d.min_qty}</td>
-                      <td class="text-xs">{d.start_date ? new Date(d.start_date).toLocaleDateString() : '—'}</td>
-                      <td class="text-xs">{d.end_date ? new Date(d.end_date).toLocaleDateString() : '—'}</td>
-                      <td><span class={`badge badge-xs ${d.active ? 'badge-success' : 'badge-ghost'}`}>{d.active ? t('active') : t('disabled')}</span></td>
-                      <td><button class="btn btn-xs btn-ghost text-error" onClick={() => deleteDiscount(d.id)}>x</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div class="px-6 py-4" style="max-height:400px;overflow-y:auto">
+            {/* Existing rules as cards */}
+            {discountItems.length === 0 && (
+              <div class="text-center py-8">
+                <div class="w-14 h-14 mx-auto rounded-full bg-base-200 flex items-center justify-center mb-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+                <p class="text-sm text-base-content/40">{t('noDiscountRules')}</p>
+              </div>
+            )}
+
+            {discountItems.length > 0 && (
+              <div class="space-y-2">
+                {discountItems.map(d => {
+                  const isExpired = d.end_date && new Date(d.end_date) < new Date()
+                  const isActive = d.active && !isExpired
+                  return (
+                    <div key={d.id} class={`border rounded-xl p-3 transition-all ${isActive ? 'border-success/30 bg-success/5' : 'border-base-200 bg-base-200/30 opacity-60'}`}>
+                      <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-3 flex-1 min-w-0">
+                          {/* Value badge */}
+                          <div class={`flex-shrink-0 px-3 py-1.5 rounded-lg font-bold font-mono text-sm ${isActive ? 'bg-success/15 text-success' : 'bg-base-300 text-base-content/40'}`}>
+                            {d.type === 'percentage' ? `${d.value}%` : d.value}
+                          </div>
+                          <div class="min-w-0">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                              <span class={`badge badge-sm ${d.type === 'percentage' ? 'badge-primary badge-outline' : 'badge-secondary badge-outline'}`}>
+                                {d.type === 'percentage' ? t('percentage') : t('fixed')}
+                              </span>
+                              {d.min_qty > 0 && (
+                                <span class="badge badge-sm badge-ghost">{t('minQty')}: {d.min_qty}</span>
+                              )}
+                              {isExpired && <span class="badge badge-sm badge-error">{t('expired')}</span>}
+                              {!isExpired && <span class={`badge badge-sm ${d.active ? 'badge-success' : 'badge-ghost'}`}>{d.active ? t('active') : t('disabled')}</span>}
+                            </div>
+                            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/40">
+                              {d.start_date && (
+                                <span>{t('dateFrom')}: {new Date(d.start_date).toLocaleDateString()}</span>
+                              )}
+                              {d.end_date && (
+                                <span>{t('dateTo')}: {new Date(d.end_date).toLocaleDateString()}</span>
+                              )}
+                              {!d.start_date && !d.end_date && <span>—</span>}
+                            </div>
+                          </div>
+                        </div>
+                        {canEdit && (
+                          <button class="btn btn-sm btn-ghost btn-square text-base-content/30 hover:text-error flex-shrink-0" onClick={() => deleteDiscount(d.id)}>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Add form */}
+          {canEdit && (
+            <div class="px-6 py-4 border-t border-base-200 bg-base-200/30">
+              <form onSubmit={addDiscount}>
+                <p class="text-sm font-semibold mb-3 flex items-center gap-1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+                  {t('addNewRule')}
+                </p>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <label class="form-control">
+                    <span class="label-text text-xs font-medium mb-1">{t('discountType')}</span>
+                    <select class="select select-bordered select-sm" value={discountForm.type}
+                      onChange={(e) => setDiscountForm({ ...discountForm, type: e.target.value })}>
+                      <option value="percentage">{t('percentage')}</option>
+                      <option value="fixed">{t('fixed')}</option>
+                    </select>
+                  </label>
+                  <label class="form-control">
+                    <span class="label-text text-xs font-medium mb-1">{t('discountValue')}</span>
+                    <input type="number" step="any" min="0" class="input input-bordered input-sm font-mono" value={discountForm.value}
+                      onInput={(e) => setDiscountForm({ ...discountForm, value: parseFloat(e.target.value) || 0 })} />
+                  </label>
+                  <label class="form-control">
+                    <span class="label-text text-xs font-medium mb-1">{t('minQty')}</span>
+                    <input type="number" step="any" min="0" class="input input-bordered input-sm font-mono" value={discountForm.min_qty}
+                      onInput={(e) => setDiscountForm({ ...discountForm, min_qty: parseFloat(e.target.value) || 0 })} />
+                  </label>
+                  <label class="form-control">
+                    <span class="label-text text-xs font-medium mb-1">{t('dateFrom')}</span>
+                    <input type="date" class="input input-bordered input-sm" value={discountForm.start_date}
+                      onInput={(e) => setDiscountForm({ ...discountForm, start_date: e.target.value })} />
+                  </label>
+                  <label class="form-control">
+                    <span class="label-text text-xs font-medium mb-1">{t('dateTo')}</span>
+                    <input type="date" class="input input-bordered input-sm" value={discountForm.end_date}
+                      onInput={(e) => setDiscountForm({ ...discountForm, end_date: e.target.value })} />
+                  </label>
+                  <label class="form-control justify-end">
+                    <button type="submit" class="btn btn-sm btn-primary gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+                      {t('add')}
+                    </button>
+                  </label>
+                </div>
+              </form>
             </div>
           )}
 
-          {canEdit && (
-            <form onSubmit={addDiscount} class="space-y-2 border-t pt-3">
-              <p class="text-xs font-semibold">{t('add')} {t('discountRules')}</p>
-              <div class="grid grid-cols-2 gap-2">
-                <label class="form-control"><span class="label-text text-xs">{t('discountType')}</span>
-                  <select class="select select-bordered select-xs" value={discountForm.type}
-                    onChange={(e) => setDiscountForm({ ...discountForm, type: e.target.value })}>
-                    <option value="percentage">{t('percentage')}</option>
-                    <option value="fixed">{t('fixed')}</option>
-                  </select></label>
-                <label class="form-control"><span class="label-text text-xs">{t('discountValue')}</span>
-                  <input type="number" step="any" min="0" class="input input-bordered input-xs" value={discountForm.value}
-                    onInput={(e) => setDiscountForm({ ...discountForm, value: parseFloat(e.target.value) || 0 })} /></label>
-                <label class="form-control"><span class="label-text text-xs">{t('minQty')}</span>
-                  <input type="number" step="any" min="0" class="input input-bordered input-xs" value={discountForm.min_qty}
-                    onInput={(e) => setDiscountForm({ ...discountForm, min_qty: parseFloat(e.target.value) || 0 })} /></label>
-                <label class="form-control"><span class="label-text text-xs">{t('dateFrom')}</span>
-                  <input type="date" class="input input-bordered input-xs" value={discountForm.start_date}
-                    onInput={(e) => setDiscountForm({ ...discountForm, start_date: e.target.value })} /></label>
-                <label class="form-control"><span class="label-text text-xs">{t('dateTo')}</span>
-                  <input type="date" class="input input-bordered input-xs" value={discountForm.end_date}
-                    onInput={(e) => setDiscountForm({ ...discountForm, end_date: e.target.value })} /></label>
-              </div>
-              <button type="submit" class="btn btn-xs btn-primary">{t('add')}</button>
-            </form>
-          )}
-
-          <div class="modal-action"><form method="dialog"><button class="btn btn-sm btn-ghost">{t('back')}</button></form></div>
+          <div class="px-6 py-3 border-t border-base-200">
+            <form method="dialog" class="flex justify-end"><button class="btn btn-sm btn-ghost">{t('back')}</button></form>
+          </div>
         </div>
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
       </dialog>

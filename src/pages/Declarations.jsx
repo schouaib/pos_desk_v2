@@ -176,7 +176,7 @@ function G50Tab() {
   const tvaAPayer = Math.max(0, tvaCollectee - tvaDeductible)
   const precompte = tvaDeductible > tvaCollectee ? tvaDeductible - tvaCollectee : 0
   const tap = salesHT * (tapRate / 100)
-  const timbreFiscal = 0 // User can adjust
+  const timbreFiscal = data?.sales?.total_timbre ?? 0
   const totalAPayer = tvaAPayer + tap + timbreFiscal
 
   function handlePrint() {

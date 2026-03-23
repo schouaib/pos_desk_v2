@@ -30,6 +30,9 @@ type ModulePerms struct {
 	Archive      bool `json:"archive"       bson:"archive"`
 	PriceHistory bool `json:"price_history" bson:"price_history"`
 	Valuation    bool `json:"valuation"     bson:"valuation"`
+	BC           bool `json:"bc"            bson:"bc"`
+	Devis        bool `json:"devis"         bson:"devis"`
+	Avoir        bool `json:"avoir"         bson:"avoir"`
 }
 
 // Permissions maps every module to its per-action flags.
@@ -44,7 +47,8 @@ type Permissions struct {
 	Expenses   ModulePerms `json:"expenses"   bson:"expenses"`
 	Retraits   ModulePerms `json:"retraits"   bson:"retraits"`
 	Folders    ModulePerms `json:"folders"    bson:"folders"`
-	Favorites  ModulePerms `json:"favorites"  bson:"favorites"`
+	Favorites    ModulePerms `json:"favorites"    bson:"favorites"`
+	Facturation  ModulePerms `json:"facturation"  bson:"facturation"`
 }
 
 type Claims struct {

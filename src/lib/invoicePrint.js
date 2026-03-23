@@ -172,6 +172,7 @@ export function printInvoice({ store = {}, sale = {}, labels = {}, client = null
     totalTTC:         labels.totalTTC         || 'Total TTC',
     paid:             labels.paid             || 'Montant reçu',
     change:           labels.change           || 'Monnaie rendue',
+    timbre:           labels.timbre           || 'Timbre fiscal',
     amountDue:        labels.amountDue        || 'Net à payer',
     amountWords:      labels.amountWords      || 'Arrêtée la présente facture à la somme de',
     itemsCount:       labels.itemsCount       || 'Total articles',
@@ -633,18 +634,25 @@ export function printInvoice({ store = {}, sale = {}, labels = {}, client = null
               <td class="t-val">${fmt(amount, lang)} ${esc(L.currency)}</td>
             </tr>`).join('')}
           <tr class="t-sep"><td colspan="2"></td></tr>
+          ${(sale.timbre ?? 0) > 0 ? `
+          <tr>
+            <td class="t-lbl" style="color:#d97706">${esc(L.timbre)}</td>
+            <td class="t-val" style="color:#d97706">${fmt(sale.timbre, lang)} ${esc(L.currency)}</td>
+          </tr>` : ''}
           <tr class="t-grand">
             <td class="t-lbl">${esc(L.amountDue)}</td>
-            <td class="t-val">${fmt(sale.total, lang)} ${esc(L.currency)}</td>
+            <td class="t-val">${fmt((sale.total ?? 0) + (sale.timbre ?? 0), lang)} ${esc(L.currency)}</td>
           </tr>
+          ${(sale.amount_paid ?? 0) > 0 ? `
           <tr class="t-payment">
             <td class="t-lbl">${esc(L.paid)}</td>
             <td class="t-val">${fmt(sale.amount_paid, lang)} ${esc(L.currency)}</td>
-          </tr>
+          </tr>` : ''}
+          ${(sale.change ?? 0) > 0 ? `
           <tr class="t-payment">
             <td class="t-lbl">${esc(L.change)}</td>
-            <td class="t-val">${fmt(Math.max(0, sale.change ?? 0), lang)} ${esc(L.currency)}</td>
-          </tr>
+            <td class="t-val">${fmt(sale.change, lang)} ${esc(L.currency)}</td>
+          </tr>` : ''}
         </table>
       </div>
     </div>
@@ -681,11 +689,11 @@ export function printInvoice({ store = {}, sale = {}, labels = {}, client = null
 </body>
 </html>`
 
-  printViaIframe(html)
+  printHtml(html)
 }
 
 /** Print HTML content (works in Tauri WebView) */
-async function printViaIframe(html) {
+export async function printHtml(html) {
   try {
     const { invoke } = await import('@tauri-apps/api/core')
     await invoke('print_html', { html })

@@ -21,8 +21,34 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func col() *mongo.Collection     { return database.Col("sales") }
+func col() *mongo.Collection        { return database.Col("sales") }
 func productCol() *mongo.Collection { return database.Col("products") }
+
+// CalcTimbre computes the Algerian droit de timbre (LF 2025) for cash payments.
+// Rate per tranche of 100 DA: ≤300 DA → 0, ≤30000 → 1 DA, ≤100000 → 1.5 DA, >100000 → 2 DA.
+// Minimum 5 DA. Non-cash payments → 0.
+func CalcTimbre(totalTTC float64, paymentMethod string) float64 {
+	if paymentMethod != "cash" && paymentMethod != "especes" {
+		return 0
+	}
+	if totalTTC <= 300 {
+		return 0
+	}
+	tranches := math.Ceil(totalTTC / 100)
+	var rate float64
+	if totalTTC <= 30000 {
+		rate = 1
+	} else if totalTTC <= 100000 {
+		rate = 1.5
+	} else {
+		rate = 2
+	}
+	timbre := tranches * rate
+	if timbre < 5 {
+		timbre = 5
+	}
+	return math.Round(timbre*100) / 100
+}
 
 // Create records a completed sale. Lines with negative qty represent returns
 // (e.g. qty=-1 means the customer returned 1 unit). Negative qty lines produce
@@ -222,6 +248,7 @@ func Create(tenantID, cashierID, cashierEmail string, input CreateInput) (*Sale,
 		Total:         totalTTC,
 		TotalEarning:  totalEarning,
 		PaymentMethod: input.PaymentMethod,
+		Timbre:        0,
 		AmountPaid:    input.AmountPaid,
 		Change:        change,
 		ClientID:      clientID,
@@ -391,6 +418,16 @@ func SalesStatistics(tenantID string, from, to time.Time, includeLosses bool) (*
 			"credit_revenue_ttc": bson.M{"$sum": bson.M{
 				"$cond": bson.A{bson.M{"$eq": bson.A{"$sale_type", "credit"}}, "$total", 0},
 			}},
+			"cash_payment_ttc": bson.M{"$sum": bson.M{
+				"$cond": bson.A{bson.M{"$in": bson.A{"$payment_method", bson.A{"cash", ""}}}, "$total", 0},
+			}},
+			"cheque_payment_ttc": bson.M{"$sum": bson.M{
+				"$cond": bson.A{bson.M{"$eq": bson.A{"$payment_method", "cheque"}}, "$total", 0},
+			}},
+			"virement_payment_ttc": bson.M{"$sum": bson.M{
+				"$cond": bson.A{bson.M{"$eq": bson.A{"$payment_method", "virement"}}, "$total", 0},
+			}},
+			"total_timbre": bson.M{"$sum": bson.M{"$ifNull": bson.A{"$timbre", 0}}},
 		}}},
 	}
 
@@ -401,24 +438,32 @@ func SalesStatistics(tenantID string, from, to time.Time, includeLosses bool) (*
 	defer cur.Close(ctx)
 
 	var agg []struct {
-		RevenueTTC       float64 `bson:"revenue_ttc"`
-		RevenueHT        float64 `bson:"revenue_ht"`
-		TotalVAT         float64 `bson:"total_vat"`
-		GrossEarning     float64 `bson:"gross_earning"`
-		CashRevenueTTC   float64 `bson:"cash_revenue_ttc"`
-		CreditRevenueTTC float64 `bson:"credit_revenue_ttc"`
+		RevenueTTC         float64 `bson:"revenue_ttc"`
+		RevenueHT          float64 `bson:"revenue_ht"`
+		TotalVAT           float64 `bson:"total_vat"`
+		GrossEarning       float64 `bson:"gross_earning"`
+		CashRevenueTTC     float64 `bson:"cash_revenue_ttc"`
+		CreditRevenueTTC   float64 `bson:"credit_revenue_ttc"`
+		CashPaymentTTC     float64 `bson:"cash_payment_ttc"`
+		ChequePaymentTTC   float64 `bson:"cheque_payment_ttc"`
+		VirementPaymentTTC float64 `bson:"virement_payment_ttc"`
+		TotalTimbre        float64 `bson:"total_timbre"`
 	}
 	cur.All(ctx, &agg)
 
 	res := &SalesStatisticsResult{SalesCount: count}
 	if len(agg) > 0 {
-		res.RevenueTTC        = math.Round(agg[0].RevenueTTC*100) / 100
-		res.RevenueHT         = math.Round(agg[0].RevenueHT*100) / 100
-		res.TotalVAT          = math.Round(agg[0].TotalVAT*100) / 100
-		res.GrossEarning      = math.Round(agg[0].GrossEarning*100) / 100
-		res.TotalCost         = math.Round((agg[0].RevenueHT-agg[0].GrossEarning)*100) / 100
-		res.CashRevenueTTC    = math.Round(agg[0].CashRevenueTTC*100) / 100
-		res.CreditRevenueTTC  = math.Round(agg[0].CreditRevenueTTC*100) / 100
+		res.RevenueTTC          = math.Round(agg[0].RevenueTTC*100) / 100
+		res.RevenueHT           = math.Round(agg[0].RevenueHT*100) / 100
+		res.TotalVAT            = math.Round(agg[0].TotalVAT*100) / 100
+		res.GrossEarning        = math.Round(agg[0].GrossEarning*100) / 100
+		res.TotalCost           = math.Round((agg[0].RevenueHT-agg[0].GrossEarning)*100) / 100
+		res.CashRevenueTTC      = math.Round(agg[0].CashRevenueTTC*100) / 100
+		res.CreditRevenueTTC    = math.Round(agg[0].CreditRevenueTTC*100) / 100
+		res.CashPaymentTTC      = math.Round(agg[0].CashPaymentTTC*100) / 100
+		res.ChequePaymentTTC    = math.Round(agg[0].ChequePaymentTTC*100) / 100
+		res.VirementPaymentTTC  = math.Round(agg[0].VirementPaymentTTC*100) / 100
+		res.TotalTimbre         = math.Round(agg[0].TotalTimbre*100) / 100
 	}
 
 	if includeLosses {
@@ -470,16 +515,27 @@ func UserSummary(tenantID string, from, to time.Time, userID string) (*UserSumma
 		filter["cashier_id"] = userID
 	}
 
-	// Aggregate sales per cashier, splitting positive (sales) and negative (returns).
+	// Aggregate sales per cashier, splitting positive (sales) and negative (returns),
+	// and breaking down positive sales by payment method for caisse calculation.
+	isSale := bson.M{"$gte": bson.A{"$total", 0}}
+	isReturn := bson.M{"$lt": bson.A{"$total", 0}}
+	isCash := bson.M{"$in": bson.A{"$payment_method", bson.A{"cash", ""}}}
+	isCheque := bson.M{"$eq": bson.A{"$payment_method", "cheque"}}
+	isVirement := bson.M{"$eq": bson.A{"$payment_method", "virement"}}
+
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: filter}},
 		{{Key: "$group", Value: bson.M{
-			"_id":           "$cashier_id",
-			"user_email":    bson.M{"$first": "$cashier_email"},
-			"sales_count":   bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$gte": bson.A{"$total", 0}}, 1, 0}}},
-			"sales_total":   bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$gte": bson.A{"$total", 0}}, "$total", 0}}},
-			"returns_count": bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$lt": bson.A{"$total", 0}}, 1, 0}}},
-			"returns_total": bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$lt": bson.A{"$total", 0}}, "$total", 0}}},
+			"_id":                  "$cashier_id",
+			"user_email":           bson.M{"$first": "$cashier_email"},
+			"sales_count":          bson.M{"$sum": bson.M{"$cond": bson.A{isSale, 1, 0}}},
+			"sales_total":          bson.M{"$sum": bson.M{"$cond": bson.A{isSale, "$total", 0}}},
+			"cash_sales_total":     bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$and": bson.A{isSale, isCash}}, "$total", 0}}},
+			"cheque_sales_total":   bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$and": bson.A{isSale, isCheque}}, "$total", 0}}},
+			"virement_sales_total": bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$and": bson.A{isSale, isVirement}}, "$total", 0}}},
+			"returns_count":        bson.M{"$sum": bson.M{"$cond": bson.A{isReturn, 1, 0}}},
+			"returns_total":        bson.M{"$sum": bson.M{"$cond": bson.A{isReturn, "$total", 0}}},
+			"timbre_total":         bson.M{"$sum": bson.M{"$ifNull": bson.A{"$timbre", 0}}},
 		}}},
 		{{Key: "$sort", Value: bson.M{"sales_total": -1}}},
 	}
@@ -491,12 +547,16 @@ func UserSummary(tenantID string, from, to time.Time, userID string) (*UserSumma
 	defer cur.Close(ctx)
 
 	type saleAgg struct {
-		UserID       string  `bson:"_id"`
-		UserEmail    string  `bson:"user_email"`
-		SalesCount   int64   `bson:"sales_count"`
-		SalesTotal   float64 `bson:"sales_total"`
-		ReturnsCount int64   `bson:"returns_count"`
-		ReturnsTotal float64 `bson:"returns_total"`
+		UserID             string  `bson:"_id"`
+		UserEmail          string  `bson:"user_email"`
+		SalesCount         int64   `bson:"sales_count"`
+		SalesTotal         float64 `bson:"sales_total"`
+		CashSalesTotal     float64 `bson:"cash_sales_total"`
+		ChequeSalesTotal   float64 `bson:"cheque_sales_total"`
+		VirementSalesTotal float64 `bson:"virement_sales_total"`
+		ReturnsCount       int64   `bson:"returns_count"`
+		ReturnsTotal       float64 `bson:"returns_total"`
+		TimbreTotal        float64 `bson:"timbre_total"`
 	}
 	var rows []saleAgg
 	cur.All(ctx, &rows)
@@ -513,12 +573,16 @@ func UserSummary(tenantID string, from, to time.Time, userID string) (*UserSumma
 		rt := math.Abs(math.Round(r.ReturnsTotal*100) / 100)
 		st := math.Round(r.SalesTotal*100) / 100
 		userMap[r.UserID] = &UserSummaryLine{
-			UserID:       r.UserID,
-			UserEmail:    r.UserEmail,
-			SalesCount:   r.SalesCount,
-			SalesTotal:   st,
-			ReturnsCount: r.ReturnsCount,
-			ReturnsTotal: rt,
+			UserID:             r.UserID,
+			UserEmail:          r.UserEmail,
+			SalesCount:         r.SalesCount,
+			SalesTotal:         st,
+			CashSalesTotal:     math.Round(r.CashSalesTotal*100) / 100,
+			ChequeSalesTotal:   math.Round(r.ChequeSalesTotal*100) / 100,
+			VirementSalesTotal: math.Round(r.VirementSalesTotal*100) / 100,
+			ReturnsCount:       r.ReturnsCount,
+			ReturnsTotal:       rt,
+			TimbreTotal:        math.Round(r.TimbreTotal*100) / 100,
 		}
 	}
 
@@ -555,8 +619,11 @@ func UserSummary(tenantID string, from, to time.Time, userID string) (*UserSumma
 	var grandSales, grandReturns, grandRetraits, grandOpening, grandClosing, grandEcart float64
 	for _, u := range userMap {
 		u.Net = math.Round((u.SalesTotal-u.ReturnsTotal-u.RetraitsTotal)*100) / 100
-		// ecart = closing_amount - expected (opening + cash_sales - returns - retraits)
-		expected := u.OpeningAmount + u.SalesTotal - u.ReturnsTotal - u.RetraitsTotal
+		// ecart = closing_amount - expected
+		// Expected cash in drawer = opening + cash_sales + timbre - returns - retraits
+		// Only cash sales go into the caisse; cheque/virement don't affect the drawer
+		// Timbre is collected as cash, so it adds to the expected drawer amount
+		expected := u.OpeningAmount + u.CashSalesTotal + u.TimbreTotal - u.ReturnsTotal - u.RetraitsTotal
 		u.Ecart = math.Round((u.ClosingAmount-expected)*100) / 100
 		grandSales += u.SalesTotal
 		grandReturns += u.ReturnsTotal

@@ -54,6 +54,10 @@ export default function Suppliers({ path }) {
   const [payError, setPayError]           = useState('')
   const [payLoading, setPayLoading]       = useState(false)
 
+  // Archived
+  const [archivedItems, setArchivedItems] = useState([])
+  const [archivedTotal, setArchivedTotal] = useState(0)
+
   // Adjust balance modal
   const [balanceTarget, setBalanceTarget] = useState(null)
   const [balanceAmount, setBalanceAmount] = useState(0)
@@ -233,8 +237,30 @@ export default function Suppliers({ path }) {
 
   async function confirmDelete() {
     try {
-      await api.deleteSupplier(deleteTarget.id)
+      const res = await api.deleteSupplier(deleteTarget.id)
       closeModal('delete-modal')
+      if (res?.archived) alert(t('supplier_archived_instead'))
+      load()
+    } catch {}
+  }
+
+  async function loadArchived() {
+    try {
+      const data = await api.listArchivedSuppliers({ page: 1, limit: 500 })
+      setArchivedItems(data.items || [])
+      setArchivedTotal(data.total || 0)
+    } catch { setArchivedItems([]) }
+  }
+
+  async function openArchived() {
+    await loadArchived()
+    document.getElementById('archived-suppliers-modal')?.showModal()
+  }
+
+  async function handleUnarchive(id) {
+    try {
+      await api.unarchiveSupplier(id)
+      loadArchived()
       load()
     } catch {}
   }
@@ -528,9 +554,15 @@ export default function Suppliers({ path }) {
     <Layout currentPath={path}>
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-2xl font-bold">{t('suppliersPage')}</h2>
-        {canAdd && (
-          <button class="btn btn-primary btn-sm" onClick={openCreate}>{t('newSupplier')}</button>
-        )}
+        <div class="flex gap-2">
+          <button class="btn btn-sm btn-ghost gap-1" onClick={openArchived}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
+            {t('showArchived')}
+          </button>
+          {canAdd && (
+            <button class="btn btn-primary btn-sm" onClick={openCreate}>{t('newSupplier')}</button>
+          )}
+        </div>
       </div>
 
       <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-2">
@@ -972,6 +1004,43 @@ export default function Suppliers({ path }) {
           <button class="btn btn-sm btn-ghost" onClick={() => closeModal('delete-modal')}>{t('back')}</button>
         </div>
       </Modal>
+
+      {/* Archived Suppliers Modal */}
+      <dialog id="archived-suppliers-modal" class="modal">
+        <div class="modal-box max-w-2xl">
+          <h3 class="font-bold text-lg mb-4">{t('archivedSuppliers')}</h3>
+          {archivedItems.length === 0 ? (
+            <p class="text-center text-base-content/50 py-8">{t('noArchivedSuppliers')}</p>
+          ) : (
+            <table class="table table-sm w-full">
+              <thead>
+                <tr>
+                  <th>{t('name')}</th>
+                  <th>{t('phone')}</th>
+                  <th>{t('balance')}</th>
+                  <th>{t('actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {archivedItems.map(s => (
+                  <tr key={s.id}>
+                    <td>{s.name}</td>
+                    <td>{s.phone || '—'}</td>
+                    <td>{(s.balance || 0).toFixed(2)}</td>
+                    <td>
+                      <button class="btn btn-xs btn-success btn-outline" onClick={() => handleUnarchive(s.id)}>{t('unarchive')}</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div class="modal-action">
+            <form method="dialog"><button class="btn btn-sm">{t('back')}</button></form>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+      </dialog>
     </Layout>
   )
 }

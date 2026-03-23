@@ -12,9 +12,11 @@ type Supplier struct {
 	Name      string             `bson:"name"       json:"name"`
 	Phone     string             `bson:"phone"      json:"phone"`
 	Address   string             `bson:"address"    json:"address"`
-	Balance   float64            `bson:"balance"    json:"balance"`
-	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time          `bson:"updated_at" json:"updated_at"`
+	Balance    float64            `bson:"balance"    json:"balance"`
+	Archived   bool               `bson:"archived"   json:"archived"`
+	ArchivedAt *time.Time         `bson:"archived_at,omitempty" json:"archived_at,omitempty"`
+	CreatedAt  time.Time          `bson:"created_at" json:"created_at"`
+	UpdatedAt  time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
 type CreateInput struct {

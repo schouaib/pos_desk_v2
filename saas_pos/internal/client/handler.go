@@ -52,7 +52,33 @@ func HandleUpdate(c *fiber.Ctx) error {
 func HandleDelete(c *fiber.Ctx) error {
 	claims := middleware.GetClaims(c)
 	id := c.Params("id")
-	if err := Delete(claims.TenantID, id); err != nil {
+	archived, err := Delete(claims.TenantID, id)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+	if archived {
+		return c.JSON(fiber.Map{"data": fiber.Map{"archived": true}})
+	}
+	return c.JSON(fiber.Map{"data": true})
+}
+
+// GET /api/tenant/clients/archived
+func HandleListArchived(c *fiber.Ctx) error {
+	claims := middleware.GetClaims(c)
+	q := c.Query("q", "")
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "50"))
+	result, err := ListArchived(claims.TenantID, q, page, limit)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"data": result})
+}
+
+// POST /api/tenant/clients/:id/unarchive
+func HandleUnarchive(c *fiber.Ctx) error {
+	claims := middleware.GetClaims(c)
+	if err := Unarchive(claims.TenantID, c.Params("id")); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"data": true})

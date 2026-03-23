@@ -20,9 +20,11 @@ type Client struct {
 	NIS       string             `bson:"nis"           json:"nis"`
 	NART      string             `bson:"nart"          json:"nart"`
 	CompteRIB string             `bson:"compte_rib"    json:"compte_rib"`
-	Balance   float64            `bson:"balance"       json:"balance"` // outstanding credit (positive = owes money)
-	CreatedAt time.Time          `bson:"created_at"    json:"created_at"`
-	UpdatedAt time.Time          `bson:"updated_at"    json:"updated_at"`
+	Balance    float64            `bson:"balance"        json:"balance"` // outstanding credit (positive = owes money)
+	Archived   bool               `bson:"archived"       json:"archived"`
+	ArchivedAt *time.Time         `bson:"archived_at,omitempty" json:"archived_at,omitempty"`
+	CreatedAt  time.Time          `bson:"created_at"     json:"created_at"`
+	UpdatedAt  time.Time          `bson:"updated_at"     json:"updated_at"`
 }
 
 // ClientInput is used for create and update requests.

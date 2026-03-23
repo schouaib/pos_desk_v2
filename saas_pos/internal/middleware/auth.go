@@ -115,6 +115,8 @@ func hasFeature(claims *jwt.Claims, feature string) bool {
 		return f.BatchTracking
 	case "scale":
 		return f.Scale
+	case "facturation":
+		return f.Facturation
 	}
 	return false
 }
@@ -164,6 +166,8 @@ func hasPermission(p jwt.Permissions, module, action string) bool {
 		m = p.Folders
 	case "favorites":
 		m = p.Favorites
+	case "facturation":
+		m = p.Facturation
 	default:
 		return false
 	}
@@ -202,6 +206,12 @@ func hasPermission(p jwt.Permissions, module, action string) bool {
 		return m.PriceHistory
 	case "valuation":
 		return m.Valuation
+	case "bc":
+		return m.BC
+	case "devis":
+		return m.Devis
+	case "avoir":
+		return m.Avoir
 	}
 	return false
 }

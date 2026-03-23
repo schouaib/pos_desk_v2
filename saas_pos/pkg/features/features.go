@@ -26,4 +26,5 @@ type PlanFeatures struct {
 	ProductBundles   bool `bson:"product_bundles"   json:"product_bundles"`
 	BatchTracking    bool `bson:"batch_tracking"    json:"batch_tracking"`
 	Scale            bool `bson:"scale"             json:"scale"`
+	Facturation      bool `bson:"facturation"       json:"facturation"`
 }

@@ -6,7 +6,7 @@ import { api } from '../lib/api'
 import { isTenantAdmin, authUser } from '../lib/auth'
 import { useI18n } from '../lib/i18n'
 
-const MODULES = ['products', 'categories', 'brands', 'units', 'purchases', 'suppliers', 'sales', 'expenses', 'retraits', 'clients', 'folders', 'favorites']
+const MODULES = ['products', 'categories', 'brands', 'units', 'purchases', 'suppliers', 'sales', 'expenses', 'retraits', 'clients', 'folders', 'favorites', 'facturation']
 const BASE_ACTIONS = ['view', 'add', 'edit', 'delete']
 
 const SPECIAL_PERMS = {
@@ -14,6 +14,7 @@ const SPECIAL_PERMS = {
   purchases: ['validate', 'pay', 'return'],
   suppliers: ['pay'],
   sales: ['earnings', 'user_summary', 'return'],
+  facturation: ['bc', 'devis', 'avoir'],
 }
 
 const ACTION_COLOR = {
@@ -24,12 +25,13 @@ const ACTION_COLOR = {
   validate: 'badge-accent', pay: 'badge-accent', return: 'badge-accent',
   earnings: 'badge-success',
   user_summary: 'badge-info',
+  bc: 'badge-accent', devis: 'badge-accent', avoir: 'badge-accent',
 }
 
 function emptyPerms() {
   const p = {}
   for (const m of MODULES) {
-    p[m] = { view: false, add: false, edit: false, delete: false, movement: false, loss: false, validate: false, pay: false, earnings: false, user_summary: false, adjustment: false, alert: false, export: false, return: false, archive: false, price_history: false, valuation: false }
+    p[m] = { view: false, add: false, edit: false, delete: false, movement: false, loss: false, validate: false, pay: false, earnings: false, user_summary: false, adjustment: false, alert: false, export: false, return: false, archive: false, price_history: false, valuation: false, bc: false, devis: false, avoir: false }
   }
   return p
 }
@@ -178,6 +180,9 @@ export default function Users({ path }) {
     if (a === 'archive') return t('permArchive')
     if (a === 'price_history') return t('permPriceHistory')
     if (a === 'valuation') return t('permValuation')
+    if (a === 'bc') return t('permBC')
+    if (a === 'devis') return t('permDevis')
+    if (a === 'avoir') return t('permAvoir')
     return t('perm' + a.charAt(0).toUpperCase() + a.slice(1))
   }
 

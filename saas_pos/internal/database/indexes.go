@@ -240,6 +240,12 @@ func EnsureIndexes() {
 		{Keys: bson.D{{Key: "key", Value: 1}}, Options: options.Index().SetUnique(true).SetName("key_unique")},
 	})
 
+	createIndexes(ctx, Col("facturation_docs"), []mongo.IndexModel{
+		{Keys: bson.D{{Key: "tenant_id", Value: 1}, {Key: "doc_type", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("tenant_doctype_date")},
+		{Keys: bson.D{{Key: "tenant_id", Value: 1}, {Key: "ref", Value: 1}}, Options: options.Index().SetName("tenant_ref")},
+		{Keys: bson.D{{Key: "tenant_id", Value: 1}, {Key: "client_id", Value: 1}}, Options: options.Index().SetName("tenant_client")},
+	})
+
 	log.Println("MongoDB indexes ensured")
 }
 

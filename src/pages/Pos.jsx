@@ -22,6 +22,18 @@ function lineTTC(line) {
 function round2(v) {
   return Math.round(v * 100) / 100
 }
+
+// Droit de timbre LF 2025 — cash only, per tranche of 100 DA
+function calcTimbre(totalTTC, paymentMethod) {
+  if (paymentMethod !== 'cash') return 0
+  if (totalTTC <= 300) return 0
+  const tranches = Math.ceil(totalTTC / 100)
+  let rate
+  if (totalTTC <= 30000) rate = 1
+  else if (totalTTC <= 100000) rate = 1.5
+  else rate = 2
+  return Math.max(5, round2(tranches * rate))
+}
 function fmt(v) {
   return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -226,6 +238,7 @@ function PriceEditor({ line, onApply, onClose, t }) {
 
 function PaymentModal({ total, onConfirm, onClose, loading, error, t, store }) {
   const [amount, setAmount] = useState('')
+  const [payMethod, setPayMethod] = useState('cash')
   const inputRef = useRef(null)
 
   useEffect(() => {
@@ -238,7 +251,7 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t, store }) {
   const insufficient = paid < total - 0.001
 
   function handleKey(e) {
-    if (e.key === 'Enter' && !insufficient) onConfirm(paid)
+    if (e.key === 'Enter' && !insufficient) onConfirm(paid, payMethod)
   }
 
   // Quick denomination buttons
@@ -248,6 +261,19 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t, store }) {
     <dialog class="modal modal-bottom sm:modal-middle" open>
       <div class="modal-box max-w-sm">
         <h3 class="font-bold text-lg mb-4">{t('payment')}</h3>
+
+        {/* Payment method selector */}
+        <div class="flex gap-2 mb-4">
+          {['cash', 'cheque', 'virement'].map(m => (
+            <button
+              key={m}
+              class={`btn btn-sm flex-1 ${payMethod === m ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setPayMethod(m)}
+            >
+              {t('payMethod_' + m)}
+            </button>
+          ))}
+        </div>
 
         <div class="pos-pay-total mb-4">
           <span class="text-sm font-semibold text-base-content/60">{store.use_vat ? t('totalTTC') : t('purchaseTotal')}</span>
@@ -305,7 +331,7 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t, store }) {
           <button
             class={`btn btn-success flex-1 gap-2 ${loading ? 'loading' : ''}`}
             style="height:3rem;font-size:1rem;font-weight:700;border-radius:0.75rem"
-            onClick={() => onConfirm(paid)}
+            onClick={() => onConfirm(paid, payMethod)}
             disabled={loading || insufficient || paid === 0}
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -542,6 +568,10 @@ export default function Pos({ path }) {
   const [payOpen, setPayOpen] = useState(false)
   const [payLoading, setPayLoading] = useState(false)
   const [payError, setPayError] = useState('')
+
+  // Facture payment method picker
+  const [factPayOpen, setFactPayOpen] = useState(false)
+  const [factPayMethod, setFactPayMethod] = useState('cash')
 
   // Client selector (requires 'clients' feature)
   const canSelectClient = hasFeature('clients')
@@ -864,6 +894,8 @@ export default function Pos({ path }) {
 
   function addToTicketSelecting(product, qty = 1, variantData = null) {
     playAddSound()
+    let isNewLine = false
+    let newLineKey = null
     setLines((prev) => {
       const lineKey = variantData ? `${product.id}-${variantData.id}` : product.id
       const idx = prev.findIndex((l) => variantData ? l.variantId === variantData.id : (!l.variantId && l.productId === product.id))
@@ -871,12 +903,16 @@ export default function Pos({ path }) {
         const updated = { ...prev[idx], qty: prev[idx].qty + qty }
         const next = [updated, ...prev.filter((_, i) => i !== idx)]
         setSelectedKey(updated._key)
+        newLineKey = updated._key
+        // Re-check discount for updated qty
+        fetchAndApplyDiscount(product.id, updated._key, updated.qty, updated.unitPrice)
         return next
       }
       const vp1 = variantData?.prix_vente_1 ?? product.prix_vente_1
       const vp2 = variantData?.prix_vente_2 ?? product.prix_vente_2
       const vp3 = variantData?.prix_vente_3 ?? product.prix_vente_3
       const attrStr = variantData?.attributes ? Object.entries(variantData.attributes).map(([k,v]) => `${v}`).join(', ') : ''
+      const unitPrice = (store.default_sale_price === 2 ? vp2 : store.default_sale_price === 3 ? vp3 : vp1) || 0
       const newLine = {
         _key: `${lineKey}-${Date.now()}`,
         productId: product.id,
@@ -886,7 +922,7 @@ export default function Pos({ path }) {
         barcode: variantData?.barcodes?.[0] || product.barcodes?.[0] || '',
         ref: product.ref || '',
         qty,
-        unitPrice: (store.default_sale_price === 2 ? vp2 : store.default_sale_price === 3 ? vp3 : vp1) || 0,
+        unitPrice,
         discount: 0,
         vat: product.vat || 0,
         pv1: vp1 || 0,
@@ -899,8 +935,27 @@ export default function Pos({ path }) {
         expiryWarning: canBatches ? expiryMapRef.current.get(product.id) || null : null,
       }
       setSelectedKey(newLine._key)
+      isNewLine = true
+      newLineKey = newLine._key
+      // Fetch and apply discount rule for new line
+      fetchAndApplyDiscount(product.id, newLine._key, qty, unitPrice)
       return [newLine, ...prev]
     })
+  }
+
+  async function fetchAndApplyDiscount(productId, lineKey, qty, unitPrice) {
+    try {
+      const rule = await api.getApplicableDiscount(productId, qty)
+      if (!rule) return
+      let discountHT = 0
+      if (rule.type === 'percentage') {
+        discountHT = round2(qty * unitPrice * rule.value / 100)
+      } else {
+        discountHT = round2(rule.value)
+      }
+      if (discountHT <= 0) return
+      setLines((prev) => prev.map((l) => l._key === lineKey ? { ...l, discount: discountHT, autoDiscount: rule } : l))
+    } catch {}
   }
 
   async function openVariantPicker(product, qty = 1) {
@@ -1161,7 +1216,7 @@ export default function Pos({ path }) {
 
   // ── Payment ──────────────────────────────────────────────────────────────────
 
-  async function handleConfirmSale(amountPaid) {
+  async function handleConfirmSale(amountPaid, payMethod = 'cash') {
     setPayLoading(true)
     setPayError('')
     try {
@@ -1173,7 +1228,7 @@ export default function Pos({ path }) {
           unit_price: l.unitPrice,
           discount: l.discount,
         })),
-        payment_method: 'cash',
+        payment_method: payMethod,
         amount_paid: amountPaid,
         client_id: selectedClient?.id ?? '',
         sale_type: saleType,
@@ -1194,6 +1249,78 @@ export default function Pos({ path }) {
       lastClientRef.current = selectedClient
       clearClient()
       setLastSale(result.data ?? result)
+      playSaleSound()
+      refocusScan()
+    } catch (err) {
+      setPayError(err.message)
+    } finally {
+      setPayLoading(false)
+    }
+  }
+
+  // ── Facturation document creation (BC / Devis / Facture) ─────────────────────
+
+  async function handleFacturationDoc(docType, paymentMethod) {
+    if (!selectedClient) return
+    if (lines.length === 0) return
+
+    setPayLoading(true)
+    setPayError('')
+    try {
+      const docLines = lines.map((l) => ({
+        product_id: l.productId,
+        variant_id: l.variantId || '',
+        qty: Math.abs(l.qty),
+        unit_price: l.unitPrice,
+        discount: l.discount,
+      }))
+
+      if (docType === 'facture') {
+        // Create sale first, then create facture linked to it
+        const result = await api.createSale({
+          lines: lines.map((l) => ({
+            product_id: l.productId,
+            variant_id: l.variantId || '',
+            qty: l.qty,
+            unit_price: l.unitPrice,
+            discount: l.discount,
+          })),
+          payment_method: paymentMethod || 'cash',
+          amount_paid: 0,
+          client_id: selectedClient.id,
+          sale_type: 'credit',
+        })
+        const sale = result.data ?? result
+        // Create facture linked to the sale
+        await api.createFacturationDoc({
+          doc_type: 'facture',
+          client_id: selectedClient.id,
+          lines: docLines,
+          sale_id: sale.id,
+          payment_method: paymentMethod || 'cash',
+        })
+      } else {
+        // BC or Devis — no sale, just document
+        await api.createFacturationDoc({
+          doc_type: docType,
+          client_id: selectedClient.id,
+          lines: docLines,
+        })
+      }
+
+      // Clear ticket
+      lastSaleItemsRef.current = [...lines]
+      if (selectedClient) {
+        const rc = recentClientsRef.current.filter(c => c.id !== selectedClient.id)
+        rc.unshift(selectedClient)
+        if (rc.length > 5) rc.length = 5
+        recentClientsRef.current = rc
+        try { sessionStorage.setItem('pos_recent_clients', JSON.stringify(rc)) } catch {}
+      }
+      setLines([])
+      setSelectedKey(null)
+      lastClientRef.current = selectedClient
+      clearClient()
       playSaleSound()
       refocusScan()
     } catch (err) {
@@ -1681,7 +1808,10 @@ export default function Pos({ path }) {
                       {/* Discount */}
                       <td class="text-end">
                         {line.discount > 0
-                          ? <span class="text-xs font-mono text-warning font-semibold">-{fmt(line.discount)}</span>
+                          ? <span class="text-xs font-mono font-semibold" style={line.autoDiscount ? 'color:#10b981' : 'color:var(--fallback-wa,oklch(var(--wa)))'}>
+                              -{fmt(line.discount)}
+                              {line.autoDiscount && <span class="badge badge-xs ms-0.5" style="background:#10b981;color:#fff;font-size:0.55rem;padding:0 3px">auto</span>}
+                            </span>
                           : <span class="text-base-content/15 text-xs">--</span>
                         }
                       </td>
@@ -1803,6 +1933,30 @@ export default function Pos({ path }) {
               {saleType === 'credit' ? t('confirmCredit') : t('checkout')}
               <kbd class="kbd kbd-xs border-white/30 bg-white/10 text-white/80">F10</kbd>
             </button>
+
+            {/* Facturation buttons (BC / Devis / Facture) */}
+            {hasFeature('facturation') && hasPerm('facturation', 'add') && (
+              <div class="flex gap-1 mt-1">
+                <button
+                  class="btn btn-sm btn-outline flex-1 text-xs"
+                  disabled={lines.length === 0 || payLoading || !selectedClient}
+                  onClick={() => handleFacturationDoc('bc')}
+                  title={!selectedClient ? t('selectClient') : ''}
+                >{t('bonCommande')}</button>
+                <button
+                  class="btn btn-sm btn-outline flex-1 text-xs"
+                  disabled={lines.length === 0 || payLoading || !selectedClient}
+                  onClick={() => handleFacturationDoc('devis')}
+                  title={!selectedClient ? t('selectClient') : ''}
+                >{t('devis')}</button>
+                <button
+                  class="btn btn-sm btn-accent btn-outline flex-1 text-xs"
+                  disabled={lines.length === 0 || payLoading || !selectedClient}
+                  onClick={() => { setFactPayMethod('cash'); setFactPayOpen(true) }}
+                  title={!selectedClient ? t('selectClient') : ''}
+                >{t('facture')}</button>
+              </div>
+            )}
 
             {/* Selected line quick actions */}
             {selectedKey && (() => {
@@ -2016,6 +2170,37 @@ export default function Pos({ path }) {
           t={t}
           store={store}
         />
+      )}
+
+      {/* ── Facture payment method picker ───────────────────────────────────── */}
+      {factPayOpen && (
+        <dialog class="modal modal-bottom sm:modal-middle" open>
+          <div class="modal-box max-w-sm">
+            <h3 class="font-bold text-base mb-4">{t('blPaymentMethod')}</h3>
+            <div class="flex flex-col gap-2">
+              {['cash', 'cheque', 'virement'].map((m) => (
+                <button
+                  key={m}
+                  class={`btn btn-lg ${factPayMethod === m ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setFactPayMethod(m)}
+                >
+                  {t('payMethod_' + m)}
+                </button>
+              ))}
+            </div>
+            <div class="modal-action">
+              <button class="btn btn-ghost" onClick={() => setFactPayOpen(false)}>{t('cancel')}</button>
+              <button
+                class="btn btn-primary"
+                disabled={payLoading}
+                onClick={() => { setFactPayOpen(false); handleFacturationDoc('facture', factPayMethod) }}
+              >
+                {payLoading ? <span class="loading loading-spinner loading-sm" /> : t('confirm')}
+              </button>
+            </div>
+          </div>
+          <form method="dialog" class="modal-backdrop"><button onClick={() => setFactPayOpen(false)}>close</button></form>
+        </dialog>
       )}
 
       {/* ── Help overlay ──────────────────────────────────────────────────────── */}

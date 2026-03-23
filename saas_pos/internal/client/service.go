@@ -61,7 +61,7 @@ func List(tenantID, q string, page, limit int) (*ListResult, error) {
 		page = 1
 	}
 
-	filter := bson.M{"tenant_id": tenantID}
+	filter := bson.M{"tenant_id": tenantID, "archived": bson.M{"$ne": true}}
 	if q != "" {
 		filter["$or"] = bson.A{
 			bson.M{"name": bson.M{"$regex": q, "$options": "i"}},
@@ -144,23 +144,70 @@ func Update(tenantID, id string, input ClientInput) (*Client, error) {
 	return &c, nil
 }
 
-// Delete removes a client. Returns an error if the client has an outstanding balance.
-func Delete(tenantID, id string) error {
+// Delete removes a client or archives it if it has sales history.
+func Delete(tenantID, id string) (bool, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return false, errors.New("invalid client id")
+	}
+	ctx := context.Background()
+	var c Client
+	err = col().FindOne(ctx, bson.M{"_id": oid, "tenant_id": tenantID}).Decode(&c)
+	if err != nil {
+		return false, errors.New("client not found")
+	}
+	if c.Balance > 0 {
+		return false, errors.New("cannot delete client with outstanding balance")
+	}
+	cnt, _ := database.Col("sales").CountDocuments(ctx, bson.M{"tenant_id": tenantID, "client_id": id})
+	if cnt > 0 {
+		now := time.Now()
+		_, err = col().UpdateOne(ctx, bson.M{"_id": oid, "tenant_id": tenantID},
+			bson.M{"$set": bson.M{"archived": true, "archived_at": now, "updated_at": now}})
+		return true, err
+	}
+	_, err = col().DeleteOne(ctx, bson.M{"_id": oid, "tenant_id": tenantID})
+	return false, err
+}
+
+// ListArchived returns only archived clients.
+func ListArchived(tenantID, q string, page, limit int) (*ListResult, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 50
+	}
+	if page <= 0 {
+		page = 1
+	}
+	ctx := context.Background()
+	filter := bson.M{"tenant_id": tenantID, "archived": true}
+	if q != "" {
+		filter["$or"] = bson.A{
+			bson.M{"name": bson.M{"$regex": q, "$options": "i"}},
+			bson.M{"phone": bson.M{"$regex": q, "$options": "i"}},
+		}
+	}
+	total, _ := col().CountDocuments(ctx, filter)
+	skip := int64((page - 1) * limit)
+	cur, err := col().Find(ctx, filter,
+		options.Find().SetSort(bson.M{"archived_at": -1}).SetSkip(skip).SetLimit(int64(limit)))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	items := []Client{}
+	cur.All(ctx, &items)
+	return &ListResult{Items: items, Total: total}, nil
+}
+
+// Unarchive restores an archived client.
+func Unarchive(tenantID, id string) error {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return errors.New("invalid client id")
 	}
-
-	var c Client
-	err = col().FindOne(context.Background(), bson.M{"_id": oid, "tenant_id": tenantID}).Decode(&c)
-	if err != nil {
-		return errors.New("client not found")
-	}
-	if c.Balance > 0 {
-		return errors.New("cannot delete client with outstanding balance")
-	}
-
-	_, err = col().DeleteOne(context.Background(), bson.M{"_id": oid, "tenant_id": tenantID})
+	_, err = col().UpdateOne(context.Background(),
+		bson.M{"_id": oid, "tenant_id": tenantID},
+		bson.M{"$set": bson.M{"archived": false, "updated_at": time.Now()}, "$unset": bson.M{"archived_at": ""}})
 	return err
 }
 
@@ -212,7 +259,105 @@ func AddPayment(tenantID, clientID string, input PaymentInput) (*Payment, error)
 		return nil, err
 	}
 
+	// Apply payment to oldest unpaid factures (FIFO)
+	applyPaymentToFactures(tenantID, clientID, p.Amount)
+
 	return p, nil
+}
+
+// applyPaymentToFactures distributes a client payment across unpaid factures (oldest first).
+func applyPaymentToFactures(tenantID, clientID string, amount float64) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	factCol := database.Col("facturation_docs")
+
+	// Find unpaid/partial factures for this client, oldest first
+	cursor, err := factCol.Find(ctx, bson.M{
+		"tenant_id": tenantID,
+		"client_id": clientID,
+		"doc_type":  "facture",
+		"status":    bson.M{"$in": bson.A{"unpaid", "partial"}},
+	}, options.Find().SetSort(bson.M{"created_at": 1}))
+	if err != nil {
+		return
+	}
+	defer cursor.Close(ctx)
+
+	remaining := amount
+	now := time.Now()
+
+	for cursor.Next(ctx) && remaining > 0 {
+		var doc struct {
+			ID            primitive.ObjectID `bson:"_id"`
+			Total         float64            `bson:"total"`
+			PaidAmount    float64            `bson:"paid_amount"`
+			Timbre        float64            `bson:"timbre"`
+			PaymentMethod string             `bson:"payment_method"`
+		}
+		if err := cursor.Decode(&doc); err != nil {
+			continue
+		}
+
+		owed := math.Round((doc.Total-doc.PaidAmount)*100) / 100
+		if owed <= 0 {
+			continue
+		}
+
+		apply := remaining
+		if apply > owed {
+			apply = owed
+		}
+
+		newPaid := math.Round((doc.PaidAmount+apply)*100) / 100
+		newStatus := "partial"
+		if newPaid >= doc.Total {
+			newStatus = "paid"
+			newPaid = doc.Total
+		}
+
+		// Calculate timbre for this payment
+		payMethod := doc.PaymentMethod
+		if payMethod == "" {
+			payMethod = "cash"
+		}
+		var payTimbre float64
+		if payMethod == "cash" && apply > 300 {
+			tr := math.Ceil(apply / 100)
+			rate := 1.0
+			if apply > 30000 {
+				rate = 1.5
+			}
+			if apply > 100000 {
+				rate = 2.0
+			}
+			payTimbre = math.Max(5, math.Round(tr*rate*100)/100)
+		}
+		newTimbre := math.Round((doc.Timbre+payTimbre)*100) / 100
+
+		factCol.UpdateOne(ctx,
+			bson.M{"_id": doc.ID},
+			bson.M{
+				"$set": bson.M{
+					"paid_amount": newPaid,
+					"status":      newStatus,
+					"timbre":      newTimbre,
+					"updated_at":  now,
+				},
+				"$push": bson.M{
+					"payments": bson.M{
+						"amount":         apply,
+						"payment_method": payMethod,
+						"timbre":         payTimbre,
+						"note":           "Client payment",
+						"created_at":     now,
+					},
+				},
+			},
+		)
+
+		remaining = math.Round((remaining-apply)*100) / 100
+	}
 }
 
 // GetStatement returns a merged chronological ledger of credit sales and payments

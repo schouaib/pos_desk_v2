@@ -35,6 +35,7 @@ type Sale struct {
 	Total         float64            `bson:"total"          json:"total"` // TTC
 	TotalEarning  float64            `bson:"total_earning"  json:"total_earning"` // sum of line earnings
 	PaymentMethod string             `bson:"payment_method" json:"payment_method"`
+	Timbre        float64            `bson:"timbre"         json:"timbre"` // droit de timbre (cash only)
 	AmountPaid    float64            `bson:"amount_paid"    json:"amount_paid"`
 	Change        float64            `bson:"change"         json:"change"`
 	// Client fields (optional)
@@ -79,17 +80,21 @@ type StatsResult struct {
 
 // UserSummaryLine holds per-user aggregated totals for a date range.
 type UserSummaryLine struct {
-	UserID         string  `json:"user_id"`
-	UserEmail      string  `json:"user_email"`
-	SalesCount     int64   `json:"sales_count"`
-	SalesTotal     float64 `json:"sales_total"`     // sum of positive sales (TTC)
-	ReturnsCount   int64   `json:"returns_count"`
-	ReturnsTotal   float64 `json:"returns_total"`   // sum of negative sales (TTC), stored as positive
-	RetraitsTotal  float64 `json:"retraits_total"`  // sum of cash withdrawals
-	OpeningAmount  float64 `json:"opening_amount"`  // caisse opening amount
-	ClosingAmount  float64 `json:"closing_amount"`  // caisse closing amount (actual counted)
-	Ecart          float64 `json:"ecart"`           // closing - expected (opening + cash_sales + payments - retraits)
-	Net            float64 `json:"net"`             // sales_total - returns_total - retraits_total
+	UserID            string  `json:"user_id"`
+	UserEmail         string  `json:"user_email"`
+	SalesCount        int64   `json:"sales_count"`
+	SalesTotal        float64 `json:"sales_total"`         // sum of positive sales (TTC)
+	CashSalesTotal    float64 `json:"cash_sales_total"`    // sum of cash payment sales only
+	ChequeSalesTotal  float64 `json:"cheque_sales_total"`  // sum of cheque payment sales
+	VirementSalesTotal float64 `json:"virement_sales_total"` // sum of virement payment sales
+	ReturnsCount      int64   `json:"returns_count"`
+	ReturnsTotal      float64 `json:"returns_total"`       // sum of negative sales (TTC), stored as positive
+	RetraitsTotal     float64 `json:"retraits_total"`      // sum of cash withdrawals
+	TimbreTotal       float64 `json:"timbre_total"`        // sum of timbre (stamp duty) collected
+	OpeningAmount     float64 `json:"opening_amount"`      // caisse opening amount
+	ClosingAmount     float64 `json:"closing_amount"`      // caisse closing amount (actual counted)
+	Ecart             float64 `json:"ecart"`               // closing - expected (opening + cash_sales + payments + timbre - returns - retraits)
+	Net               float64 `json:"net"`                 // sales_total - returns_total - retraits_total
 }
 
 // UserSummaryResult holds the full per-user daily summary.
@@ -114,6 +119,10 @@ type SalesStatisticsResult struct {
 	GrossEarning    float64 `json:"gross_earning"`     // sum of total_earning
 	LossCost        float64 `json:"loss_cost"`         // purchase cost of stock losses in the period
 	NetEarning      float64 `json:"net_earning"`       // gross_earning - loss_cost
-	CashRevenueTTC  float64 `json:"cash_revenue_ttc"`  // sum of total for cash sales only
-	CreditRevenueTTC float64 `json:"credit_revenue_ttc"` // sum of total for credit sales only
+	CashRevenueTTC     float64 `json:"cash_revenue_ttc"`     // sum of total for cash sale_type only
+	CreditRevenueTTC   float64 `json:"credit_revenue_ttc"`   // sum of total for credit sale_type only
+	CashPaymentTTC     float64 `json:"cash_payment_ttc"`     // sum of total paid by cash method (in caisse)
+	ChequePaymentTTC   float64 `json:"cheque_payment_ttc"`   // sum of total paid by cheque method
+	VirementPaymentTTC float64 `json:"virement_payment_ttc"` // sum of total paid by virement method
+	TotalTimbre        float64 `json:"total_timbre"`         // sum of timbre (stamp duty)
 }

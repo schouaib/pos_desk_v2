@@ -42,6 +42,7 @@ import (
 	"saas_pos/internal/transfer"
 	"saas_pos/internal/unit"
 	"saas_pos/internal/user"
+	"saas_pos/internal/facturation"
 	"saas_pos/internal/scale"
 	"saas_pos/internal/variant"
 
@@ -335,7 +336,9 @@ func registerRoutes(app *fiber.App) {
 	// Supplier management
 	tpSuppliers := tp.Group("", middleware.RequireFeature("suppliers"))
 	tpSuppliers.Get("/suppliers", middleware.RequirePermission("suppliers", "view"), supplier.HandleList)
+	tpSuppliers.Get("/suppliers/archived", middleware.RequirePermission("suppliers", "view"), supplier.HandleListArchived)
 	tpSuppliers.Post("/suppliers/", middleware.RequirePermission("suppliers", "add"), supplier.HandleCreate)
+	tpSuppliers.Post("/suppliers/:id/unarchive", middleware.RequirePermission("suppliers", "edit"), supplier.HandleUnarchive)
 	tpSuppliers.Put("/suppliers/:id", middleware.RequirePermission("suppliers", "edit"), supplier.HandleUpdate)
 	tpSuppliers.Delete("/suppliers/:id", middleware.RequirePermission("suppliers", "delete"), supplier.HandleDelete)
 	tpSuppliers.Patch("/suppliers/:id/balance", middleware.RequirePermission("suppliers", "edit"), supplier.HandleAdjustBalance)
@@ -406,7 +409,9 @@ func registerRoutes(app *fiber.App) {
 	// Client management
 	tpClients := tp.Group("", middleware.RequireFeature("clients"))
 	tpClients.Get("/clients", middleware.RequirePermission("clients", "view"), client.HandleList)
+	tpClients.Get("/clients/archived", middleware.RequirePermission("clients", "view"), client.HandleListArchived)
 	tpClients.Post("/clients/", middleware.RequirePermission("clients", "add"), client.HandleCreate)
+	tpClients.Post("/clients/:id/unarchive", middleware.RequirePermission("clients", "edit"), client.HandleUnarchive)
 	tpClients.Put("/clients/:id", middleware.RequirePermission("clients", "edit"), client.HandleUpdate)
 	tpClients.Delete("/clients/:id", middleware.RequirePermission("clients", "delete"), client.HandleDelete)
 	tpClients.Get("/clients/payments/sum", middleware.RequireFeature("client_payments"), middleware.RequirePermission("clients", "view"), client.HandlePaymentsSum)
@@ -437,6 +442,7 @@ func registerRoutes(app *fiber.App) {
 	// Discount rules (plan-gated)
 	tpDiscounts := tp.Group("", middleware.RequireFeature("product_discounts"), middleware.RequireFeature("products"))
 	tpDiscounts.Get("/products/:id/discounts", middleware.RequirePermission("products", "view"), discount.HandleListByProduct)
+	tpDiscounts.Get("/products/:id/discount-applicable", middleware.RequirePermission("products", "view"), discount.HandleGetApplicable)
 	tpDiscounts.Post("/discounts", middleware.RequirePermission("products", "edit"), discount.HandleCreate)
 	tpDiscounts.Put("/discounts/:id", middleware.RequirePermission("products", "edit"), discount.HandleUpdate)
 	tpDiscounts.Delete("/discounts/:id", middleware.RequirePermission("products", "delete"), discount.HandleDelete)
@@ -460,4 +466,16 @@ func registerRoutes(app *fiber.App) {
 	tpBatch.Get("/batches/expiring-list", middleware.RequirePermission("products", "view"), batch.HandleListExpiringPaginated)
 	tpBatch.Get("/batches/alerts", middleware.RequirePermission("products", "view"), batch.HandleListAlerts)
 	tpBatch.Delete("/batches/:id", middleware.RequirePermission("products", "delete"), batch.HandleDelete)
+
+	// Facturation (BC / Devis / Facture / Avoir)
+	tpFact := tp.Group("/facturation", middleware.RequireFeature("facturation"))
+	tpFact.Get("", middleware.RequirePermission("facturation", "view"), facturation.HandleList)
+	tpFact.Get("/:id", middleware.RequirePermission("facturation", "view"), facturation.HandleGetByID)
+	tpFact.Post("", middleware.RequirePermission("facturation", "add"), facturation.HandleCreate)
+	tpFact.Put("/:id", middleware.RequirePermission("facturation", "edit"), facturation.HandleUpdate)
+	tpFact.Delete("/:id", middleware.RequirePermission("facturation", "delete"), facturation.HandleDelete)
+	tpFact.Post("/:id/convert", middleware.RequirePermission("facturation", "add"), facturation.HandleConvert)
+	tpFact.Patch("/:id/status", middleware.RequirePermission("facturation", "edit"), facturation.HandleUpdateStatus)
+	tpFact.Post("/:id/avoir", middleware.RequirePermission("facturation", "avoir"), facturation.HandleCreateAvoir)
+	tpFact.Post("/:id/pay", middleware.RequirePermission("facturation", "edit"), facturation.HandlePay)
 }

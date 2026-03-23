@@ -1078,22 +1078,47 @@ func GetByIDs(tenantID string, ids []primitive.ObjectID) ([]Product, error) {
 	return products, nil
 }
 
-func Delete(tenantID, id string) error {
+// Delete hard-deletes a product if it has no sales or purchases;
+// otherwise it auto-archives it to preserve history.
+func Delete(tenantID, id string) (archived bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	tid, _ := primitive.ObjectIDFromHex(tenantID)
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return errors.New("invalid id")
+		return false, errors.New("invalid id")
 	}
 
+	// Check if product has any sales
+	salesCount, _ := database.Col("sales").CountDocuments(ctx, bson.M{
+		"tenant_id":        tenantID,
+		"lines.product_id": oid,
+	})
+
+	// Check if product has any purchases
+	purchasesCount, _ := database.Col("purchases").CountDocuments(ctx, bson.M{
+		"tenant_id":        tenantID,
+		"items.product_id": oid,
+	})
+
+	if salesCount > 0 || purchasesCount > 0 {
+		// Auto-archive instead of delete
+		now := time.Now()
+		_, err = col().UpdateOne(ctx,
+			bson.M{"_id": oid, "tenant_id": tid},
+			bson.M{"$set": bson.M{"archived": true, "archived_at": now, "updated_at": now}},
+		)
+		return true, err
+	}
+
+	// No history — safe to hard delete
 	res, err := col().DeleteOne(ctx, bson.M{"_id": oid, "tenant_id": tid})
 	if err != nil {
-		return err
+		return false, err
 	}
 	if res.DeletedCount == 0 {
-		return errors.New("product not found")
+		return false, errors.New("product not found")
 	}
-	return nil
+	return false, nil
 }

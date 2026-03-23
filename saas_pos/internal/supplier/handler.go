@@ -53,8 +53,34 @@ func HandleUpdate(c *fiber.Ctx) error {
 // DELETE /api/tenant/suppliers/:id
 func HandleDelete(c *fiber.Ctx) error {
 	tenantID := middleware.GetClaims(c).TenantID
-	if err := Delete(tenantID, c.Params("id")); err != nil {
+	archived, err := Delete(tenantID, c.Params("id"))
+	if err != nil {
 		return response.NotFound(c, err.Error())
+	}
+	if archived {
+		return response.OK(c, fiber.Map{"archived": true})
+	}
+	return response.OK(c, nil)
+}
+
+// GET /api/tenant/suppliers/archived
+func HandleListArchived(c *fiber.Ctx) error {
+	tenantID := middleware.GetClaims(c).TenantID
+	q := c.Query("q", "")
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "500"))
+	result, err := ListArchived(tenantID, q, page, limit)
+	if err != nil {
+		return response.Error(c, 500, err.Error())
+	}
+	return response.OK(c, result)
+}
+
+// POST /api/tenant/suppliers/:id/unarchive
+func HandleUnarchive(c *fiber.Ctx) error {
+	tenantID := middleware.GetClaims(c).TenantID
+	if err := Unarchive(tenantID, c.Params("id")); err != nil {
+		return response.BadRequest(c, err.Error())
 	}
 	return response.OK(c, nil)
 }

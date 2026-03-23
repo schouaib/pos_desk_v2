@@ -9,7 +9,7 @@ import { shortcutsOpen } from '../components/ShortcutsOverlay'
 const inventoryPaths = ['/products', '/categories', '/brands', '/units', '/favorites']
 const stockPaths = ['/losses', '/low-stock', '/expiring-batches', '/archived-products', '/transfers']
 const purchasePaths = ['/purchases', '/suppliers']
-const salesPaths = ['/pos', '/sales', '/sale-returns']
+const salesPaths = ['/pos', '/sales', '/sale-returns', '/facturation']
 const financePaths = ['/sales-stats', '/expenses', '/retraits', '/user-summary', '/declarations']
 const peoplePaths = ['/clients', '/users']
 const systemPaths = ['/settings', '/folders', '/chat']
@@ -48,6 +48,7 @@ const ICONS = {
   finance:    'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
   people:     'M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z',
   systemGear: 'M11.42 15.17l-5.1 3.03a.75.75 0 01-1.14-.76l1.28-5.63a.75.75 0 00-.24-.7L1.53 7.11a.75.75 0 01.43-1.32l5.79-.49a.75.75 0 00.63-.43L10.97.74a.75.75 0 011.37 0l2.59 5.13a.75.75 0 00.63.43l5.79.49a.75.75 0 01.43 1.32l-4.28 3.7a.75.75 0 00-.24.7l1.28 5.63a.75.75 0 01-1.14.76l-5.1-3.03a.75.75 0 00-.74 0z',
+  facturation: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.888L15.721 18.75M13.481 16.638a.75.75 0 11-1.06-1.06.75.75 0 011.06 1.06zm0 0L11.228 18.89a1.5 1.5 0 01-2.121 0l-1.5-1.5a1.5 1.5 0 010-2.121l6.364-6.364a.75.75 0 011.06 0l1.5 1.5a.75.75 0 010 1.06l-6.364 6.364zM10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
   declarations: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
   menu:       'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5',
   close:      'M6 18L18 6M6 6l12 12',
@@ -222,6 +223,7 @@ export function Layout({ children, currentPath }) {
             {hasFeature('pos')   && hasPerm('sales', 'add')    && <NavLink href="/pos"          label={t('posNav')}      icon={ICONS.pos}   active={currentPath === '/pos'}          onNavigate={closeMenu} kbdHint="Ctrl+P" />}
             {hasFeature('sales') && hasPerm('sales', 'view')   && <NavLink href="/sales"        label={t('salesPage')}   icon={ICONS.sales} active={currentPath === '/sales'}        onNavigate={closeMenu} />}
             {hasFeature('sales') && hasPerm('sales', 'return') && <NavLink href="/sale-returns" label={t('saleReturns')} icon={ICONS.sales} active={currentPath === '/sale-returns'} onNavigate={closeMenu} />}
+            {hasFeature('facturation') && hasPerm('facturation', 'view') && <NavLink href="/facturation" label={t('facturationPage')} icon={ICONS.facturation} active={currentPath === '/facturation'} onNavigate={closeMenu} />}
           </div>
         )}
 

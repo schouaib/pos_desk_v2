@@ -153,7 +153,7 @@ func List(tenantID, q string, page, limit int) (*ListResult, error) {
 	}
 	skip := int64((page - 1) * limit)
 
-	filter := bson.M{"tenant_id": tid}
+	filter := bson.M{"tenant_id": tid, "archived": bson.M{"$ne": true}}
 	if q != "" {
 		filter["$or"] = bson.A{
 			bson.M{"name": bson.M{"$regex": q, "$options": "i"}},
@@ -240,24 +240,81 @@ func Update(tenantID, id string, input UpdateInput) (*Supplier, error) {
 	return &s, nil
 }
 
-func Delete(tenantID, id string) error {
+func Delete(tenantID, id string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	tid, _ := primitive.ObjectIDFromHex(tenantID)
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return errors.New("invalid id")
+		return false, errors.New("invalid id")
+	}
+
+	cnt, _ := database.Col("purchases").CountDocuments(ctx, bson.M{"tenant_id": tid, "supplier_id": oid})
+	if cnt > 0 {
+		now := time.Now()
+		_, err = col().UpdateOne(ctx, bson.M{"_id": oid, "tenant_id": tid},
+			bson.M{"$set": bson.M{"archived": true, "archived_at": now, "updated_at": now}})
+		return true, err
 	}
 
 	res, err := col().DeleteOne(ctx, bson.M{"_id": oid, "tenant_id": tid})
 	if err != nil {
-		return err
+		return false, err
 	}
 	if res.DeletedCount == 0 {
-		return errors.New("supplier not found")
+		return false, errors.New("supplier not found")
 	}
-	return nil
+	return false, nil
+}
+
+// ListArchived returns only archived suppliers.
+func ListArchived(tenantID, q string, page, limit int) (*ListResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	tid, _ := primitive.ObjectIDFromHex(tenantID)
+	if limit < 1 || limit > 500 {
+		limit = 500
+	}
+	if page < 1 {
+		page = 1
+	}
+	skip := int64((page - 1) * limit)
+	filter := bson.M{"tenant_id": tid, "archived": true}
+	if q != "" {
+		filter["$or"] = bson.A{
+			bson.M{"name": bson.M{"$regex": q, "$options": "i"}},
+			bson.M{"phone": bson.M{"$regex": q, "$options": "i"}},
+		}
+	}
+	total, _ := col().CountDocuments(ctx, filter)
+	cur, err := col().Find(ctx, filter,
+		options.Find().SetSort(bson.M{"archived_at": -1}).SetSkip(skip).SetLimit(int64(limit)))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	items := []Supplier{}
+	cur.All(ctx, &items)
+	pages := int(math.Ceil(float64(total) / float64(limit)))
+	if pages == 0 {
+		pages = 1
+	}
+	return &ListResult{Items: items, Total: total, Page: page, Limit: limit, Pages: pages}, nil
+}
+
+// Unarchive restores an archived supplier.
+func Unarchive(tenantID, id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	tid, _ := primitive.ObjectIDFromHex(tenantID)
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return errors.New("invalid id")
+	}
+	_, err = col().UpdateOne(ctx, bson.M{"_id": oid, "tenant_id": tid},
+		bson.M{"$set": bson.M{"archived": false, "updated_at": time.Now()}, "$unset": bson.M{"archived_at": ""}})
+	return err
 }
 
 func AdjustBalance(tenantID, id string, input AdjustBalanceInput) (*Supplier, error) {

@@ -113,8 +113,12 @@ func HandleUpdate(c *fiber.Ctx) error {
 // DELETE /api/tenant/products/:id
 func HandleDelete(c *fiber.Ctx) error {
 	tenantID := middleware.GetClaims(c).TenantID
-	if err := Delete(tenantID, c.Params("id")); err != nil {
+	archived, err := Delete(tenantID, c.Params("id"))
+	if err != nil {
 		return response.NotFound(c, err.Error())
+	}
+	if archived {
+		return response.OK(c, fiber.Map{"archived": true, "message": "product has sales/purchases history and was archived instead of deleted"})
 	}
 	return response.OK(c, nil)
 }

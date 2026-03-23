@@ -44,6 +44,7 @@ export function buildReceipt({ store = {}, sale = {}, labels = {}, width = WIDTH
     subtotalHT: labels.subtotalHT || 'Subtotal HT',
     vat:        labels.vat        || 'VAT',
     totalTTC:   labels.totalTTC   || 'TOTAL TTC',
+    timbre:     labels.timbre     || 'Timbre',
     paid:       labels.paid       || 'Paid',
     change:     labels.change     || 'Change',
     discount:   labels.discount   || 'Discount',
@@ -104,6 +105,9 @@ export function buildReceipt({ store = {}, sale = {}, labels = {}, width = WIDTH
   out.push(ESC, 0x45, 0x01)   // bold
   out.push(...rowBytes(L.totalTTC, Number(sale.total).toFixed(2), width, ' '))
   out.push(ESC, 0x45, 0x00)   // bold off
+  if ((sale.timbre ?? 0) > 0) {
+    out.push(...rowBytes(L.timbre, Number(sale.timbre).toFixed(2), width))
+  }
   sep('=')
   out.push(...rowBytes(L.paid,   Number(sale.amount_paid).toFixed(2), width))
   out.push(...rowBytes(L.change, Math.max(0, sale.change ?? 0).toFixed(2), width))

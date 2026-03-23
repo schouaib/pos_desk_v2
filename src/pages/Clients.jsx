@@ -4,6 +4,7 @@ import { Modal, openModal, closeModal } from '../components/Modal'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 import { hasPerm, hasFeature, authUser } from '../lib/auth'
+import { printHtml } from '../lib/invoicePrint'
 
 const emptyForm = { name: '', phone: '', email: '', address: '', rc: '', nif: '', nis: '', nart: '', compte_rib: '' }
 const STMT_PAGE_SIZE = 10
@@ -41,6 +42,11 @@ export default function Clients({ path }) {
 
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleteError, setDeleteError]   = useState('')
+
+  // Archived
+  const [archivedItems, setArchivedItems] = useState([])
+  const [archivedTotal, setArchivedTotal] = useState(0)
+  const [showArchived, setShowArchived]   = useState(false)
 
   // Sales history modal
   const [salesTarget, setSalesTarget]     = useState(null)
@@ -188,13 +194,96 @@ export default function Clients({ path }) {
     setPayLoading(true)
     try {
       await api.addClientPayment(stmtTarget.id, { amount, note: payNote })
-      setStmtTarget((prev) => ({ ...prev, balance: Math.max(0, prev.balance - amount) }))
+      const newBalance = Math.max(0, stmtTarget.balance - amount)
+      setStmtTarget((prev) => ({ ...prev, balance: newBalance }))
+      // Print receipt
+      printClientPaymentReceipt(stmtTarget, amount, payNote, newBalance)
       setPayAmount('')
       setPayNote('')
       setStmtPage(1)
       await loadStatement(stmtTarget.id)
       load()
     } catch (e) { setPayError(e.message) } finally { setPayLoading(false) }
+  }
+
+  function printClientPaymentReceipt(client, amount, note, newBalance) {
+    const user = authUser.value
+    const storeName = user?.tenant_name || ''
+    const dir = lang === 'ar' ? 'rtl' : 'ltr'
+    const dateStr = new Date().toLocaleDateString(lang === 'ar' ? 'ar-DZ' : 'fr-DZ', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const timeStr = new Date().toLocaleTimeString(lang === 'ar' ? 'ar-DZ' : 'fr-DZ', { hour: '2-digit', minute: '2-digit' })
+    const fmtDA = (n) => new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 2 }).format(n) + ' DA'
+
+    const html = `<!DOCTYPE html>
+<html dir="${dir}"><head><meta charset="UTF-8">
+<title>${t('paymentReceipt')} - ${client.name}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; color:#1e293b; background:#e2e8f0; direction:${dir}; }
+  .page { width:210mm; margin:0 auto; background:#fff; padding:24px 32px; box-shadow:0 4px 24px rgba(0,0,0,.1); }
+  .header { border-bottom:3px solid #1a56db; padding-bottom:16px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:flex-start; }
+  .title { font-size:20px; font-weight:800; color:#1a56db; text-transform:uppercase; letter-spacing:1px; }
+  .store-name { font-size:14px; font-weight:700; }
+  .meta { font-size:11px; color:#64748b; }
+  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+  .info-box { padding:14px 16px; border-radius:8px; font-size:11px; line-height:1.7; }
+  .info-from { background:#f8fafc; border:1px solid #e2e8f0; }
+  .info-to { background:#1a56db08; border:1px solid #1a56db25; }
+  .info-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#94a3b8; margin-bottom:6px; }
+  .info-to .info-label { color:#1a56db; }
+  .info-name { font-size:13px; font-weight:700; margin-bottom:2px; }
+  .amount-box { text-align:center; padding:24px; margin:20px 0; border-radius:12px; background:linear-gradient(135deg,#1a56db,#1a56dbdd); }
+  .amount-label { font-size:12px; color:rgba(255,255,255,.8); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+  .amount-value { font-size:32px; font-weight:800; color:#fff; font-variant-numeric:tabular-nums; }
+  .details { margin:20px 0; }
+  .detail-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f1f5f9; font-size:12px; }
+  .detail-row .label { color:#64748b; }
+  .detail-row .value { font-weight:600; font-variant-numeric:tabular-nums; }
+  .signature { margin-top:40px; display:flex; justify-content:space-between; }
+  .sig-box { width:45%; text-align:center; }
+  .sig-line { border-top:1px solid #cbd5e1; margin-top:50px; padding-top:6px; font-size:10px; color:#94a3b8; }
+  @media print { body { background:#fff; } .page { box-shadow:none; } }
+  @page { size:A4; margin:15mm; }
+</style></head><body>
+<div class="page">
+  <div class="header">
+    <div>
+      <div class="title">${lang === 'ar' ? 'وصل دفع' : lang === 'en' ? 'PAYMENT RECEIPT' : 'REÇU DE PAIEMENT'}</div>
+      <div class="meta">${dateStr} ${timeStr}</div>
+    </div>
+    <div style="text-align:${lang === 'ar' ? 'left' : 'right'}">
+      <div class="store-name">${storeName}</div>
+    </div>
+  </div>
+  <div class="info-grid">
+    <div class="info-box info-from">
+      <div class="info-label">${lang === 'ar' ? 'من' : 'De'}</div>
+      <div class="info-name">${storeName}</div>
+    </div>
+    <div class="info-box info-to">
+      <div class="info-label">${lang === 'ar' ? 'العميل' : 'Client'}</div>
+      <div class="info-name">${client.name || ''}</div>
+      ${client.code ? `<div>${client.code}</div>` : ''}
+      ${client.phone ? `<div>${client.phone}</div>` : ''}
+    </div>
+  </div>
+  <div class="amount-box">
+    <div class="amount-label">${lang === 'ar' ? 'المبلغ المدفوع' : lang === 'en' ? 'Amount Paid' : 'Montant payé'}</div>
+    <div class="amount-value">${fmtDA(amount)}</div>
+  </div>
+  <div class="details">
+    <div class="detail-row"><span class="label">${lang === 'ar' ? 'الرصيد المتبقي' : lang === 'en' ? 'Remaining Balance' : 'Solde restant'}</span><span class="value">${fmtDA(newBalance)}</span></div>
+    ${note ? `<div class="detail-row"><span class="label">${t('note')}</span><span class="value">${note}</span></div>` : ''}
+    <div class="detail-row"><span class="label">${lang === 'ar' ? 'بواسطة' : lang === 'en' ? 'By' : 'Par'}</span><span class="value">${user?.email || ''}</span></div>
+  </div>
+  <div class="signature">
+    <div class="sig-box"><div class="sig-line">${lang === 'ar' ? 'ختم وتوقيع البائع' : 'Cachet et signature vendeur'}</div></div>
+    <div class="sig-box"><div class="sig-line">${lang === 'ar' ? 'توقيع العميل' : 'Signature client'}</div></div>
+  </div>
+</div>
+</body></html>`
+
+    printHtml(html)
   }
 
   function printStatement() {
@@ -574,12 +663,35 @@ export default function Clients({ path }) {
 
   async function confirmDelete() {
     try {
-      await api.deleteClient(deleteTarget.id)
+      const res = await api.deleteClient(deleteTarget.id)
       closeModal('delete-modal')
+      if (res?.archived) alert(t('client_archived_instead'))
       load()
     } catch (e) {
       setDeleteError(e.message)
     }
+  }
+
+  async function loadArchived() {
+    try {
+      const data = await api.listArchivedClients({ page: 1, limit: 50 })
+      setArchivedItems(data.items || [])
+      setArchivedTotal(data.total || 0)
+    } catch { setArchivedItems([]) }
+  }
+
+  async function openArchived() {
+    setShowArchived(true)
+    await loadArchived()
+    document.getElementById('archived-clients-modal')?.showModal()
+  }
+
+  async function handleUnarchive(id) {
+    try {
+      await api.unarchiveClient(id)
+      loadArchived()
+      load()
+    } catch {}
   }
 
   const { items, pages } = result
@@ -593,9 +705,15 @@ export default function Clients({ path }) {
     <Layout currentPath={path}>
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-2xl font-bold">{t('clientsPage')}</h2>
-        {canAdd && (
-          <button class="btn btn-primary btn-sm" onClick={openCreate}>{t('newClient')}</button>
-        )}
+        <div class="flex gap-2">
+          <button class="btn btn-sm btn-ghost gap-1" onClick={openArchived}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
+            {t('showArchived')}
+          </button>
+          {canAdd && (
+            <button class="btn btn-primary btn-sm" onClick={openCreate}>{t('newClient')}</button>
+          )}
+        </div>
       </div>
 
       {/* Search */}
@@ -777,9 +895,14 @@ export default function Clients({ path }) {
                   <span class="text-xs text-base-content/40">
                     {new Date(e.date).toLocaleDateString()} {new Date(e.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
-                  <span class={`text-xs font-mono font-medium ${e.balance > 0 ? 'text-error/70' : 'text-success/70'}`}>
-                    {t('outstandingBalance')}: {e.balance.toFixed(2)}
-                  </span>
+                  <div class="flex items-center gap-2">
+                    {e.type === 'payment' && (
+                      <button class="btn btn-xs btn-ghost border border-base-300" onClick={() => printClientPaymentReceipt(stmtTarget, e.amount, e.note || '', e.balance)}>{t('print')}</button>
+                    )}
+                    <span class={`text-xs font-mono font-medium ${e.balance > 0 ? 'text-error/70' : 'text-success/70'}`}>
+                      {t('outstandingBalance')}: {e.balance.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               </div>
               {e.type === 'sale' && e.lines && e.lines.length > 0 && (
@@ -1043,6 +1166,43 @@ export default function Clients({ path }) {
           <button class="btn btn-sm btn-ghost" onClick={() => closeModal('delete-modal')}>{t('back')}</button>
         </div>
       </Modal>
+
+      {/* Archived Clients Modal */}
+      <dialog id="archived-clients-modal" class="modal">
+        <div class="modal-box max-w-2xl">
+          <h3 class="font-bold text-lg mb-4">{t('archivedClients')}</h3>
+          {archivedItems.length === 0 ? (
+            <p class="text-center text-base-content/50 py-8">{t('noArchivedClients')}</p>
+          ) : (
+            <table class="table table-sm w-full">
+              <thead>
+                <tr>
+                  <th>{t('name')}</th>
+                  <th>{t('phone')}</th>
+                  <th>{t('balance')}</th>
+                  <th>{t('actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {archivedItems.map(c => (
+                  <tr key={c.id}>
+                    <td>{c.name}</td>
+                    <td>{c.phone || '—'}</td>
+                    <td>{(c.balance || 0).toFixed(2)}</td>
+                    <td>
+                      <button class="btn btn-xs btn-success btn-outline" onClick={() => handleUnarchive(c.id)}>{t('unarchive')}</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div class="modal-action">
+            <form method="dialog"><button class="btn btn-sm">{t('back')}</button></form>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+      </dialog>
     </Layout>
   )
 }
