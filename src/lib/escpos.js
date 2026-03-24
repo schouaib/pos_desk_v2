@@ -6,17 +6,11 @@ const LF  = 0x0A
 
 const WIDTH_80MM = 48  // chars per line on 80 mm paper
 
-/**
- * Convert string to printable ASCII bytes + LF (same as label builder).
- * Non-ASCII chars are replaced with '?'.
- */
+/** Encode string to UTF-8 bytes + LF. Supports Arabic, Latin, etc. */
 function strLine(text, maxLen = WIDTH_80MM) {
   const s = String(text ?? '').slice(0, maxLen)
-  const out = []
-  for (const ch of s) {
-    const c = ch.charCodeAt(0)
-    out.push(c >= 0x20 && c <= 0x7E ? c : 0x3F)
-  }
+  const encoded = new TextEncoder().encode(s)
+  const out = Array.from(encoded)
   out.push(LF)
   return out
 }
@@ -56,6 +50,7 @@ export function buildReceipt({ store = {}, sale = {}, labels = {}, width = WIDTH
 
   // ── Init ──────────────────────────────────────────────────────────────────
   out.push(ESC, 0x40)          // initialize
+  out.push(ESC, 0x74, 0xFF)    // select UTF-8 code page (supported by most modern POS printers)
 
   // ── Store header ──────────────────────────────────────────────────────────
   out.push(ESC, 0x61, 0x01)   // center

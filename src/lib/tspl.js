@@ -2,215 +2,264 @@
  * TSPL (TSC Printer Language) label builder
  *
  * For thermal label printers: TSC, Xprinter, Gainscha, etc.
- * Sends text-based commands via raw printing (Tauri print_raw).
- *
- * TSPL reference: https://www.tscprinters.com/EN/DownloadFile/TSPL_TSPL2
+ * 203 dpi = 8 dots/mm
+ * Built-in fonts: "1"=8x12, "2"=12x20, "3"=16x24, "4"=24x32, "5"=32x48
  */
 
 function encode(str) {
-  const encoder = new TextEncoder()
-  return encoder.encode(str)
+  return new TextEncoder().encode(str)
 }
 
-/**
- * Build TSPL label commands.
- *
- * @param {string} model     '45x35' | '40x20' | 'optic' | 'bijou'
- * @param {string} storeName Store name
- * @param {string} name      Product name
- * @param {string} ref       Product reference
- * @param {string} barcode   Barcode value
- * @param {string|number} price  Price to display
- * @param {number} copies    Number of copies
- * @returns {Uint8Array}
- */
-export function buildTsplLabel({ model = '45x35', storeName = '', name = '', ref = '', barcode = '', price = '', copies = 1 } = {}) {
+// Font char dimensions in dots
+const F = {
+  '1': { w: 8,  h: 12 },
+  '2': { w: 12, h: 20 },
+  '3': { w: 16, h: 24 },
+  '4': { w: 24, h: 32 },
+  '5': { w: 32, h: 48 },
+}
+
+/** Text width in dots */
+function textW(text, font, xMul = 1) {
+  return text.length * (F[font]?.w || 8) * xMul
+}
+
+/** Text height in dots */
+function textH(font, yMul = 1) {
+  return (F[font]?.h || 12) * yMul
+}
+
+/** Center X for text on label */
+function cx(labelW, text, font, xMul = 1) {
+  return Math.max(0, Math.floor((labelW - textW(text, font, xMul)) / 2))
+}
+
+/** Format price with space as thousands separator + currency */
+function fmtPrice(price, currency = '') {
+  const n = Number(price)
+  if (isNaN(n)) return String(price)
+  const parts = n.toFixed(2).split('.')
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const formatted = parts[1] === '00' ? intPart : `${intPart}.${parts[1]}`
+  return currency ? `${formatted} ${currency}` : formatted
+}
+
+/** Common header */
+function header(wMm, hMm) {
+  return `SIZE ${wMm} mm, ${hMm} mm\nGAP 2 mm, 0\nSPEED 4\nDENSITY 8\nDIRECTION 1\nCLS\r\n`
+}
+
+/** Escape TSPL strings */
+function esc(str) {
+  return String(str ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').slice(0, 60)
+}
+
+export function buildTsplLabel({ model = '45x35', storeName = '', name = '', ref = '', barcode = '', price = '', currency = 'DA', copies = 1 } = {}) {
   switch (model) {
-    case '40x20': return build40x20(name, barcode, price, copies)
-    case 'optic': return buildOptic(ref, price, copies)
-    case 'bijou': return buildBijou(storeName, name, ref, price, copies)
-    default:      return build45x35(storeName, name, barcode, price, copies)
+    case '40x20': return build40x20(name, barcode, price, currency, copies, storeName)
+    case 'optic': return buildOptic(ref, price, currency, copies)
+    case 'bijou': return buildBijou(storeName, name, ref, price, currency, copies)
+    default:      return build45x35(storeName, name, barcode, price, currency, copies)
   }
 }
 
-/** 45×35mm — Store name + product name + barcode + price */
-function build45x35(storeName, name, barcode, price, copies) {
-  // Size in mm, gap between labels
-  let cmd = `SIZE 45 mm, 35 mm\n`
-  cmd += `GAP 2 mm, 0\n`
-  cmd += `DIRECTION 1\n`
-  cmd += `CLS\n`
+/** ────────────────────────────────────────────
+ *  45×35mm — Store + Name + Barcode + Price
+ *  ──────────────────────────────────────────── */
+function build45x35(storeName, name, barcode, price, currency, copies) {
+  const W = 360, H = 280
+  const GAP = 20
+  let cmd = header(45, 35)
 
-  // All coordinates in dots (203 dpi = 8 dots/mm)
-  // Label area: 360 x 280 dots
-
-  let y = 8
-
-  // Store name (small, centered)
-  if (storeName) {
-    const storeX = Math.max(0, Math.floor((360 - storeName.length * 8) / 2))
-    cmd += `TEXT ${storeX},${y},"1",0,1,1,"${tsplEsc(storeName)}"\n`
-    y += 20
-  }
-
-  // Product name (bold, centered, auto-size)
+  const hasStore = !!storeName
   const nameStr = String(name)
-  if (nameStr.length > 24) {
-    // Long name: smaller font "2", split into 2 lines
-    const mid = nameStr.lastIndexOf(' ', 30)
-    const split = mid > 0 ? mid : 30
-    const line1 = nameStr.slice(0, split).trim()
-    const line2 = nameStr.slice(split).trim().slice(0, 30)
-    const x1 = Math.max(0, Math.floor((360 - line1.length * 10) / 2))
-    const x2 = Math.max(0, Math.floor((360 - line2.length * 10) / 2))
-    cmd += `TEXT ${x1},${y},"2",0,1,1,"${tsplEsc(line1)}"\n`
-    y += 22
-    cmd += `TEXT ${x2},${y},"2",0,1,1,"${tsplEsc(line2)}"\n`
-    y += 24
+  const isLongName = nameStr.length > 28
+  const priceStr = fmtPrice(price, currency)
+
+  // --- Calculate total content height ---
+  let totalH = 0
+  if (hasStore) totalH += textH('1') + GAP
+  if (isLongName) {
+    totalH += textH('1') + 4 + textH('1') + GAP
   } else {
-    // Normal name: font "3" (larger)
-    const nameX = Math.max(0, Math.floor((360 - nameStr.length * 12) / 2))
-    cmd += `TEXT ${nameX},${y},"3",0,1,1,"${tsplEsc(nameStr)}"\n`
-    y += 30
+    totalH += textH('2') + GAP
+  }
+  if (barcode) totalH += 55 + 14 + GAP
+  totalH += textH('3') // price
+
+  let y = Math.max(4, Math.floor((H - totalH) / 2))
+
+  // --- Store name (font 1 — small) ---
+  if (hasStore) {
+    const s = String(storeName).slice(0, 40)
+    cmd += `TEXT ${cx(W, s, '1')},${y},"1",0,1,1,"${esc(s)}"\r\n`
+    y += textH('1') + GAP
   }
 
-  // Barcode (CODE128, centered)
+  // --- Product name (font 1 long / font 2 short) ---
+  if (isLongName) {
+    const mid = nameStr.lastIndexOf(' ', 38)
+    const split = mid > 5 ? mid : 38
+    const line1 = nameStr.slice(0, split).trim()
+    const line2 = nameStr.slice(split).trim().slice(0, 38)
+    cmd += `TEXT ${cx(W, line1, '1')},${y},"1",0,1,1,"${esc(line1)}"\r\n`
+    y += textH('1') + 4
+    if (line2) {
+      cmd += `TEXT ${cx(W, line2, '1')},${y},"1",0,1,1,"${esc(line2)}"\r\n`
+    }
+    y += textH('1') + GAP
+  } else {
+    cmd += `TEXT ${cx(W, nameStr, '2')},${y},"2",0,1,1,"${esc(nameStr)}"\r\n`
+    y += textH('2') + GAP
+  }
+
+  // --- Barcode ---
   if (barcode) {
-    const bcWidth = Math.min(320, barcode.length * 14 + 40)
-    const bcX = Math.floor((360 - bcWidth) / 2)
-    cmd += `BARCODE ${bcX},${y},"128",70,1,0,2,4,"${tsplEsc(barcode)}"\n`
-    y += 90
+    const bcStr = String(barcode).slice(0, 20)
+    cmd += `BARCODE ${cx(W, bcStr, '1', 2)},${y},"128",55,1,0,2,3,"${esc(bcStr)}"\r\n`
+    y += 55 + 14 + GAP
   }
 
-  // Price (large, bold, centered)
-  const priceStr = String(price)
-  const priceX = Math.max(0, Math.floor((360 - priceStr.length * 18) / 2))
-  cmd += `TEXT ${priceX},${y},"4",0,2,2,"${tsplEsc(priceStr)}"\n`
+  // --- Price (font 3, 1x size) ---
+  cmd += `TEXT ${cx(W, priceStr, '3')},${y},"3",0,1,1,"${esc(priceStr)}"\r\n`
 
-  cmd += `PRINT ${copies},1\n`
-
+  cmd += `PRINT ${copies},1\r\n`
   return encode(cmd)
 }
 
-/** 40×20mm — Compact: name + barcode + price */
-function build40x20(name, barcode, price, copies) {
-  let cmd = `SIZE 40 mm, 20 mm\n`
-  cmd += `GAP 2 mm, 0\n`
-  cmd += `DIRECTION 1\n`
-  cmd += `CLS\n`
+/** ────────────────────────────────────────────
+ *  40×20mm — Name + Barcode + Price
+ *  ──────────────────────────────────────────── */
+function build40x20(name, barcode, price, currency, copies, storeName) {
+  const W = 320, H = 160
+  const GAP = 10
+  let cmd = header(40, 20)
 
-  // 320 x 160 dots
-  let y = 4
+  const hasStore = !!storeName
+  const nameStr = String(name).slice(0, 34)
+  const priceStr = fmtPrice(price, currency)
 
-  // Product name (small font "1")
-  const nameStr = String(name).slice(0, 30)
-  const nameX = Math.max(0, Math.floor((320 - nameStr.length * 8) / 2))
-  cmd += `TEXT ${nameX},${y},"1",0,1,1,"${tsplEsc(nameStr)}"\n`
-  y += 18
+  // --- Calculate total height ---
+  let totalH = 0
+  if (hasStore) totalH += textH('1') + GAP
+  totalH += textH('1') + GAP // name
+  if (barcode) totalH += 35 + 12 + 20 // barcode + text + 2.5mm space
+  totalH += textH('3') // price
 
-  // Barcode (shorter)
-  if (barcode) {
-    const bcWidth = Math.min(280, barcode.length * 12 + 30)
-    const bcX = Math.floor((320 - bcWidth) / 2)
-    cmd += `BARCODE ${bcX},${y},"128",45,1,0,1,3,"${tsplEsc(barcode)}"\n`
-    y += 62
+  let y = Math.max(2, Math.floor((H - totalH) / 2))
+
+  // --- Store name (font 1 — small) ---
+  if (hasStore) {
+    const s = String(storeName).slice(0, 34)
+    cmd += `TEXT ${cx(W, s, '1')},${y},"1",0,1,1,"${esc(s)}"\r\n`
+    y += textH('1') + GAP
   }
 
-  // Price (bold)
-  const priceStr = String(price)
-  const priceX = Math.max(0, Math.floor((320 - priceStr.length * 16) / 2))
-  cmd += `TEXT ${priceX},${y},"3",0,2,1,"${tsplEsc(priceStr)}"\n`
+  // --- Name (font 1 — small) ---
+  cmd += `TEXT ${cx(W, nameStr, '1')},${y},"1",0,1,1,"${esc(nameStr)}"\r\n`
+  y += textH('1') + GAP
 
-  cmd += `PRINT ${copies},1\n`
+  // --- Barcode ---
+  if (barcode) {
+    const bcStr = String(barcode).slice(0, 18)
+    cmd += `BARCODE ${cx(W, bcStr, '1', 2)},${y},"128",35,1,0,2,2,"${esc(bcStr)}"\r\n`
+    y += 35 + 12 + 20 // 2.5mm space after barcode
+  }
 
+  // --- Price (font 3, ~3mm height) ---
+  cmd += `TEXT ${cx(W, priceStr, '3')},${y},"3",0,1,1,"${esc(priceStr)}"\r\n`
+
+  cmd += `PRINT ${copies},1\r\n`
   return encode(cmd)
 }
 
-/** Optic 12×7mm — Tiny: ref + price only */
-function buildOptic(ref, price, copies) {
-  let cmd = `SIZE 12 mm, 7 mm\n`
-  cmd += `GAP 2 mm, 0\n`
-  cmd += `DIRECTION 1\n`
-  cmd += `CLS\n`
+/** ────────────────────────────────────────────
+ *  12×7mm Optic — Ref + Price
+ *  ──────────────────────────────────────────── */
+function buildOptic(ref, price, currency, copies) {
+  const W = 96, H = 56
+  const GAP = 4
+  let cmd = header(12, 7)
 
-  // 96 x 56 dots
-  // Ref (tiny font "1")
+  const priceStr = fmtPrice(price, currency)
+
+  let totalH = 0
+  if (ref) totalH += textH('1') + GAP
+  totalH += textH('2')
+
+  let y = Math.max(0, Math.floor((H - totalH) / 2))
+
   if (ref) {
-    const refStr = String(ref).slice(0, 12)
-    const refX = Math.max(0, Math.floor((96 - refStr.length * 8) / 2))
-    cmd += `TEXT ${refX},2,"1",0,1,1,"${tsplEsc(refStr)}"\n`
+    const refStr = String(ref).slice(0, 10)
+    cmd += `TEXT ${cx(W, refStr, '1')},${y},"1",0,1,1,"${esc(refStr)}"\r\n`
+    y += textH('1') + GAP
   }
 
-  // Price (font "2", bold, centered)
-  const priceStr = String(price)
-  const priceX = Math.max(0, Math.floor((96 - priceStr.length * 10) / 2))
-  cmd += `TEXT ${priceX},${ref ? 22 : 12},"2",0,1,1,"${tsplEsc(priceStr)}"\n`
+  cmd += `TEXT ${cx(W, priceStr, '2')},${y},"2",0,1,1,"${esc(priceStr)}"\r\n`
 
-  cmd += `PRINT ${copies},1\n`
-
+  cmd += `PRINT ${copies},1\r\n`
   return encode(cmd)
 }
 
-/** Bijouterie — Compact: store + name + ref + price */
-function buildBijou(storeName, name, ref, price, copies) {
-  let cmd = `SIZE 30 mm, 20 mm\n`
-  cmd += `GAP 2 mm, 0\n`
-  cmd += `DIRECTION 1\n`
-  cmd += `CLS\n`
+/** ────────────────────────────────────────────
+ *  30×20mm Bijou — Store + Name + Ref + Price
+ *  ──────────────────────────────────────────── */
+function buildBijou(storeName, name, ref, price, currency, copies) {
+  const W = 240, H = 160
+  const GAP = 6
+  let cmd = header(30, 20)
 
-  // 240 x 160 dots
-  let y = 4
-
-  // Store name (tiny)
-  if (storeName) {
-    const storeStr = String(storeName).slice(0, 20)
-    const storeX = Math.max(0, Math.floor((240 - storeStr.length * 8) / 2))
-    cmd += `TEXT ${storeX},${y},"1",0,1,1,"${tsplEsc(storeStr)}"\n`
-    y += 18
-  }
-
-  // Product name (font "2", auto-shrink)
   const nameStr = String(name)
-  if (nameStr.length > 20) {
-    // 2 lines, font "1"
-    const mid = nameStr.lastIndexOf(' ', 24)
-    const split = mid > 0 ? mid : 24
-    const line1 = nameStr.slice(0, split).trim()
-    const line2 = nameStr.slice(split).trim().slice(0, 24)
-    const x1 = Math.max(0, Math.floor((240 - line1.length * 8) / 2))
-    const x2 = Math.max(0, Math.floor((240 - line2.length * 8) / 2))
-    cmd += `TEXT ${x1},${y},"1",0,1,1,"${tsplEsc(line1)}"\n`
-    y += 16
-    cmd += `TEXT ${x2},${y},"1",0,1,1,"${tsplEsc(line2)}"\n`
-    y += 18
+  const isLongName = nameStr.length > 18
+  const priceStr = fmtPrice(price, currency)
+
+  // --- Total height ---
+  let totalH = 0
+  if (storeName) totalH += textH('1') + GAP
+  if (isLongName) {
+    totalH += textH('1') + 4 + textH('1') + GAP
   } else {
-    const nameX = Math.max(0, Math.floor((240 - nameStr.length * 10) / 2))
-    cmd += `TEXT ${nameX},${y},"2",0,1,1,"${tsplEsc(nameStr)}"\n`
-    y += 24
+    totalH += textH('2') + GAP
+  }
+  if (ref) totalH += textH('1') + GAP
+  totalH += textH('3')
+
+  let y = Math.max(2, Math.floor((H - totalH) / 2))
+
+  // --- Store ---
+  if (storeName) {
+    const s = String(storeName).slice(0, 18)
+    cmd += `TEXT ${cx(W, s, '1')},${y},"1",0,1,1,"${esc(s)}"\r\n`
+    y += textH('1') + GAP
   }
 
-  // Ref (tiny)
+  // --- Name ---
+  if (isLongName) {
+    const mid = nameStr.lastIndexOf(' ', 22)
+    const split = mid > 4 ? mid : 22
+    const line1 = nameStr.slice(0, split).trim()
+    const line2 = nameStr.slice(split).trim().slice(0, 22)
+    cmd += `TEXT ${cx(W, line1, '1')},${y},"1",0,1,1,"${esc(line1)}"\r\n`
+    y += textH('1') + 4
+    if (line2) {
+      cmd += `TEXT ${cx(W, line2, '1')},${y},"1",0,1,1,"${esc(line2)}"\r\n`
+      y += textH('1') + GAP
+    }
+  } else {
+    cmd += `TEXT ${cx(W, nameStr, '2')},${y},"2",0,1,1,"${esc(nameStr)}"\r\n`
+    y += textH('2') + GAP
+  }
+
+  // --- Ref ---
   if (ref) {
-    const refStr = String(ref).slice(0, 20)
-    const refX = Math.max(0, Math.floor((240 - refStr.length * 8) / 2))
-    cmd += `TEXT ${refX},${y},"1",0,1,1,"${tsplEsc(refStr)}"\n`
-    y += 18
+    const refStr = String(ref).slice(0, 18)
+    cmd += `TEXT ${cx(W, refStr, '1')},${y},"1",0,1,1,"${esc(refStr)}"\r\n`
+    y += textH('1') + GAP
   }
 
-  // Price (bold, larger)
-  const priceStr = String(price)
-  const priceX = Math.max(0, Math.floor((240 - priceStr.length * 16) / 2))
-  cmd += `TEXT ${priceX},${y},"3",0,2,1,"${tsplEsc(priceStr)}"\n`
+  // --- Price (bold, 2x width) ---
+  cmd += `TEXT ${cx(W, priceStr, '3', 2)},${y},"3",0,2,1,"${esc(priceStr)}"\r\n`
 
-  cmd += `PRINT ${copies},1\n`
-
+  cmd += `PRINT ${copies},1\r\n`
   return encode(cmd)
-}
-
-/** Escape special characters for TSPL strings */
-function tsplEsc(str) {
-  return String(str ?? '')
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .slice(0, 60)
 }

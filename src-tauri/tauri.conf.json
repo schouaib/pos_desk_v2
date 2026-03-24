@@ -49,7 +49,6 @@
       "webviewInstallMode": {
         "type": "embedBootstrapper"
       },
-      "signCommand": "",
       "nsis": {
         "installMode": "both",
         "displayLanguageSelector": true,

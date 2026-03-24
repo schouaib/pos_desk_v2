@@ -5,6 +5,8 @@ use ed25519_dalek::{VerifyingKey, Verifier, Signature};
 use std::env;
 use std::fs;
 use std::process::Command;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::net::UdpSocket;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tauri::Manager;
@@ -171,10 +173,9 @@ fn check_environment_integrity() -> bool {
     #[cfg(target_os = "windows")]
     {
         // Check for known analysis sandbox artifacts
-        let suspicious_files = [
-            obfstr!(r"C:\windows\system32\drivers\VBoxMouse.sys"),
-            obfstr!(r"C:\windows\system32\drivers\vmhgfs.sys"),
-        ];
+        let f1 = obfstr!(r"C:\windows\system32\drivers\VBoxMouse.sys").to_string();
+        let f2 = obfstr!(r"C:\windows\system32\drivers\vmhgfs.sys").to_string();
+        let suspicious_files = [f1.as_str(), f2.as_str()];
         let mut vm_count = 0;
         for f in &suspicious_files {
             if std::path::Path::new(f).exists() {
@@ -511,19 +512,10 @@ fn validate_key_secondary(machine_id: &str, key: &str) -> bool {
         return false;
     }
     // Re-derive public keys independently (not sharing the get_public_keys result)
-    let pk1 = obfstr!("3e3ce7e1af68e01eadbb9af7f45cee360efefa84deb7da65eb47049d0c26b283").to_string();
-    let pub_bytes = match hex::decode(&pk1) {
-        Ok(b) => b,
-        Err(_) => return false,
-    };
-    let key_array: [u8; 32] = match pub_bytes.try_into() {
-        Ok(a) => a,
-        Err(_) => return false,
-    };
-    let vk = match VerifyingKey::from_bytes(&key_array) {
-        Ok(k) => k,
-        Err(_) => return false,
-    };
+    let pk_hexes = [
+        obfstr!("3e3ce7e1af68e01eadbb9af7f45cee360efefa84deb7da65eb47049d0c26b283").to_string(),
+        obfstr!("f14c96fad2e14455c9994d1b7d4b1d96b6623afd50fa79d2938f6254594726a8").to_string(),
+    ];
 
     let hex_str = key.trim().replace('-', "").to_lowercase();
     let sig_bytes = match hex::decode(&hex_str) {
@@ -535,7 +527,22 @@ fn validate_key_secondary(machine_id: &str, key: &str) -> bool {
         Err(_) => return false,
     };
     let signature = Signature::from_bytes(&sig_array);
-    vk.verify(machine_id.as_bytes(), &signature).is_ok()
+
+    pk_hexes.iter().any(|pk_hex| {
+        let pub_bytes = match hex::decode(pk_hex) {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
+        let key_array: [u8; 32] = match pub_bytes.try_into() {
+            Ok(a) => a,
+            Err(_) => return false,
+        };
+        let vk = match VerifyingKey::from_bytes(&key_array) {
+            Ok(k) => k,
+            Err(_) => return false,
+        };
+        vk.verify(machine_id.as_bytes(), &signature).is_ok()
+    })
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -781,71 +788,31 @@ fn get_stored_activation_key(app: tauri::AppHandle) -> Result<String, String> {
     decrypt_from_storage(&stored, &machine_id).ok_or_else(|| "decrypt failed".to_string())
 }
 
-// ─── MongoDB credentials & JWT secret (auto-generated per installation) ──
+// ─── MongoDB credentials derived from machine ID (no files on disk) ──
 
-#[derive(serde::Deserialize, serde::Serialize, Clone)]
+#[derive(Clone)]
 struct MongoCredentials {
-    admin_user: String,
-    admin_pass: String,
     app_user: String,
     app_pass: String,
     jwt_secret: String,
-    initialized: bool,
 }
 
-fn generate_random_string(len: usize) -> String {
-    use rand::Rng;
-    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let mut rng = rand::thread_rng();
-    (0..len).map(|_| CHARSET[rng.gen_range(0..CHARSET.len())] as char).collect()
+/// Derive a deterministic credential string from the machine ID and a purpose tag.
+/// Uses HMAC-SHA256 so credentials are unique per machine and not reversible.
+fn derive_credential(machine_id: &str, purpose: &str) -> String {
+    let key = format!("{}{}{}", obfstr!("cP0s-"), purpose, obfstr!("-dErIvE"));
+    let mut mac = HmacSha256::new_from_slice(key.as_bytes()).expect("HMAC key");
+    mac.update(machine_id.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
 }
 
-fn get_credentials_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
-    Ok(data_dir.join("mongo_credentials.json"))
-}
-
-fn load_or_create_credentials(app: &tauri::AppHandle) -> Result<MongoCredentials, String> {
-    let cred_path = get_credentials_path(app)?;
-    if cred_path.exists() {
-        let content = fs::read_to_string(&cred_path).map_err(|e| e.to_string())?;
-        let creds: MongoCredentials = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-        return Ok(creds);
+fn get_derived_credentials() -> MongoCredentials {
+    let mid = compute_machine_id();
+    MongoCredentials {
+        app_user: obfstr!("posApp").to_string(),
+        app_pass: derive_credential(&mid, obfstr!("mongo-app")),
+        jwt_secret: derive_credential(&mid, obfstr!("jwt-secret")),
     }
-
-    // Generate new credentials
-    let creds = MongoCredentials {
-        admin_user: "posAdmin".to_string(),
-        admin_pass: generate_random_string(32),
-        app_user: "posApp".to_string(),
-        app_pass: generate_random_string(32),
-        jwt_secret: generate_random_string(64),
-        initialized: false,
-    };
-
-    let json = serde_json::to_string_pretty(&creds).map_err(|e| e.to_string())?;
-    write_secure_file(&cred_path, json.as_bytes())?;
-    Ok(creds)
-}
-
-fn mark_credentials_initialized(app: &tauri::AppHandle) -> Result<(), String> {
-    let cred_path = get_credentials_path(app)?;
-    let content = fs::read_to_string(&cred_path).map_err(|e| e.to_string())?;
-    let mut creds: MongoCredentials = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-    creds.initialized = true;
-    let json = serde_json::to_string_pretty(&creds).map_err(|e| e.to_string())?;
-    write_secure_file(&cred_path, json.as_bytes())?;
-    Ok(())
-}
-
-/// Signal file that tells the Go server to create MongoDB auth users.
-fn write_mongo_init_signal(app: &tauri::AppHandle, creds: &MongoCredentials) -> Result<(), String> {
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let signal_path = data_dir.join("mongo_init_pending.json");
-    let json = serde_json::to_string_pretty(creds).map_err(|e| e.to_string())?;
-    write_secure_file(&signal_path, json.as_bytes())?;
-    Ok(())
 }
 
 // ─── Server management ──────────────────────────────────────────────
@@ -919,12 +886,12 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
 
     let db_path = get_db_path(&app)?;
     let log_path = get_mongod_log_path(&app)?;
-    let creds = load_or_create_credentials(&app)?;
-    let needs_init = !creds.initialized;
+    let creds = get_derived_credentials();
 
     cleanup_stale_lock(&db_path);
 
-    let mut mongod_args = vec![
+    // MongoDB on localhost only, no --auth needed (bound to 127.0.0.1)
+    let mongod_args = vec![
         "--dbpath".to_string(), db_path.clone(),
         "--port".to_string(), MONGO_PORT.to_string(),
         "--bind_ip".to_string(), "127.0.0.1".to_string(),
@@ -932,9 +899,6 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
         "--logpath".to_string(), log_path.clone(),
         "--logappend".to_string(),
     ];
-    if !needs_init {
-        mongod_args.push("--auth".to_string());
-    }
 
     let mongod = app.shell()
         .sidecar("mongod")
@@ -952,6 +916,7 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
         let app = app.clone();
         let creds = creds.clone();
         move || {
+            // Wait for mongod to be ready
             let addr = format!("127.0.0.1:{}", MONGO_PORT);
             for _ in 0..40 {
                 if std::net::TcpStream::connect_timeout(
@@ -963,19 +928,7 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
                 std::thread::sleep(std::time::Duration::from_millis(250));
             }
 
-            if needs_init {
-                log::info!("First launch: Go server will initialize MongoDB auth users...");
-                let _ = write_mongo_init_signal(&app, &creds);
-            }
-
-            let mongo_uri = if !needs_init {
-                format!(
-                    "mongodb://{}:{}@127.0.0.1:{}/saas_pos?authSource=saas_pos",
-                    creds.app_user, creds.app_pass, MONGO_PORT
-                )
-            } else {
-                format!("mongodb://127.0.0.1:{}", MONGO_PORT)
-            };
+            let mongo_uri = format!("mongodb://127.0.0.1:{}", MONGO_PORT);
 
             if let Ok(server) = app.shell()
                 .sidecar("server")
@@ -983,7 +936,7 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
                     .env("MONGO_URI", &mongo_uri)
                     .env("MONGO_DB", "saas_pos")
                     .env("JWT_SECRET", &creds.jwt_secret)
-                    .env("APP_HOST", "127.0.0.1")
+                    .env("APP_HOST", "0.0.0.0")
                     .spawn()
                 )
             {
@@ -1013,18 +966,13 @@ fn get_mongod_log(app: tauri::AppHandle) -> Result<String, String> {
 #[tauri::command]
 fn get_db_credentials(app: tauri::AppHandle) -> Result<String, String> {
     guard_tamper()?;
-    // Verify activation before exposing credentials
     if !check_activation(app.clone()) {
         return Err(obfstr!("activation required").to_string());
     }
-    let creds = load_or_create_credentials(&app)?;
+    let creds = get_derived_credentials();
     let info = serde_json::json!({
         "port": MONGO_PORT,
-        "admin_user": creds.admin_user,
-        "admin_pass": creds.admin_pass,
         "app_user": creds.app_user,
-        "app_pass": creds.app_pass,
-        "auth_enabled": creds.initialized,
         "db_name": "saas_pos",
     });
     serde_json::to_string(&info).map_err(|e| e.to_string())

@@ -57,6 +57,7 @@ export default function Products({ path }) {
   const canScale       = hasFeature('scale') && isWindows
 
   const [storeName, setStoreName] = useState('')
+  const [storeCurrency, setStoreCurrency] = useState('DA')
   const [defaultSalePrice, setDefaultSalePrice] = useState(1)
   const [useVAT, setUseVAT] = useState(false)
   const [categories, setCategories] = useState([])
@@ -136,7 +137,7 @@ export default function Products({ path }) {
     api.listCategories().then(d => { if (!cancelled) setCategories(d) }).catch(() => {})
     api.listBrands().then(d => { if (!cancelled) setBrands(d) }).catch(() => {})
     api.listUnits().then(d => { if (!cancelled) setUnits(d) }).catch(() => {})
-    api.getStoreSettings().then(d => { if (!cancelled) { setStoreName(d?.name || ''); setDefaultSalePrice(d?.default_sale_price || 1); setUseVAT(!!d?.use_vat) } }).catch(() => {})
+    api.getStoreSettings().then(d => { if (!cancelled) { setStoreName(d?.name || ''); setStoreCurrency(d?.currency === 'EUR' ? '€' : d?.currency === 'USD' ? '$' : d?.currency === 'GBP' ? '£' : d?.currency === 'TND' ? 'DT' : d?.currency === 'SAR' ? 'SR' : d?.currency || 'DA'); setDefaultSalePrice(d?.default_sale_price || 1); setUseVAT(!!d?.use_vat) } }).catch(() => {})
     return () => { cancelled = true }
   }, [])
 
@@ -1255,7 +1256,7 @@ export default function Products({ path }) {
 
       {/* Print label — lazy-loaded so JsBarcode is excluded from initial bundle */}
       <Suspense fallback={null}>
-        <PrintLabelModal product={printTarget} storeName={storeName} />
+        <PrintLabelModal product={printTarget} storeName={storeName} currency={storeCurrency} />
       </Suspense>
 
       {/* Stock Adjustment dialog */}

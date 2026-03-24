@@ -91,7 +91,6 @@ func main() {
 	config.Load()
 	database.Connect()
 	database.EnsureIndexes()
-	seed.InitMongoAuth()
 	seed.RunDesktopSeed()
 	done := make(chan struct{})
 	metrics.Init(done)

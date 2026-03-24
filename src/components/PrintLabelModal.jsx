@@ -3,7 +3,7 @@ import { Modal, closeModal } from './Modal'
 import { useI18n } from '../lib/i18n'
 import { buildBarcodeLabel } from '../lib/escpos'
 import { buildTsplLabel } from '../lib/tspl'
-import { printBytes, getConnection } from '../lib/webusbPrint'
+import { printBytes, getConnection, listPrinters } from '../lib/webusbPrint'
 import { toast } from './Toast'
 
 export const PRINT_MODAL_ID = 'print-label-modal'
@@ -34,7 +34,7 @@ function BarcodePreview({ value }) {
   return <svg ref={ref} class="max-w-full" />
 }
 
-export function PrintLabelModal({ product, storeName }) {
+export function PrintLabelModal({ product, storeName, currency = 'DA' }) {
   const { t } = useI18n()
   const [model, setModel]           = useState('standard')
   const [copies, setCopies]         = useState(1)
@@ -42,20 +42,45 @@ export function PrintLabelModal({ product, storeName }) {
   const [barcodeVal, setBarcodeVal] = useState('')
   const [printing, setPrinting]     = useState(false)
   const [error, setError]           = useState('')
+  const [printers, setPrinters]     = useState([])
+  const [selectedPrinter, setSelectedPrinter] = useState('')
 
-  const hasPrinter = !!getConnection()
+  const hasPrinter = !!getConnection() || !!selectedPrinter
 
   useEffect(() => {
     if (!product) return
     setBarcodeVal(product.barcodes?.[0] || product.ref || '')
     setError('')
+    // Load available printers and saved label printer preference
+    listPrinters().then(async ({ printers: list, default: def }) => {
+      setPrinters(list)
+      let saved = null
+      try {
+        const { LazyStore } = await import('@tauri-apps/plugin-store')
+        const store = new LazyStore('printer.json')
+        saved = await store.get('label_printer')
+      } catch {}
+      const conn = getConnection()
+      setSelectedPrinter((saved && list.includes(saved)) ? saved : conn?.printer || def || list[0] || '')
+    }).catch(() => {})
   }, [product])
+
+  async function handlePrinterChange(name) {
+    setSelectedPrinter(name)
+    // Save as label printer preference (don't change global receipt printer)
+    try {
+      const { LazyStore } = await import('@tauri-apps/plugin-store')
+      const store = new LazyStore('printer.json')
+      await store.set('label_printer', name)
+      await store.save()
+    } catch {}
+  }
 
   async function handlePrint() {
     setError('')
     setPrinting(true)
     try {
-      if (!getConnection()) {
+      if (!selectedPrinter) {
         throw new Error(t('connectPrinter') || 'No printer connected')
       }
       const price = product[priceField] ?? 0
@@ -70,6 +95,7 @@ export function PrintLabelModal({ product, storeName }) {
           ref: product.ref || product.barcodes?.[0] || '',
           barcode: barcodeVal,
           price: String(price),
+          currency,
           copies,
         })
       } else {
@@ -84,7 +110,7 @@ export function PrintLabelModal({ product, storeName }) {
           copies,
         })
       }
-      await printBytes(bytes)
+      await printBytes(bytes, selectedPrinter)
       toast.success(`${copies} label(s) printed`)
       closeModal(PRINT_MODAL_ID)
     } catch (err) {
@@ -103,14 +129,28 @@ export function PrintLabelModal({ product, storeName }) {
 
         {error && <div class="alert alert-error text-sm py-2"><span>{error}</span></div>}
 
-        {!hasPrinter && (
-          <div class="alert alert-warning text-sm py-2">
-            <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{t('connectPrinter') || 'Connect a printer first'}</span>
-          </div>
-        )}
+        {/* Printer selector */}
+        <div>
+          <p class="label-text text-xs font-medium mb-1">{t('selectPrinter') || 'Printer'}</p>
+          {printers.length > 0 ? (
+            <select
+              class="select select-bordered select-sm w-full"
+              value={selectedPrinter}
+              onChange={(e) => handlePrinterChange(e.target.value)}
+            >
+              {printers.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          ) : (
+            <div class="alert alert-warning text-sm py-2">
+              <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{t('connectPrinter') || 'No printers found'}</span>
+            </div>
+          )}
+        </div>
 
         {/* Label model selector */}
         <div>

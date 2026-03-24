@@ -13,6 +13,9 @@ async function loadSavedPrinter() {
   try {
     const { LazyStore } = await import('@tauri-apps/plugin-store')
     const store = new LazyStore('printer.json')
+    // Prefer receipt_printer (set in Settings), fall back to selected_printer
+    const receipt = await store.get('receipt_printer')
+    if (receipt) return receipt
     return await store.get('selected_printer')
   } catch { return null }
 }
@@ -63,11 +66,12 @@ export function getConnection() {
   return _selectedPrinter ? { type: 'native', printer: _selectedPrinter } : null
 }
 
-/** Send raw ESC/POS bytes to the selected printer */
-export async function printBytes(data) {
-  if (!_selectedPrinter) throw new Error('Printer not connected')
+/** Send raw bytes to the selected printer, or a specific printer by name */
+export async function printBytes(data, printerName) {
+  const target = printerName || _selectedPrinter
+  if (!target) throw new Error('Printer not connected')
   const bytes = data instanceof Uint8Array ? Array.from(data) : Array.from(new Uint8Array(data))
-  await invoke('print_raw', { printer: _selectedPrinter, data: bytes })
+  await invoke('print_raw', { printer: target, data: bytes })
 }
 
 /** Clear the printer selection */
