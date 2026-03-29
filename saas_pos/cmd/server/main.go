@@ -22,6 +22,7 @@ import (
 	"saas_pos/internal/chat"
 	"saas_pos/internal/client"
 	"saas_pos/internal/discount"
+	"saas_pos/internal/docimport"
 	"saas_pos/internal/expense"
 	"saas_pos/internal/folder"
 	"saas_pos/internal/location"
@@ -43,6 +44,7 @@ import (
 	"saas_pos/internal/unit"
 	"saas_pos/internal/user"
 	"saas_pos/internal/facturation"
+	"saas_pos/internal/remotescan"
 	"saas_pos/internal/scale"
 	"saas_pos/internal/testrunner"
 	"saas_pos/internal/variant"
@@ -154,6 +156,19 @@ func main() {
 		}
 		return c.SendStatus(200)
 	})
+
+	// Start HTTPS scanner server for iOS camera access
+	remotescan.StartTLSServer(done)
+
+	// Remote scanner — public routes (phone browser, no activation)
+	app.Get("/scan/manifest.json", remotescan.HandleManifest)
+	app.Get("/scan/sw.js", remotescan.HandleSW)
+	app.Get("/scan/icon-192.png", remotescan.HandleIcon192)
+	app.Get("/scan/icon-512.png", remotescan.HandleIcon512)
+	app.Get("/scan/:token", remotescan.HandleScannerPage)
+	app.Get("/api/scan/ws/phone", remotescan.PhoneWSUpgrade)
+	// Desktop scanner WS — requires valid JWT + session token
+	app.Get("/api/scan/ws/desktop", remotescan.ValidateDesktopWS(), remotescan.DesktopWSUpgrade)
 
 	registerRoutes(app)
 
@@ -367,6 +382,8 @@ func registerRoutes(app *fiber.App) {
 	tpPurchases.Get("/purchases/:id/returnable", middleware.RequirePermission("purchases", "return"), purchase.HandleGetReturnable)
 	tpPurchases.Post("/purchases/:id/return", middleware.RequirePermission("purchases", "return"), purchase.HandleReturn)
 	tpPurchases.Delete("/purchases/:id", middleware.RequirePermission("purchases", "delete"), purchase.HandleDelete)
+	tpPurchases.Post("/purchases/import/parse", middleware.RequirePermission("purchases", "add"), docimport.HandleParse)
+	tpPurchases.Post("/purchases/import/confirm", middleware.RequirePermission("purchases", "add"), docimport.HandleConfirm)
 
 	// Stock loss management
 	tpLosses := tp.Group("", middleware.RequireFeature("losses"))
@@ -384,6 +401,11 @@ func registerRoutes(app *fiber.App) {
 	// POS (sale creation)
 	tpPOS := tp.Group("", middleware.RequireFeature("pos"))
 	tpPOS.Post("/sales", middleware.RequirePermission("sales", "add"), sale.HandleCreate)
+
+	// Remote barcode scanner (phone → desktop relay)
+	tpScanner := tp.Group("", middleware.RequireFeature("remote_scanner"), middleware.RequireFeature("pos"))
+	tpScanner.Post("/scan/session", middleware.RequirePermission("sales", "add"), remotescan.HandleCreateSession)
+	tpScanner.Post("/scan/session/delete", middleware.RequirePermission("sales", "add"), remotescan.HandleDeleteSession)
 
 	// Sales history & stats
 	tpSales := tp.Group("", middleware.RequireFeature("sales"))

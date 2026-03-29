@@ -122,6 +122,8 @@ func hasFeature(claims *jwt.Claims, feature string) bool {
 		return f.Scale
 	case "facturation":
 		return f.Facturation
+	case "remote_scanner":
+		return f.RemoteScanner
 	}
 	return false
 }

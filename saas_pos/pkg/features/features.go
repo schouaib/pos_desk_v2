@@ -27,4 +27,5 @@ type PlanFeatures struct {
 	BatchTracking    bool `bson:"batch_tracking"    json:"batch_tracking"`
 	Scale            bool `bson:"scale"             json:"scale"`
 	Facturation      bool `bson:"facturation"       json:"facturation"`
+	RemoteScanner    bool `bson:"remote_scanner"    json:"remote_scanner"`
 }

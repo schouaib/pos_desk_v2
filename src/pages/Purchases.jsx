@@ -5,6 +5,9 @@ import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 import { hasPerm, hasFeature } from '../lib/auth'
 import { QuickAddProductModal } from '../components/QuickAddProductModal'
+import RemoteScanner from '../components/RemoteScanner'
+
+const IMPORT_ACCEPTED = '.pdf,.jpg,.jpeg,.png,.webp,.bmp,.tiff,.tif'
 
 const STATUS_BADGE = {
   draft:                 'badge-warning',
@@ -102,6 +105,85 @@ export default function Purchases({ path }) {
   const [lowStockOpen, setLowStockOpen] = useState(false)
   const [lowStockItems, setLowStockItems] = useState([])
 
+  // Phone scanner (for photo import)
+  const [phoneScanOpen, setPhoneScanOpen] = useState(false)
+
+  // Document import
+  const [importOpen, setImportOpen] = useState(false)
+  const [importStep, setImportStep] = useState('upload') // upload | review | done
+  const [importFile, setImportFile] = useState(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importError, setImportError] = useState('')
+  const [importParseResult, setImportParseResult] = useState(null)
+  const [importLines, setImportLines] = useState([])
+  const [importSupplierID, setImportSupplierID] = useState('')
+  const [importSupplierInvoice, setImportSupplierInvoice] = useState('')
+  const [importNote, setImportNote] = useState('')
+  const [importResult, setImportResult] = useState(null)
+  const importFileRef = useRef(null)
+
+  const resetImport = useCallback(() => {
+    setImportStep('upload'); setImportFile(null); setImportError(''); setImportParseResult(null)
+    setImportLines([]); setImportSupplierID(''); setImportSupplierInvoice(''); setImportNote('')
+    setImportResult(null)
+  }, [])
+
+  const handleImportFile = useCallback((e) => {
+    e.preventDefault()
+    const f = e.dataTransfer ? e.dataTransfer.files[0] : e.target.files[0]
+    if (f) setImportFile(f)
+  }, [])
+
+  const handleImportParse = useCallback(async () => {
+    if (!importFile) return
+    setImportLoading(true); setImportError('')
+    try {
+      const res = await api.parsePurchaseDocument(importFile)
+      setImportParseResult(res)
+      setImportLines((res.lines || []).map((l, i) => ({
+        _idx: i, product_id: l.product_id || '', product_name: l.product_name || '',
+        name: l.name || '', barcode: l.barcode || '', qty: l.qty || 0,
+        prix_achat: l.unit_price || 0, prix_vente_1: 0, vat: l.vat || 19,
+        is_new: l.is_new, confidence: l.confidence || 0, candidates: l.candidates || [], skip: false,
+      })))
+      if (res.document && res.document.supplier_invoice) setImportSupplierInvoice(res.document.supplier_invoice)
+      setImportStep('review')
+    } catch (err) { setImportError(err.message) }
+    finally { setImportLoading(false) }
+  }, [importFile])
+
+  const handleImportConfirm = useCallback(async () => {
+    setImportLoading(true); setImportError('')
+    try {
+      const res = await api.confirmPurchaseImport({
+        supplier_id: importSupplierID, supplier_invoice: importSupplierInvoice,
+        note: importNote || (t('importedFromDocument') + ': ' + (importFile ? importFile.name : '')),
+        lines: importLines.map(l => ({
+          product_id: l.is_new ? '' : l.product_id, name: l.is_new ? l.name : (l.product_name || l.name),
+          barcode: l.barcode, qty: l.qty, prix_achat: l.prix_achat,
+          prix_vente_1: l.is_new ? l.prix_vente_1 : 0, vat: 19, skip: l.skip,
+        })),
+      })
+      setImportResult(res); setImportStep('done')
+    } catch (err) { setImportError(err.message) }
+    finally { setImportLoading(false) }
+  }, [importLines, importSupplierID, importSupplierInvoice, importNote, importFile, t])
+
+  const updateImportLine = useCallback((idx, field, value) => {
+    setImportLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l))
+  }, [])
+
+  const [newSupplierName, setNewSupplierName] = useState('')
+  const handleCreateImportSupplier = useCallback(async () => {
+    if (!newSupplierName.trim()) return
+    try {
+      const s = await api.createSupplier({ name: newSupplierName.trim() })
+      setSuppliers(prev => [...prev, s])
+      setImportSupplierID(s.id)
+      setNewSupplierName('')
+    } catch (err) { setImportError(err.message) }
+  }, [newSupplierName])
+
   // VAT setting
   const [useVAT, setUseVAT] = useState(false)
   const [visiblePrices, setVisiblePrices] = useState({ pv1: true, pv2: true, pv3: true })
@@ -144,7 +226,7 @@ export default function Purchases({ path }) {
     api.listSuppliers().then(d => { if (!cancelled) setSuppliers(d) }).catch(() => {})
     api.listBrands().then(d => { if (!cancelled) setBrands(d) }).catch(() => {})
     api.listCategories().then(d => { if (!cancelled) setCategories(d) }).catch(() => {})
-    api.getStoreSettings().then(d => { if (!cancelled) { setUseVAT(!!d?.use_vat); if (d?.visible_prices) setVisiblePrices(d.visible_prices) } }).catch(() => {})
+    api.getStoreSettings().then(d => { if (!cancelled) { setUseVAT(!!(d?.use_vat_purchase ?? d?.use_vat)); if (d?.visible_prices) setVisiblePrices(d.visible_prices) } }).catch(() => {})
     return () => { cancelled = true }
   }, [])
 
@@ -1170,9 +1252,25 @@ export default function Purchases({ path }) {
     <Layout currentPath={path}>
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-2xl font-bold">{t('purchasesPage')}</h2>
-        {canAdd && (
-          <button class="btn btn-primary btn-sm" onClick={openCreate}>{t('newPurchase')}</button>
-        )}
+        <div class="flex gap-2">
+          {canAdd && hasFeature('remote_scanner') && (
+            <button class="btn btn-outline btn-sm" onClick={() => setPhoneScanOpen(true)}>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+              </svg>
+              {t('phonePhoto') || 'Phone Photo'}
+            </button>
+          )}
+          {canAdd && (
+            <button class="btn btn-outline btn-sm" onClick={() => { resetImport(); setImportOpen(true) }}>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              {t('importPurchaseDoc') || 'Import Document'}
+            </button>
+          )}
+          {canAdd && (
+            <button class="btn btn-primary btn-sm" onClick={openCreate}>{t('newPurchase')}</button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -1535,6 +1633,235 @@ export default function Purchases({ path }) {
           <button class="btn btn-sm btn-ghost" onClick={() => closeModal('return-modal')}>{t('back')}</button>
         </div>
       </Modal>
+
+      {/* ── Document Import Modal ── */}
+      {importOpen && (
+        <dialog class="modal modal-open">
+          <div class="modal-box w-full max-w-4xl max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-bold text-lg">{t('importPurchaseDoc') || 'Import Document'}</h3>
+              <button class="btn btn-sm btn-ghost btn-square" onClick={() => setImportOpen(false)}>x</button>
+            </div>
+
+            {/* Steps */}
+            <ul class="steps steps-horizontal w-full mb-6 text-xs">
+              <li class={'step' + (importStep !== 'done' || importStep === 'upload' ? ' step-primary' : '')}>{t('upload') || 'Upload'}</li>
+              <li class={'step' + (importStep === 'review' || importStep === 'done' ? ' step-primary' : '')}>{t('reviewLines') || 'Review'}</li>
+              <li class={'step' + (importStep === 'done' ? ' step-primary' : '')}>{t('confirm') || 'Confirm'}</li>
+            </ul>
+
+            {importError && (
+              <div class="alert alert-error mb-4 text-sm py-2">
+                <span>{importError}</span>
+                <button class="btn btn-ghost btn-xs" onClick={() => setImportError('')}>x</button>
+              </div>
+            )}
+
+            {/* Upload step */}
+            {importStep === 'upload' && (
+              <div>
+                <div
+                  class="w-full border-2 border-dashed border-base-300 rounded-xl p-10 cursor-pointer hover:border-primary transition-colors text-center"
+                  onDrop={handleImportFile}
+                  onDragOver={e => e.preventDefault()}
+                  onClick={() => importFileRef.current && importFileRef.current.click()}
+                >
+                  <input ref={importFileRef} type="file" accept={IMPORT_ACCEPTED} class="hidden" onChange={handleImportFile} />
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-base-content/30 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p class="font-medium">{importFile ? importFile.name : (t('dropDocumentHere') || 'Drop invoice here (PDF or image)')}</p>
+                  <p class="text-xs text-base-content/50 mt-1">PDF, JPG, PNG — Max 10MB</p>
+                </div>
+                {importFile && (
+                  <div class="mt-4 flex justify-center gap-2">
+                    <button class="btn btn-primary btn-sm" onClick={handleImportParse} disabled={importLoading}>
+                      {importLoading && <span class="loading loading-spinner loading-xs"></span>}
+                      {t('analyzeDocument') || 'Analyze'}
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onClick={() => setImportFile(null)}>{t('cancel') || 'Cancel'}</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Review step */}
+            {importStep === 'review' && importParseResult && (
+              <div>
+                {/* Stats */}
+                <div class="grid grid-cols-3 gap-2 mb-4">
+                  <div class="bg-base-200 rounded-lg p-2 text-center">
+                    <div class="text-xs text-base-content/60">{t('totalLines') || 'Lines'}</div>
+                    <div class="font-bold">{importLines.filter(l => !l.skip).length}</div>
+                  </div>
+                  <div class="bg-base-200 rounded-lg p-2 text-center">
+                    <div class="text-xs text-base-content/60">{t('matchedProducts') || 'Matched'}</div>
+                    <div class="font-bold text-success">{importLines.filter(l => !l.skip && !l.is_new).length}</div>
+                  </div>
+                  <div class="bg-base-200 rounded-lg p-2 text-center">
+                    <div class="text-xs text-base-content/60">{t('newProducts') || 'New'}</div>
+                    <div class="font-bold text-warning">{importLines.filter(l => !l.skip && l.is_new).length}</div>
+                  </div>
+                </div>
+
+                {/* Supplier info */}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+                  <div>
+                    <label class="label label-text text-xs">{t('supplier') || 'Supplier'}</label>
+                    <select class="select select-bordered select-sm w-full" value={importSupplierID} onChange={e => setImportSupplierID(e.target.value)}>
+                      <option value="">{t('selectSupplier') || 'Select...'}</option>
+                      {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    {importParseResult.document && importParseResult.document.supplier_name && (
+                      <p class="text-[10px] text-base-content/50 mt-0.5">{t('detected') || 'Detected'}: {importParseResult.document.supplier_name}</p>
+                    )}
+                    {!importSupplierID && (
+                      <div class="flex gap-1 mt-1">
+                        <input type="text" class="input input-bordered input-xs flex-1" placeholder={t('newSupplierName') || 'New supplier name'} value={newSupplierName} onInput={e => setNewSupplierName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreateImportSupplier()} />
+                        <button class="btn btn-xs btn-primary" onClick={handleCreateImportSupplier} disabled={!newSupplierName.trim()}>+</button>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label class="label label-text text-xs">{t('supplierInvoice') || 'Invoice #'}</label>
+                    <input type="text" class="input input-bordered input-sm w-full" value={importSupplierInvoice} onInput={e => setImportSupplierInvoice(e.target.value)} />
+                  </div>
+                  <div>
+                    <label class="label label-text text-xs">{t('note') || 'Note'}</label>
+                    <input type="text" class="input input-bordered input-sm w-full" value={importNote} onInput={e => setImportNote(e.target.value)} />
+                  </div>
+                </div>
+
+                {/* Lines */}
+                <div class="overflow-x-auto mb-4">
+                  <table class="table table-xs">
+                    <thead>
+                      <tr>
+                        <th class="w-6"></th>
+                        <th class="w-16"></th>
+                        <th>{t('productName') || 'Product'}</th>
+                        <th>{t('barcode') || 'Barcode'}</th>
+                        <th class="text-right">{t('qty') || 'Qty'}</th>
+                        <th class="text-right">PA</th>
+                        <th class="text-right">PV</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importLines.map((l, i) => (
+                        <tr key={i} class={l.skip ? 'opacity-30' : ''}>
+                          <td><input type="checkbox" class="checkbox checkbox-xs" checked={!l.skip} onChange={() => updateImportLine(i, 'skip', !l.skip)} /></td>
+                          <td>
+                            {l.is_new ? (
+                              <span class="badge badge-warning badge-xs">{t('new') || 'New'}</span>
+                            ) : l.confidence >= 80 ? (
+                              <span class="badge badge-success badge-xs">{l.confidence}%</span>
+                            ) : (
+                              <span class="badge badge-info badge-xs">{l.confidence}%</span>
+                            )}
+                          </td>
+                          <td>
+                            {l.is_new ? (
+                              <input type="text" class="input input-bordered input-xs w-full min-w-[150px]" value={l.name}
+                                onInput={e => updateImportLine(i, 'name', e.target.value)} disabled={l.skip} />
+                            ) : l.candidates && l.candidates.length > 1 ? (
+                              <select class="select select-bordered select-xs w-full min-w-[150px]" value={l.product_id} disabled={l.skip}
+                                onChange={e => {
+                                  const sel = l.candidates.find(c => c.product_id === e.target.value)
+                                  if (sel) updateImportLine(i, 'product_id', sel.product_id); updateImportLine(i, 'product_name', sel ? sel.product_name : ''); updateImportLine(i, 'confidence', sel ? sel.confidence : 0)
+                                  if (e.target.value === '__new__') { updateImportLine(i, 'product_id', ''); updateImportLine(i, 'is_new', true); updateImportLine(i, 'confidence', 0) }
+                                }}>
+                                {l.candidates.map(c => <option key={c.product_id} value={c.product_id}>{c.product_name} ({c.confidence}%)</option>)}
+                                <option value="__new__">-- {t('new') || 'Create new'} --</option>
+                              </select>
+                            ) : (
+                              <span class="text-sm">{l.product_name || l.name}</span>
+                            )}
+                          </td>
+                          <td><input type="text" class="input input-bordered input-xs w-20" value={l.barcode} onInput={e => updateImportLine(i, 'barcode', e.target.value)} disabled={l.skip} /></td>
+                          <td class="text-right"><input type="number" class="input input-bordered input-xs w-16 text-right" value={l.qty} onInput={e => updateImportLine(i, 'qty', parseFloat(e.target.value) || 0)} disabled={l.skip} min="0" /></td>
+                          <td class="text-right"><input type="number" class="input input-bordered input-xs w-20 text-right" value={l.prix_achat} onInput={e => updateImportLine(i, 'prix_achat', parseFloat(e.target.value) || 0)} disabled={l.skip} min="0" step="0.01" /></td>
+                          <td class="text-right">
+                            {l.is_new ? (
+                              <input type="number" class="input input-bordered input-xs w-20 text-right" value={l.prix_vente_1} onInput={e => updateImportLine(i, 'prix_vente_1', parseFloat(e.target.value) || 0)} disabled={l.skip} min="0" step="0.01" />
+                            ) : <span class="text-xs text-base-content/40">--</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Raw text */}
+                <details class="collapse collapse-arrow bg-base-200 mb-4">
+                  <summary class="collapse-title text-xs font-medium py-2 min-h-0">{t('rawExtractedText') || 'Raw Text'}</summary>
+                  <div class="collapse-content">
+                    <pre class="text-[10px] whitespace-pre-wrap max-h-40 overflow-auto">{importParseResult.document ? importParseResult.document.raw_text : ''}</pre>
+                  </div>
+                </details>
+
+                <div class="flex justify-between">
+                  <button class="btn btn-ghost btn-sm" onClick={() => { setImportStep('upload'); setImportFile(null) }}>{t('back') || 'Back'}</button>
+                  <button class="btn btn-primary btn-sm" onClick={handleImportConfirm} disabled={importLoading || importLines.filter(l => !l.skip).length === 0}>
+                    {importLoading && <span class="loading loading-spinner loading-xs"></span>}
+                    {t('createPurchase') || 'Create Purchase'} ({importLines.filter(l => !l.skip).length})
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Done step */}
+            {importStep === 'done' && importResult && (
+              <div class="text-center py-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-14 w-14 text-success mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 class="text-lg font-bold mb-3">{t('importSuccess') || 'Import Successful!'}</h3>
+                <div class="grid grid-cols-3 gap-3 max-w-sm mx-auto mb-4">
+                  <div><div class="text-xs text-base-content/60">Ref</div><div class="font-bold">{importResult.purchase_ref}</div></div>
+                  <div><div class="text-xs text-base-content/60">{t('lines') || 'Lines'}</div><div class="font-bold">{importResult.lines_imported}</div></div>
+                  <div><div class="text-xs text-base-content/60">{t('new') || 'New'}</div><div class="font-bold text-warning">{importResult.products_created}</div></div>
+                </div>
+                <div class="flex justify-center gap-2">
+                  <button class="btn btn-primary btn-sm" onClick={() => { setImportOpen(false); load() }}>{t('back') || 'Close'}</button>
+                  <button class="btn btn-ghost btn-sm" onClick={resetImport}>{t('importAnother') || 'Import Another'}</button>
+                </div>
+              </div>
+            )}
+          </div>
+          <form method="dialog" class="modal-backdrop"><button onClick={() => setImportOpen(false)}>close</button></form>
+        </dialog>
+      )}
+
+      {phoneScanOpen && (
+        <RemoteScanner
+          onScan={() => {}}
+          onPhoto={(file) => {
+            // Auto-trigger import flow with the received photo
+            resetImport()
+            setImportFile(file)
+            setImportOpen(true)
+            // Auto-parse after a tick so state is settled
+            setTimeout(async () => {
+              setImportLoading(true); setImportError('')
+              try {
+                const res = await api.parsePurchaseDocument(file)
+                setImportParseResult(res)
+                setImportLines((res.lines || []).map((l, i) => ({
+                  _idx: i, product_id: l.product_id || '', product_name: l.product_name || '',
+                  name: l.name || '', barcode: l.barcode || '', qty: l.qty || 0,
+                  prix_achat: l.unit_price || 0, prix_vente_1: 0, vat: l.vat || 19,
+                  is_new: l.is_new, confidence: l.confidence || 0, candidates: l.candidates || [], skip: false,
+                })))
+                if (res.document && res.document.supplier_invoice) setImportSupplierInvoice(res.document.supplier_invoice)
+                setImportNote(t('importedFromDocument') + ': ' + file.name)
+                setImportStep('review')
+              } catch (err) { setImportError(err.message) }
+              finally { setImportLoading(false) }
+            }, 100)
+          }}
+          onClose={() => setPhoneScanOpen(false)}
+        />
+      )}
     </Layout>
   )
 }

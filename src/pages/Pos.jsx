@@ -11,6 +11,7 @@ import {
   getConnection, tryAutoConnect,
 } from '../lib/webusbPrint'
 import { QuickAddProductModal } from '../components/QuickAddProductModal'
+import RemoteScanner from '../components/RemoteScanner'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -290,7 +291,7 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t, store }) {
         </div>
 
         <div class="pos-pay-total mb-4">
-          <span class="text-sm font-semibold text-base-content/80">{store.use_vat ? t('totalTTC') : t('purchaseTotal')}</span>
+          <span class="text-sm font-semibold text-base-content/80">{store.use_vat_sale ? t('totalTTC') : t('purchaseTotal')}</span>
           <span class={`text-2xl font-extrabold font-mono ${total < 0 ? 'text-error' : 'text-primary'}`}>{fmt(total)}</span>
         </div>
 
@@ -655,6 +656,9 @@ export default function Pos({ path }) {
   // Touch numpad
   const [numpadKey, setNumpadKey] = useState(null)       // line _key being edited via numpad
   const [numpadVal, setNumpadVal] = useState('')
+
+  // Remote phone scanner
+  const [remoteScanOpen, setRemoteScanOpen] = useState(false)
 
   // Auto-submit barcode (scanner detection — auto-submit after 50ms idle)
   const scanIdleRef = useRef(null)
@@ -1106,10 +1110,11 @@ export default function Pos({ path }) {
 
   // ── Barcode scan ─────────────────────────────────────────────────────────────
 
-  async function handleScan(e) {
-    if (e.key !== 'Enter') return
-    const raw = scanInput.trim()
+  async function handleScan(e, directBarcode) {
+    if (!directBarcode && e.key !== 'Enter') return
+    const raw = (directBarcode || scanInput).trim()
     if (!raw) return
+    console.log('[handleScan]', directBarcode ? 'remote' : 'local', 'barcode:', raw)
 
     // Parse qty prefix: "3*barcode" or "3 * barcode"
     let barcode = raw
@@ -1147,6 +1152,61 @@ export default function Pos({ path }) {
         setScanError(t('productNotFound'))
       } else {
         // Always go through variant picker (if product has variants, user must select one)
+        await openVariantPicker(product, qty)
+        setScanInput('')
+        playBeep()
+        refocusScan()
+        clearTimeout(scanToastRef.current)
+        setScanToast(qty !== 1 ? `${qty} × ${product.name}` : product.name)
+        scanToastRef.current = setTimeout(() => setScanToast(''), 2000)
+      }
+    } catch {
+      setScanError(t('productNotFound'))
+    } finally {
+      setScanLoading(false)
+    }
+  }
+
+  // ── Remote barcode (from phone scanner) ────────────────────────────────────────
+
+  async function processRemoteBarcode(raw) {
+    if (!raw || !raw.trim()) return
+    raw = raw.trim()
+    setScanInput(raw)
+
+    let barcode = raw
+    let qty = 1
+    const prefixMatch = raw.match(/^(-?\d+(?:\.\d+)?)\s*\*\s*(.+)$/)
+    if (prefixMatch) {
+      qty = parseFloat(prefixMatch[1]) || 1
+      barcode = prefixMatch[2].trim()
+    }
+
+    setScanError('')
+    setScanLoading(true)
+    try {
+      const data = await api.listProducts({ q: barcode, limit: 5 })
+      const product = data.items?.find((p) => p.barcodes?.includes(barcode)) || data.items?.[0]
+      if (!product) {
+        try {
+          const v = await api.findVariantByBarcode(barcode)
+          if (v) {
+            const parentData = await api.getProduct(v.parent_product_id)
+            if (parentData) {
+              addToTicketSelecting(parentData, qty, v)
+              setScanInput('')
+              playBeep()
+              refocusScan()
+              const attrStr = v.attributes ? Object.values(v.attributes).join(', ') : ''
+              clearTimeout(scanToastRef.current)
+              setScanToast(qty !== 1 ? `${qty} × ${parentData.name} (${attrStr})` : `${parentData.name} (${attrStr})`)
+              scanToastRef.current = setTimeout(() => setScanToast(''), 2000)
+              return
+            }
+          }
+        } catch {}
+        setScanError(t('productNotFound'))
+      } else {
         await openVariantPicker(product, qty)
         setScanInput('')
         playBeep()
@@ -1684,6 +1744,14 @@ export default function Pos({ path }) {
           <span class="hidden sm:inline">{t('searchProduct')}</span>
           <kbd class="kbd kbd-xs hidden md:inline-flex">F2</kbd>
         </button>
+        {hasFeature('remote_scanner') && (
+          <button class="btn btn-outline gap-1.5" style="height:3.25rem;border-radius:0.75rem" onClick={() => setRemoteScanOpen(true)} title={t('remoteScan')}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+            </svg>
+            <span class="hidden sm:inline">{t('remoteScan')}</span>
+          </button>
+        )}
         {(favorites.length > 0 || categories.length > 0 || isTenantAdmin()) && (
           <button class="btn btn-outline gap-1.5" style="height:3.25rem;border-radius:0.75rem" onClick={() => setCatalogOpen(true)}>
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -1750,7 +1818,7 @@ export default function Pos({ path }) {
                   <th class="text-center w-20">{t('qty')}</th>
                   <th class="text-end w-28">{store.default_sale_price === 2 ? t('prixVente2') : store.default_sale_price === 3 ? t('prixVente3') : t('prixVente1')}</th>
                   <th class="text-end w-24">{t('discount')}</th>
-                  <th class="text-end w-28">{store.use_vat ? t('totalTTC') : t('purchaseTotal')}</th>
+                  <th class="text-end w-28">{store.use_vat_sale ? t('totalTTC') : t('purchaseTotal')}</th>
                   <th class="w-10"></th>
                 </tr>
               </thead>
@@ -1909,7 +1977,7 @@ export default function Pos({ path }) {
               </div>
             )}
 
-            {store.use_vat && (
+            {store.use_vat_sale && (
             <div class="flex justify-between text-sm py-0.5">
               <span class="text-base-content/70">{t('subtotalHT')}</span>
               <span class="font-mono font-medium">{fmt(totalHT)}</span>
@@ -1917,13 +1985,13 @@ export default function Pos({ path }) {
             )}
 
             {/* VAT breakdown */}
-            {store.use_vat && Object.entries(vatBreakdown).map(([rate, amount]) => (
+            {store.use_vat_sale && Object.entries(vatBreakdown).map(([rate, amount]) => (
               <div key={rate} class="flex justify-between text-sm py-0.5">
                 <span class="text-base-content/70">{t('totalVAT')} {rate}%</span>
                 <span class="font-mono text-warning font-medium">{fmt(amount)}</span>
               </div>
             ))}
-            {store.use_vat && totalVAT === 0 && (
+            {store.use_vat_sale && totalVAT === 0 && (
               <div class="flex justify-between text-sm py-0.5">
                 <span class="text-base-content/70">{t('totalVAT')}</span>
                 <span class="font-mono text-base-content/50">0.00</span>
@@ -1935,7 +2003,7 @@ export default function Pos({ path }) {
 
             {/* ── Total TTC (gradient banner) ── */}
             <div class="pos-summary-total rounded-xl">
-              <span class="pos-total-label">{store.use_vat ? t('totalTTC') : t('purchaseTotal')}</span>
+              <span class="pos-total-label">{store.use_vat_sale ? t('totalTTC') : t('purchaseTotal')}</span>
               <span class={`pos-total-amount ${total < 0 ? 'text-red-200' : ''}`}>{fmt(total)}</span>
             </div>
 
@@ -2679,6 +2747,13 @@ export default function Pos({ path }) {
           </div>
           <div class="modal-backdrop" onClick={() => { setVariantPickerOpen(false); refocusScan() }} />
         </dialog>
+      )}
+
+      {remoteScanOpen && (
+        <RemoteScanner
+          onScan={(barcode) => processRemoteBarcode(barcode)}
+          onClose={() => setRemoteScanOpen(false)}
+        />
       )}
 
       </div>)}

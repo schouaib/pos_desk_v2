@@ -337,6 +337,89 @@ export const api = {
   getLowStock: (params) => request('GET', `/tenant/purchases/low-stock?${new URLSearchParams(params)}`),
   getPurchaseStats: (params) => request('GET', `/tenant/purchases/stats?${new URLSearchParams(params)}`),
 
+  // Purchase Document Import — fully local via PaddleOCR (localhost:5050)
+  parsePurchaseDocument: async (file) => {
+    const OCR_URL = 'http://localhost:5050'
+
+    const ocrForm = new FormData()
+    ocrForm.append('image', file, file.name)
+    let ocrData
+    try {
+      const ocrRes = await fetch(`${OCR_URL}/ocr/purchase`, { method: 'POST', body: ocrForm })
+      if (!ocrRes.ok) throw new Error('OCR failed')
+      ocrData = await ocrRes.json()
+    } catch (err) {
+      throw new Error('PaddleOCR server unreachable — make sure it is running on port 5050')
+    }
+
+    const meta = ocrData.metadata || {}
+    const ocrDoc = {
+      supplier_name: meta.supplier_name || '',
+      supplier_invoice: meta.invoice_number || '',
+      raw_text: ocrData.raw_text || '',
+      lines: (ocrData.items || []).map(item => ({
+        name: item.name || '',
+        barcode: '',
+        qty: item.qty || 0,
+        unit_price: item.unit_price || 0,
+        vat: 19,
+      })),
+    }
+
+    // Send to backend for product matching against existing inventory
+    try {
+      const matchResult = await request('POST', '/tenant/purchases/import/parse', {
+        ocr_text: '__pre_parsed__',
+        filename: file.name,
+        pre_parsed: ocrDoc,
+      })
+      // Backend returns matched lines with product_id, is_new, confidence, candidates
+      return {
+        lines: (matchResult.lines || []).map(ml => ({
+          product_id: ml.product_id || '',
+          product_name: ml.product_name || '',
+          name: ml.name || '',
+          barcode: ml.barcode || '',
+          qty: ml.qty || 0,
+          unit_price: ml.unit_price || 0,
+          vat: ml.vat || 19,
+          is_new: ml.is_new !== false,
+          confidence: ml.confidence || 0,
+          candidates: ml.candidates || [],
+        })),
+        document: {
+          supplier_name: ocrDoc.supplier_name,
+          supplier_invoice: ocrDoc.supplier_invoice,
+          raw_text: ocrDoc.raw_text,
+          warnings: matchResult.document?.warnings || [],
+        },
+      }
+    } catch {
+      // Fallback: return unmatched lines if backend matching fails
+      return {
+        lines: ocrDoc.lines.map(item => ({
+          product_id: '',
+          product_name: '',
+          name: item.name,
+          barcode: item.barcode,
+          qty: item.qty,
+          unit_price: item.unit_price,
+          vat: 19,
+          is_new: true,
+          confidence: 0,
+          candidates: [],
+        })),
+        document: {
+          supplier_name: ocrDoc.supplier_name,
+          supplier_invoice: ocrDoc.supplier_invoice,
+          raw_text: ocrDoc.raw_text,
+          warnings: [],
+        },
+      }
+    }
+  },
+  confirmPurchaseImport: (body) => request('POST', '/tenant/purchases/import/confirm', body),
+
   // Tax Declarations (G50, G50A, G11, G12, G20)
   getDeclarationG50: (params) => request('GET', `/tenant/declarations/g50?${new URLSearchParams(params)}`),
   getDeclarationG50A: (params) => request('GET', `/tenant/declarations/g50a?${new URLSearchParams(params)}`),
@@ -370,6 +453,10 @@ export const api = {
   updateFacturationStatus: (id, body) => request('PATCH', `/tenant/facturation/${encodeURIComponent(id)}/status`, body),
   createAvoir: (id, body) => request('POST', `/tenant/facturation/${encodeURIComponent(id)}/avoir`, body),
   payFacture: (id, body) => request('POST', `/tenant/facturation/${encodeURIComponent(id)}/pay`, body),
+
+  // Remote Scanner
+  createScanSession: () => request('POST', '/tenant/scan/session'),
+  deleteScanSession: (token) => request('POST', '/tenant/scan/session/delete', { token }),
 
   // Folders
   listFolders: () => request('GET', '/tenant/folders'),

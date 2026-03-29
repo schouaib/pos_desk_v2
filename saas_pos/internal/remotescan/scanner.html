@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>CiPOSdz Scanner</title>
+<link rel="manifest" href="/scan/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#6366f1">
+<link rel="apple-touch-icon" href="/scan/icon-192.png">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#fff;font-family:-apple-system,system-ui,sans-serif;height:100dvh;display:flex;flex-direction:column}
+#status{display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:14px}
+#status .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.dot-ok{background:#22c55e;box-shadow:0 0 6px #22c55e}
+.dot-wait{background:#eab308;animation:pulse 1.5s infinite}
+.dot-err{background:#ef4444}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+#tabs{display:flex;gap:0;padding:0 16px;padding-top:4px}
+.tab{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;border:2px solid #333;background:#111;color:#aaa;cursor:pointer;border-radius:10px 10px 0 0;border-bottom:none}
+.tab.active{background:#1a1a2e;color:#fff;border-color:#6366f1;border-bottom:2px solid #1a1a2e}
+
+/* Manual input */
+#manual{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:16px}
+#manual h2{font-size:20px;font-weight:700}
+#manual p{font-size:14px;color:#aaa;text-align:center}
+#barcode-input{width:100%;max-width:400px;padding:16px 20px;font-size:20px;font-family:monospace;border-radius:12px;border:2px solid #333;background:#111;color:#fff;text-align:center;outline:none}
+#barcode-input:focus{border-color:#6366f1}
+#send-btn{width:100%;max-width:400px;padding:14px;font-size:16px;font-weight:600;border:none;border-radius:12px;background:#6366f1;color:#fff;cursor:pointer}
+#send-btn:active{background:#4f46e5}
+#scan-count{font-size:13px;color:#888;margin-top:4px}
+#history-list{list-style:none;max-height:200px;overflow-y:auto;width:100%;max-width:400px}
+#history-list li{padding:8px 12px;font-family:monospace;font-size:14px;border-bottom:1px solid #222;display:flex;justify-content:space-between;align-items:center}
+#history-list li .time{font-size:11px;color:#666;font-family:sans-serif}
+.flash{animation:flashGreen .3s}
+@keyframes flashGreen{0%{background:#22c55e33}100%{background:transparent}}
+
+/* Camera mode */
+#camera-section{flex:1;display:none;flex-direction:column;overflow:hidden}
+#reader{flex:1;width:100%}
+#reader video{object-fit:cover!important}
+#cam-bottom{padding:12px 16px;background:rgba(0,0,0,.7);text-align:center}
+#cam-last{font-size:18px;font-weight:600;min-height:24px;word-break:break-all}
+#cam-count{font-size:12px;color:#aaa;margin-top:4px}
+
+/* Photo mode */
+#photo-section{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:16px}
+#photo-section h2{font-size:20px;font-weight:700}
+#photo-section p{font-size:14px;color:#aaa;text-align:center}
+#photo-preview{max-width:100%;max-height:40vh;border-radius:12px;display:none;border:2px solid #333}
+#photo-input{display:none}
+.photo-btn{width:100%;max-width:400px;padding:14px;font-size:16px;font-weight:600;border:none;border-radius:12px;cursor:pointer;text-align:center}
+#take-photo-btn{background:#6366f1;color:#fff}
+#take-photo-btn:active{background:#4f46e5}
+#send-photo-btn{background:#22c55e;color:#fff;display:none}
+#send-photo-btn:active{background:#16a34a}
+#send-photo-btn:disabled{background:#333;color:#666;cursor:not-allowed}
+#photo-status{font-size:13px;color:#888;min-height:20px}
+#retake-btn{background:transparent;color:#aaa;border:2px solid #333;display:none}
+</style>
+</head>
+<body>
+
+<div id="status"><span class="dot dot-wait"></span><span id="status-text">Connecting...</span></div>
+
+<div id="tabs">
+  <div class="tab" id="tab-camera" onclick="switchMode('camera')">Barcode</div>
+  <div class="tab active" id="tab-manual" onclick="switchMode('manual')">Keyboard</div>
+  <div class="tab" id="tab-photo" onclick="switchMode('photo')">Photo</div>
+</div>
+
+<div id="manual">
+  <h2>Scan Barcode</h2>
+  <p>Type or scan a barcode with your phone's keyboard</p>
+  <input id="barcode-input" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Barcode..." autofocus />
+  <button id="send-btn" onclick="submitBarcode()">Send</button>
+  <div id="scan-count"></div>
+  <ul id="history-list"></ul>
+</div>
+
+<div id="camera-section">
+  <div id="reader"></div>
+  <div id="cam-bottom">
+    <div id="cam-last">Point camera at barcode</div>
+    <div id="cam-count"></div>
+  </div>
+</div>
+
+<div id="photo-section">
+  <h2>Invoice / BL Photo</h2>
+  <p>Take a photo of an invoice or delivery note to import into purchases</p>
+  <input type="file" id="photo-input" accept="image/*" capture="environment" />
+  <img id="photo-preview" alt="Preview" />
+  <button class="photo-btn" id="take-photo-btn" onclick="takePhoto()">Take Photo</button>
+  <button class="photo-btn" id="retake-btn" onclick="retakePhoto()">Retake</button>
+  <button class="photo-btn" id="send-photo-btn" onclick="sendPhoto()">Send to Desktop</button>
+  <div id="photo-status"></div>
+</div>
+
+<script>
+(function(){
+  var token = location.pathname.split('/').pop();
+  var wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  var wsUrl = wsProto + '//' + location.host + '/api/scan/ws/phone?token=' + token;
+
+  var statusDot = document.querySelector('#status .dot');
+  var statusText = document.getElementById('status-text');
+  var barcodeInput = document.getElementById('barcode-input');
+  var historyList = document.getElementById('history-list');
+  var scanCountEl = document.getElementById('scan-count');
+
+  var ws = null;
+  var scanCount = 0;
+  var lastBarcode = '';
+  var lastScanTime = 0;
+  var DEDUP_MS = 1500;
+  var html5QrCode = null;
+  var cameraStarted = false;
+  var photoBlob = null;
+
+  // ── WebSocket ──
+  var reconnectDelay = 1000;
+  function connect() {
+    ws = new WebSocket(wsUrl);
+    ws.onopen = function() {
+      reconnectDelay = 1000;
+      setStatus('ok', 'Connected');
+    };
+    ws.onclose = function() {
+      setStatus('wait', 'Reconnecting...');
+      setTimeout(connect, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
+    };
+    ws.onerror = function() { ws.close(); };
+    ws.onmessage = function(e) {
+      try {
+        var msg = JSON.parse(e.data);
+        if (msg.type === 'desktop_connected') setStatus('ok', 'Desktop connected');
+        if (msg.type === 'photo_received') {
+          document.getElementById('photo-status').textContent = 'Photo received by desktop!';
+          document.getElementById('send-photo-btn').disabled = false;
+          document.getElementById('send-photo-btn').textContent = 'Sent ✓';
+        }
+      } catch(_){}
+    };
+  }
+
+  function setStatus(state, text) {
+    statusDot.className = 'dot dot-' + state;
+    statusText.textContent = text;
+  }
+
+  function sendBarcode(code) {
+    code = (code || '').trim();
+    if (!code) return;
+    var now = Date.now();
+    if (code === lastBarcode && (now - lastScanTime) < DEDUP_MS) return;
+    lastBarcode = code;
+    lastScanTime = now;
+    scanCount++;
+
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'scan', barcode: code }));
+    }
+
+    scanCountEl.textContent = scanCount + ' sent';
+    var camCount = document.getElementById('cam-count');
+    if (camCount) camCount.textContent = scanCount + ' scanned';
+    var camLast = document.getElementById('cam-last');
+    if (camLast) camLast.textContent = code;
+
+    var li = document.createElement('li');
+    li.innerHTML = '<span>' + code + '</span><span class="time">' + new Date().toLocaleTimeString() + '</span>';
+    li.classList.add('flash');
+    historyList.insertBefore(li, historyList.firstChild);
+    if (historyList.children.length > 20) historyList.removeChild(historyList.lastChild);
+
+    if (navigator.vibrate) navigator.vibrate(80);
+  }
+
+  // ── Manual input ──
+  window.submitBarcode = function() {
+    var val = barcodeInput.value.trim();
+    if (val) { sendBarcode(val); barcodeInput.value = ''; }
+    barcodeInput.focus();
+  };
+
+  barcodeInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); window.submitBarcode(); }
+  });
+
+  var scanStart = 0, scanIdle = null;
+  barcodeInput.addEventListener('input', function() {
+    var val = barcodeInput.value, now = Date.now();
+    if (val.length === 1) scanStart = now;
+    clearTimeout(scanIdle);
+    if (val.length >= 4 && (now - scanStart) < 300) {
+      scanIdle = setTimeout(window.submitBarcode, 50);
+    }
+  });
+
+  // ── Mode switching ──
+  window.switchMode = function(mode) {
+    document.getElementById('tab-manual').classList.toggle('active', mode === 'manual');
+    document.getElementById('tab-camera').classList.toggle('active', mode === 'camera');
+    document.getElementById('tab-photo').classList.toggle('active', mode === 'photo');
+    document.getElementById('manual').style.display = mode === 'manual' ? 'flex' : 'none';
+    document.getElementById('camera-section').style.display = mode === 'camera' ? 'flex' : 'none';
+    document.getElementById('photo-section').style.display = mode === 'photo' ? 'flex' : 'none';
+
+    if (mode === 'camera' && !cameraStarted) startCamera();
+    if (mode === 'manual') barcodeInput.focus();
+  };
+
+  // ── Camera with html5-qrcode ──
+  function startCamera() {
+    cameraStarted = true;
+    if (typeof Html5Qrcode === 'undefined') {
+      alert('Scanner library failed to load. Use Keyboard mode.');
+      window.switchMode('manual');
+      return;
+    }
+    html5QrCode = new Html5Qrcode('reader');
+    html5QrCode.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        qrbox: function(vw, vh) {
+          return { width: Math.floor(Math.min(vw * 0.8, 350)), height: Math.floor(Math.min(vh * 0.4, 150)) };
+        },
+        aspectRatio: 1.0,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93, Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.QR_CODE,
+        ]
+      },
+      function(text) { sendBarcode(text); },
+      function() {}
+    ).catch(function(err) {
+      alert('Camera error: ' + err + '\n\nUse Keyboard mode instead.');
+      window.switchMode('manual');
+    });
+  }
+
+  // ── Photo capture ──
+  var photoInput = document.getElementById('photo-input');
+  var photoPreview = document.getElementById('photo-preview');
+  var sendPhotoBtn = document.getElementById('send-photo-btn');
+  var retakeBtn = document.getElementById('retake-btn');
+  var takePhotoBtn = document.getElementById('take-photo-btn');
+  var photoStatusEl = document.getElementById('photo-status');
+
+  window.takePhoto = function() {
+    photoInput.click();
+  };
+
+  photoInput.addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+
+    photoStatusEl.textContent = 'Compressing...';
+
+    // Compress image on canvas (max 1600px, JPEG 80%)
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var img = new Image();
+      img.onload = function() {
+        var maxW = 1600, maxH = 1600;
+        var w = img.width, h = img.height;
+        if (w > maxW || h > maxH) {
+          var ratio = Math.min(maxW / w, maxH / h);
+          w = Math.floor(w * ratio);
+          h = Math.floor(h * ratio);
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function(blob) {
+          photoBlob = blob;
+          photoPreview.src = URL.createObjectURL(blob);
+          photoPreview.style.display = 'block';
+          takePhotoBtn.style.display = 'none';
+          sendPhotoBtn.style.display = 'block';
+          sendPhotoBtn.disabled = false;
+          sendPhotoBtn.textContent = 'Send to Desktop';
+          retakeBtn.style.display = 'block';
+          photoStatusEl.textContent = (blob.size / 1024).toFixed(0) + ' KB';
+        }, 'image/jpeg', 0.80);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  window.retakePhoto = function() {
+    photoBlob = null;
+    photoPreview.style.display = 'none';
+    sendPhotoBtn.style.display = 'none';
+    retakeBtn.style.display = 'none';
+    takePhotoBtn.style.display = 'block';
+    photoStatusEl.textContent = '';
+    photoInput.value = '';
+  };
+
+  window.sendPhoto = function() {
+    if (!photoBlob || !ws || ws.readyState !== 1) {
+      photoStatusEl.textContent = 'Not connected to desktop';
+      return;
+    }
+    sendPhotoBtn.disabled = true;
+    sendPhotoBtn.textContent = 'Sending...';
+    photoStatusEl.textContent = 'Uploading...';
+
+    // Convert blob to base64 and send as JSON
+    var reader = new FileReader();
+    reader.onload = function() {
+      var base64 = reader.result.split(',')[1]; // remove data:image/jpeg;base64,
+      ws.send(JSON.stringify({
+        type: 'photo',
+        data: base64,
+        filename: 'invoice_' + new Date().toISOString().slice(0,10) + '.jpg'
+      }));
+      photoStatusEl.textContent = 'Sent! Waiting for desktop...';
+      if (navigator.vibrate) navigator.vibrate(100);
+    };
+    reader.readAsDataURL(photoBlob);
+  };
+
+  // ── Init ──
+  connect();
+  barcodeInput.focus();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/scan/sw.js').catch(function(){});
+  }
+})();
+</script>
+</body>
+</html>

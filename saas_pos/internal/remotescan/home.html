@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>CiPOSdz Scanner</title>
+<link rel="manifest" href="/scan/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#6366f1">
+<link rel="apple-touch-icon" href="/scan/icon-192.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#fff;font-family:-apple-system,system-ui,sans-serif;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}
+h1{font-size:28px;margin-bottom:8px}
+.icon{width:80px;height:80px;margin-bottom:24px;border-radius:20px}
+p{color:#aaa;font-size:15px;line-height:1.6;max-width:320px}
+.step{margin-top:32px;text-align:left;max-width:320px}
+.step div{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px}
+.num{width:28px;height:28px;border-radius:50%;background:#6366f1;color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step span{font-size:14px;color:#ccc;padding-top:3px}
+</style>
+</head>
+<body>
+<img src="/scan/icon-192.png" class="icon" alt="CiPOSdz">
+<h1>CiPOSdz Scanner</h1>
+<p>Remote barcode scanner for your POS desktop app</p>
+
+<div class="step">
+  <div><span class="num">1</span><span>Open CiPOSdz on your desktop</span></div>
+  <div><span class="num">2</span><span>Go to POS and tap the phone scanner button</span></div>
+  <div><span class="num">3</span><span>Scan the QR code shown on screen with this phone</span></div>
+</div>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/scan/sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>

@@ -80,7 +80,10 @@ func RequireActivation() fiber.Handler {
 			path == "/api/super-admin/login" ||
 			path == "/api/plans" || path == "/api/signup" ||
 			path == "/api/tenant/auth/login" ||
-			strings.HasPrefix(path, "/api/activation/") {
+			strings.HasPrefix(path, "/api/activation/") ||
+			strings.HasPrefix(path, "/scan/") ||
+			path == "/api/scan/ws/phone" ||
+			path == "/api/scan/ws/desktop" {
 			return c.Next()
 		}
 
