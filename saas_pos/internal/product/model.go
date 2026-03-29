@@ -171,9 +171,10 @@ type BulkImportResult struct {
 }
 
 type MovementsResult struct {
-	Items []Movement `json:"items"`
-	Total int64      `json:"total"`
-	Page  int        `json:"page"`
-	Limit int        `json:"limit"`
-	Pages int        `json:"pages"`
+	Items  []Movement `json:"items"`
+	Total  int64      `json:"total"`
+	SumQty float64    `json:"sum_qty"`
+	Page   int        `json:"page"`
+	Limit  int        `json:"limit"`
+	Pages  int        `json:"pages"`
 }

@@ -4,6 +4,7 @@ import { Modal, openModal, closeModal } from '../components/Modal'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 import { hasPerm, hasFeature } from '../lib/auth'
+import { QuickAddProductModal } from '../components/QuickAddProductModal'
 
 const STATUS_BADGE = {
   draft:                 'badge-warning',
@@ -14,17 +15,9 @@ const STATUS_BADGE = {
 
 const emptyLine = { product_id: '', variant_id: '', variant_name: '', product_name: '', qty: 1, prix_achat: 0, remise: 0, prix_vente_1: 0, prix_vente_2: 0, prix_vente_3: 0, lot: '', expiry_date: '' }
 
-function NumInput({ label, value, onChange }) {
-  return (
-    <label class="form-control">
-      {label && <span class="label-text text-xs">{label}</span>}
-      <input type="number" min="0" step="any"
-        class="input input-bordered input-sm w-24"
-        value={value}
-        onInput={(e) => onChange(Number(e.target.value))} />
-    </label>
-  )
-}
+const KBD = ({ children }) => (
+  <kbd class="kbd kbd-xs bg-base-200 text-base-content/75 border-base-300 font-mono">{children}</kbd>
+)
 
 export default function Purchases({ path }) {
   const { t } = useI18n()
@@ -35,6 +28,7 @@ export default function Purchases({ path }) {
   const canPay      = hasPerm('purchases', 'pay')
   const canWrite    = canAdd || canEdit || canDelete || canValidate || canPay
   const canBatches  = hasFeature('batch_tracking')
+  const canAddProduct = hasPerm('products', 'add')
 
   const [result, setResult] = useState({ items: [], total: 0, page: 1, limit: 10, pages: 0 })
   const [page, setPage] = useState(1)
@@ -72,6 +66,8 @@ export default function Purchases({ path }) {
   const [dialogLoading, setDialogLoading] = useState(false)
   const lastDialogSearchRef = useRef('')
 
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
+
   // Purchase variant picker
   const [purchaseVariantProduct, setPurchaseVariantProduct] = useState(null)
   const [purchaseVariants, setPurchaseVariants] = useState([])
@@ -108,6 +104,7 @@ export default function Purchases({ path }) {
 
   // VAT setting
   const [useVAT, setUseVAT] = useState(false)
+  const [visiblePrices, setVisiblePrices] = useState({ pv1: true, pv2: true, pv3: true })
 
   const brandMap = useMemo(() => new Map(brands.map((b) => [b.id, b.name])), [brands])
   const catMap   = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories])
@@ -147,7 +144,7 @@ export default function Purchases({ path }) {
     api.listSuppliers().then(d => { if (!cancelled) setSuppliers(d) }).catch(() => {})
     api.listBrands().then(d => { if (!cancelled) setBrands(d) }).catch(() => {})
     api.listCategories().then(d => { if (!cancelled) setCategories(d) }).catch(() => {})
-    api.getStoreSettings().then(d => { if (!cancelled) setUseVAT(!!d?.use_vat) }).catch(() => {})
+    api.getStoreSettings().then(d => { if (!cancelled) { setUseVAT(!!d?.use_vat); if (d?.visible_prices) setVisiblePrices(d.visible_prices) } }).catch(() => {})
     return () => { cancelled = true }
   }, [])
 
@@ -184,7 +181,13 @@ export default function Purchases({ path }) {
         return
       }
     } catch {}
-    setLineForm({
+    function openLineDialog(form) {
+      setLineForm(form)
+      document.getElementById('product-dialog')?.close()
+      setTimeout(() => document.getElementById('line-dialog')?.showModal(), 100)
+    }
+
+    openLineDialog({
       product_id:   p.id,
       variant_id:   '',
       variant_name: '',
@@ -197,12 +200,19 @@ export default function Purchases({ path }) {
       lot:          '',
       expiry_date:  '',
     })
-    document.getElementById('product-dialog')?.close()
+  }
+
+  function openLineDialogWith(form) {
+    setLineForm(form)
+    setTimeout(() => document.getElementById('line-dialog')?.showModal(), 100)
   }
 
   function selectPurchaseVariant(v) {
     const attrStr = v.attributes ? Object.values(v.attributes).join(', ') : ''
-    setLineForm({
+    document.getElementById('purchase-variant-dialog')?.close()
+    setPurchaseVariantProduct(null)
+    setPurchaseVariants([])
+    openLineDialogWith({
       product_id:   purchaseVariantProduct.id,
       variant_id:   v.id,
       variant_name: attrStr,
@@ -215,14 +225,14 @@ export default function Purchases({ path }) {
       lot:          '',
       expiry_date:  '',
     })
-    document.getElementById('purchase-variant-dialog')?.close()
-    setPurchaseVariantProduct(null)
-    setPurchaseVariants([])
   }
 
   function selectPurchaseNoVariant() {
     const p = purchaseVariantProduct
-    setLineForm({
+    document.getElementById('purchase-variant-dialog')?.close()
+    setPurchaseVariantProduct(null)
+    setPurchaseVariants([])
+    openLineDialogWith({
       product_id:   p.id,
       variant_id:   '',
       variant_name: '',
@@ -235,9 +245,12 @@ export default function Purchases({ path }) {
       lot:          '',
       expiry_date:  '',
     })
-    document.getElementById('purchase-variant-dialog')?.close()
-    setPurchaseVariantProduct(null)
-    setPurchaseVariants([])
+  }
+
+  function confirmLineDialog() {
+    if (!lineForm.product_id || lineForm.qty <= 0) return
+    addLine()
+    document.getElementById('line-dialog')?.close()
   }
 
   function addLine() {
@@ -568,227 +581,265 @@ export default function Purchases({ path }) {
 
   const { items, pages } = result
 
+  // Keyboard shortcuts for purchase form
+  useEffect(() => {
+    if (!formOpen) return
+    function handleKey(e) {
+      const lineDialog = document.getElementById('line-dialog')
+      const lineDialogOpen = lineDialog?.open
+
+      // F3 works inside line dialog to confirm
+      if (e.key === 'F3' && lineDialogOpen && lineForm.product_id) {
+        e.preventDefault()
+        confirmLineDialog()
+        return
+      }
+
+      // Block other shortcuts when any dialog is open
+      const dialog = document.querySelector('dialog[open]')
+      if (dialog) return
+
+      const tag = e.target.tagName
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+
+      if (e.key === 'F2') {
+        e.preventDefault()
+        openProductDialog()
+      } else if (e.key === 'F4') {
+        e.preventDefault()
+        handleSave()
+      } else if (e.key === 'F5') {
+        e.preventDefault()
+        openSupplierDialog()
+      } else if (e.key === 'F6') {
+        e.preventDefault()
+        openLowStock()
+      } else if (e.key === 'Escape' && !isInput) {
+        e.preventDefault()
+        setFormOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [formOpen, lineForm.product_id])
+
+  // Shortcuts help toggle
+  const [showKbHelp, setShowKbHelp] = useState(false)
+
   // ── Purchase form view ──────────────────────────────────────────────────────
   if (formOpen) {
+    const pvCount = (visiblePrices.pv1 ? 1 : 0) + (visiblePrices.pv2 ? 1 : 0) + (visiblePrices.pv3 ? 1 : 0)
+    const colCount = 5 + pvCount + (showEffective ? 1 : 0) + (canBatches ? 2 : 0)
     return (
       <Layout currentPath={path}>
-        <div class="flex items-center gap-3 mb-6">
-          <button class="btn btn-sm btn-ghost" onClick={() => setFormOpen(false)}>← {t('back')}</button>
-          <h2 class="text-xl font-bold">{formTitle}</h2>
-        </div>
+        <div class="flex flex-col h-[calc(100vh-80px)]">
 
-        {/* Header fields */}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <label class="form-control">
-            <span class="label-text">{t('purchaseSupplier')} *</span>
-            <div class="flex gap-2">
-              <input class="input input-bordered input-sm flex-1" readOnly
-                value={supplierName}
-                placeholder={t('selectSupplier')}
-                onClick={openSupplierDialog} />
-              <button class="btn btn-outline btn-sm" onClick={openSupplierDialog}>{t('search')}</button>
+          {/* ── Top bar ── */}
+          <div class="flex items-center justify-between pb-3 border-b border-base-200 mb-3 flex-shrink-0">
+            <div class="flex items-center gap-3">
+              <button class="btn btn-sm btn-ghost" onClick={() => setFormOpen(false)}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+              </button>
+              <h2 class="text-lg font-bold">{formTitle}</h2>
+              {supplierName && <span class="badge badge-outline badge-sm">{supplierName}</span>}
             </div>
-          </label>
-          <label class="form-control">
-            <span class="label-text">{t('supplierInvoice')}</span>
-            <input class="input input-bordered input-sm" value={supplierInvoice}
-              onInput={(e) => setSupplierInvoice(e.target.value)} />
-          </label>
-          <label class="form-control">
-            <span class="label-text">{t('expectedDelivery')}</span>
-            <input type="date" class="input input-bordered input-sm" value={expectedDelivery}
-              onInput={(e) => setExpectedDelivery(e.target.value)} />
-          </label>
-          <label class="form-control">
-            <span class="label-text">{t('purchaseNote')}</span>
-            <input class="input input-bordered input-sm" value={note}
-              onInput={(e) => setNote(e.target.value)} />
-          </label>
-        </div>
+            <div class="flex items-center gap-2">
+              <button class="btn btn-xs btn-ghost text-base-content/75" onClick={() => setShowKbHelp(v => !v)} title="Keyboard shortcuts">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M7.5 6.75h9a2.25 2.25 0 012.25 2.25v6a2.25 2.25 0 01-2.25 2.25h-9A2.25 2.25 0 015.25 15V9a2.25 2.25 0 012.25-2.25zm1.5 3h.008v.008H9V9.75zm0 3h.008v.008H9v-.008zm3-3h.008v.008H12V9.75zm0 3h.008v.008H12v-.008zm3-3h.008v.008H15V9.75zm0 3h.008v.008H15v-.008z" /></svg>
+              </button>
+              <button class="btn btn-primary btn-sm gap-1" onClick={handleSave}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                {t('saveChanges')} <KBD>F4</KBD>
+              </button>
+            </div>
+          </div>
 
-        {/* Add product row */}
-        <div class="card bg-base-100 shadow p-4 mb-4">
-          <div class="flex items-end gap-2 flex-wrap">
-            <div class="form-control flex-1 min-w-48">
-              <span class="label-text text-xs mb-1">{t('searchAddProduct')}</span>
-              <div class="flex gap-2">
-                <input class="input input-bordered input-sm flex-1" readOnly
-                  value={lineForm.product_name || ''}
-                  placeholder={t('searchAddProduct')}
-                  onClick={openProductDialog} />
-                <button class="btn btn-outline btn-sm" onClick={openProductDialog}>{t('search')}</button>
+          {/* ── Shortcuts help popover ── */}
+          {showKbHelp && (
+            <div class="bg-base-200 rounded-lg p-3 mb-3 flex-shrink-0 animate-fadeIn">
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1 text-xs">
+                <div class="flex justify-between gap-2"><span>{t('searchAddProduct')}</span> <KBD>F2</KBD></div>
+                <div class="flex justify-between gap-2"><span>{t('addToList')}</span> <KBD>F3</KBD></div>
+                <div class="flex justify-between gap-2"><span>{t('saveChanges')}</span> <KBD>F4</KBD></div>
+                <div class="flex justify-between gap-2"><span>{t('purchaseSupplier')}</span> <KBD>F5</KBD></div>
+                <div class="flex justify-between gap-2"><span>{t('lowStockSuggest')}</span> <KBD>F6</KBD></div>
+                <div class="flex justify-between gap-2"><span>{t('back')}</span> <KBD>Esc</KBD></div>
               </div>
             </div>
-            {lineForm.product_id && (
-              <>
-                <NumInput label={t('qty')} value={lineForm.qty}
-                  onChange={(v) => setLineForm((f) => ({ ...f, qty: v }))} />
-                <NumInput label={t('prixAchat')} value={lineForm.prix_achat}
-                  onChange={(v) => setLineForm((f) => ({ ...f, prix_achat: v }))} />
-                <NumInput label={t('remise') + ' %'} value={lineForm.remise}
-                  onChange={(v) => setLineForm((f) => ({ ...f, remise: v }))} />
-                <NumInput label={t('prixVente1')} value={lineForm.prix_vente_1}
-                  onChange={(v) => setLineForm((f) => ({ ...f, prix_vente_1: v }))} />
-                <NumInput label={t('prixVente2')} value={lineForm.prix_vente_2}
-                  onChange={(v) => setLineForm((f) => ({ ...f, prix_vente_2: v }))} />
-                <NumInput label={t('prixVente3')} value={lineForm.prix_vente_3}
-                  onChange={(v) => setLineForm((f) => ({ ...f, prix_vente_3: v }))} />
-                {canBatches && (
-                  <>
-                    <label class="form-control">
-                      <span class="label-text text-xs">{t('batchNumber')}</span>
-                      <input type="text" class="input input-bordered input-sm w-28"
-                        value={lineForm.lot || ''}
-                        onInput={(e) => setLineForm((f) => ({ ...f, lot: e.target.value }))} />
-                    </label>
-                    <label class="form-control">
-                      <span class="label-text text-xs">{t('expiryDate')}</span>
-                      <input type="date" class="input input-bordered input-sm w-36"
-                        value={lineForm.expiry_date || ''}
-                        onInput={(e) => setLineForm((f) => ({ ...f, expiry_date: e.target.value }))} />
-                    </label>
-                  </>
-                )}
-                <button class="btn btn-primary btn-sm self-end" onClick={addLine}>{t('addToList')}</button>
-              </>
+          )}
+
+          {formError && (
+            <div class="alert alert-error py-2 text-sm mb-3 flex-shrink-0">{formError}</div>
+          )}
+
+          {/* ── Header fields (compact row) ── */}
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 flex-shrink-0">
+            <div class="form-control" onClick={openSupplierDialog}>
+              <span class="label-text text-[11px] text-base-content/80 uppercase tracking-wide">{t('purchaseSupplier')} * <KBD>F5</KBD></span>
+              <input class="input input-bordered input-sm cursor-pointer" readOnly
+                value={supplierName} placeholder={t('selectSupplier')} />
+            </div>
+            <label class="form-control">
+              <span class="label-text text-[11px] text-base-content/80 uppercase tracking-wide">{t('supplierInvoice')}</span>
+              <input class="input input-bordered input-sm" value={supplierInvoice}
+                onInput={(e) => setSupplierInvoice(e.target.value)} />
+            </label>
+            <label class="form-control">
+              <span class="label-text text-[11px] text-base-content/80 uppercase tracking-wide">{t('expectedDelivery')}</span>
+              <input type="date" class="input input-bordered input-sm" value={expectedDelivery}
+                onInput={(e) => setExpectedDelivery(e.target.value)} />
+            </label>
+            <label class="form-control">
+              <span class="label-text text-[11px] text-base-content/80 uppercase tracking-wide">{t('purchaseNote')}</span>
+              <input class="input input-bordered input-sm" value={note}
+                onInput={(e) => setNote(e.target.value)} />
+            </label>
+          </div>
+
+          {/* ── Product search bar (single line) ── */}
+          <div class="flex gap-2 items-center mb-3 flex-shrink-0">
+            <button class="btn btn-sm btn-outline flex-1 justify-start gap-2 font-normal text-base-content/80" onClick={openProductDialog}>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+              {t('searchAddProduct')}
+              <KBD>F2</KBD>
+            </button>
+            {!editingId && canAdd && (
+              <button class="btn btn-xs btn-ghost text-warning" onClick={openLowStock}>
+                {t('lowStockSuggest')} <KBD>F6</KBD>
+              </button>
             )}
           </div>
-          {/* Low stock suggest button */}
-          {!editingId && canAdd && (
-            <button class="btn btn-xs btn-ghost text-warning mt-2" onClick={openLowStock}>
-              {t('lowStockSuggest')}
-            </button>
-          )}
-        </div>
 
-        {/* Lines table */}
-        <div class="card bg-base-100 shadow overflow-x-auto mb-4">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>{t('productName')}</th>
-                <th class="text-end">{t('qty')}</th>
-                <th class="text-end">{t('prixAchat')}</th>
-                <th class="text-end">{t('remise')} %</th>
-                {showEffective && <th class="text-end">{t('effectivePrice')}</th>}
-                <th class="text-end">{t('prixVente1')}</th>
-                <th class="text-end">{t('prixVente2')}</th>
-                <th class="text-end">{t('prixVente3')}</th>
-                {canBatches && <th>{t('batchNumber')}</th>}
-                {canBatches && <th>{t('expiryDate')}</th>}
-                <th class="text-end">Total</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.length === 0 && (
-                <tr><td colSpan={(showEffective ? 10 : 9) + (canBatches ? 2 : 0)} class="text-center text-base-content/40 py-6">{t('noLines')}</td></tr>
-              )}
-              {lines.map((l, i) => (
-                <tr key={l.product_id}>
-                  <td class="font-medium">{l.product_name}</td>
-                  <td class="text-end">{l.qty}</td>
-                  <td class="text-end">{l.prix_achat}</td>
-                  <td class="text-end">{l.remise ? `${l.remise}%` : '-'}</td>
-                  {showEffective && <td class="text-end font-mono text-primary">{effectiveUnitPrice(l).toFixed(2)}</td>}
-                  <td class="text-end">{l.prix_vente_1}</td>
-                  <td class="text-end">{l.prix_vente_2}</td>
-                  <td class="text-end">{l.prix_vente_3}</td>
-                  {canBatches && <td>{l.lot || '-'}</td>}
-                  {canBatches && <td>{l.expiry_date ? (typeof l.expiry_date === 'string' ? l.expiry_date.slice(0, 10) : new Date(l.expiry_date).toISOString().slice(0, 10)) : '-'}</td>}
-                  <td class="text-end font-mono">{(showEffective ? l.qty * effectiveUnitPrice(l) : l.qty * l.prix_achat * (1 - (l.remise || 0) / 100)).toFixed(2)}</td>
-                  <td class="text-end">
-                    <button class="btn btn-xs btn-ghost text-error" onClick={() => removeLine(i)}>✕</button>
-                  </td>
+          {/* ── Lines table (scrollable middle area) ── */}
+          <div class="flex-1 overflow-auto min-h-0 rounded-lg border border-base-200 bg-base-100 mb-3">
+            <table class="table table-sm table-pin-rows">
+              <thead>
+                <tr class="bg-base-200/60 text-[11px] uppercase tracking-wide text-base-content/80">
+                  <th class="font-semibold">{t('productName')}</th>
+                  <th class="font-semibold text-end w-16">{t('qty')}</th>
+                  <th class="font-semibold text-end w-20">{t('prixAchat')}</th>
+                  <th class="font-semibold text-end w-16">{t('remise')} %</th>
+                  {showEffective && <th class="font-semibold text-end w-20">{t('effectivePrice')}</th>}
+                  {visiblePrices.pv1 && <th class="font-semibold text-end w-20">{t('prixVente1')}</th>}
+                  {visiblePrices.pv2 && <th class="font-semibold text-end w-20">{t('prixVente2')}</th>}
+                  {visiblePrices.pv3 && <th class="font-semibold text-end w-20">{t('prixVente3')}</th>}
+                  {canBatches && <th class="font-semibold w-20">{t('batchNumber')}</th>}
+                  {canBatches && <th class="font-semibold w-24">{t('expiryDate')}</th>}
+                  <th class="font-semibold text-end w-24">Total</th>
+                  <th class="w-8"></th>
                 </tr>
-              ))}
-            </tbody>
-            {lines.length > 0 && (
-              <tfoot>
-                {!distributeExpenses && expensesTotal > 0 && (
+              </thead>
+              <tbody>
+                {lines.length === 0 && (
                   <tr>
-                    <td colSpan={(showEffective ? 8 : 7) + (canBatches ? 2 : 0)} class="text-end">{t('purchaseExpenses')}</td>
-                    <td class="text-end font-mono">+{expensesTotal.toFixed(2)}</td>
-                    <td></td>
+                    <td colSpan={colCount} class="text-center py-12">
+                      <div class="flex flex-col items-center gap-2 text-base-content/80">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                        </svg>
+                        <p class="text-xs">{t('noLines')}</p>
+                        <p class="text-[11px]">{t('searchAddProduct')} <KBD>F2</KBD></p>
+                      </div>
+                    </td>
                   </tr>
                 )}
-                <tr>
-                  <td colSpan={(showEffective ? 8 : 7) + (canBatches ? 2 : 0)} class="text-end font-bold">{t('purchaseTotal')}</td>
-                  <td class="text-end font-bold font-mono">{grandTotal.toFixed(2)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
+                {lines.map((l, i) => {
+                  const updateLine = (field, val) => setLines(prev => prev.map((ll, j) => j === i ? { ...ll, [field]: val } : ll))
+                  const lineTotal = showEffective ? l.qty * effectiveUnitPrice(l) : l.qty * l.prix_achat * (1 - (l.remise || 0) / 100)
+                  return (
+                    <tr key={`${l.product_id}-${l.variant_id || ''}`} class="hover:bg-base-50 transition-colors group">
+                      <td class="font-medium text-sm">{l.product_name}</td>
+                      <td class="text-end"><input type="number" min="1" step="1" class="input input-bordered input-xs w-16 font-mono text-end" value={l.qty} onInput={(e) => updateLine('qty', Math.max(1, parseInt(e.target.value) || 1))} /></td>
+                      <td class="text-end"><input type="number" min="0" step="any" class="input input-bordered input-xs w-20 font-mono text-end" value={l.prix_achat} onInput={(e) => updateLine('prix_achat', parseFloat(e.target.value) || 0)} /></td>
+                      <td class="text-end"><input type="number" min="0" max="100" step="any" class="input input-bordered input-xs w-16 font-mono text-end" value={l.remise || 0} onInput={(e) => updateLine('remise', parseFloat(e.target.value) || 0)} /></td>
+                      {showEffective && <td class="text-end font-mono text-sm text-primary font-semibold">{effectiveUnitPrice(l).toFixed(2)}</td>}
+                      {visiblePrices.pv1 && <td class="text-end"><input type="number" min="0" step="any" class="input input-bordered input-xs w-20 font-mono text-end" value={l.prix_vente_1} onInput={(e) => updateLine('prix_vente_1', parseFloat(e.target.value) || 0)} /></td>}
+                      {visiblePrices.pv2 && <td class="text-end"><input type="number" min="0" step="any" class="input input-bordered input-xs w-20 font-mono text-end" value={l.prix_vente_2} onInput={(e) => updateLine('prix_vente_2', parseFloat(e.target.value) || 0)} /></td>}
+                      {visiblePrices.pv3 && <td class="text-end"><input type="number" min="0" step="any" class="input input-bordered input-xs w-20 font-mono text-end" value={l.prix_vente_3} onInput={(e) => updateLine('prix_vente_3', parseFloat(e.target.value) || 0)} /></td>}
+                      {canBatches && <td><input type="text" class="input input-bordered input-xs w-20 text-sm" value={l.lot || ''} onInput={(e) => updateLine('lot', e.target.value)} /></td>}
+                      {canBatches && <td><input type="date" class="input input-bordered input-xs w-28 text-sm" value={l.expiry_date ? (typeof l.expiry_date === 'string' ? l.expiry_date.slice(0, 10) : new Date(l.expiry_date).toISOString().slice(0, 10)) : ''} onInput={(e) => updateLine('expiry_date', e.target.value)} /></td>}
+                      <td class="text-end font-mono text-sm font-semibold">{lineTotal.toFixed(2)}</td>
+                      <td class="text-end">
+                        <button class="btn btn-xs btn-ghost text-error opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeLine(i)}>
+                          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── Bottom: discount, expenses, total ── */}
+          <div class="flex-shrink-0 border-t border-base-200 pt-3">
+            {lines.length > 0 && (
+              <div class="grid grid-cols-1 lg:grid-cols-[1fr_1fr_auto] gap-3 items-start">
+                {/* Global discount */}
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-base-content/80 uppercase tracking-wide whitespace-nowrap">{t('globalDiscount')}</span>
+                  <select class="select select-bordered select-xs w-16"
+                    value={globalRemiseType}
+                    onChange={(e) => { setGlobalRemiseType(e.target.value); setGlobalRemise(0) }}>
+                    <option value="percent">%</option>
+                    <option value="flat">{t('flat')}</option>
+                  </select>
+                  <input type="number" min="0" max={globalRemiseType === 'percent' ? 100 : undefined} step="any"
+                    class="input input-bordered input-xs w-20 font-mono"
+                    value={globalRemise}
+                    onInput={(e) => setGlobalRemise(Number(e.target.value))} />
+                  {globalRemise > 0 && <span class="text-xs text-error font-mono font-bold">-{globalDiscountAmt.toFixed(2)}</span>}
+                </div>
+
+                {/* Expenses inline */}
+                <div>
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs text-base-content/80 uppercase tracking-wide">{t('purchaseExpenses')}</span>
+                    <button class="btn btn-xs btn-ghost text-primary py-0 h-auto min-h-0" onClick={addExpense}>+</button>
+                    {expensesTotal > 0 && (
+                      <label class="flex items-center gap-1 cursor-pointer ms-auto">
+                        <input type="checkbox" class="checkbox checkbox-xs checkbox-primary"
+                          checked={distributeExpenses}
+                          onChange={(e) => setDistributeExpenses(e.target.checked)} />
+                        <span class="text-[11px] text-base-content/80">{t('distributeExpensesLabel')}</span>
+                      </label>
+                    )}
+                  </div>
+                  {expenses.map((e, i) => (
+                    <div key={i} class="flex gap-1 items-center mb-1">
+                      <input class="input input-bordered input-xs flex-1" placeholder={t('expenseLabel')}
+                        value={e.label} onInput={(ev) => updateExpense(i, 'label', ev.target.value)} />
+                      <input type="number" min="0" step="any" class="input input-bordered input-xs w-24 font-mono"
+                        placeholder={t('expenseAmountShort')}
+                        value={e.amount} onInput={(ev) => updateExpense(i, 'amount', Number(ev.target.value))} />
+                      <button class="btn btn-xs btn-ghost text-error py-0 h-auto min-h-0" onClick={() => removeExpense(i)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Grand total */}
+                <div class="flex flex-col items-end gap-1">
+                  {hasDiscount && (
+                    <div class="text-xs text-base-content/80">
+                      {t('totalDiscount')}: <span class="font-mono text-error font-bold">-{discountTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {expensesTotal > 0 && (
+                    <div class="text-xs text-base-content/80">
+                      {t('purchaseExpenses')}: <span class="font-mono font-bold">+{expensesTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div class="text-xl font-bold font-mono text-primary">
+                    {grandTotal.toFixed(2)}
+                  </div>
+                  <div class="text-[11px] text-base-content/75">{lines.length} {t('productName').toLowerCase()}</div>
+                </div>
+              </div>
             )}
-          </table>
-        </div>
-
-        {/* Global discount */}
-        {lines.length > 0 && (
-          <div class="card bg-base-100 shadow p-4 mb-4">
-            <div class="flex items-center gap-3">
-              <span class="font-semibold text-sm">{t('globalDiscount')}</span>
-              <select class="select select-bordered select-sm w-24"
-                value={globalRemiseType}
-                onChange={(e) => { setGlobalRemiseType(e.target.value); setGlobalRemise(0) }}>
-                <option value="percent">%</option>
-                <option value="flat">{t('flat')}</option>
-              </select>
-              <input type="number" min="0" max={globalRemiseType === 'percent' ? 100 : undefined} step="any"
-                class="input input-bordered input-sm w-28"
-                value={globalRemise}
-                onInput={(e) => setGlobalRemise(Number(e.target.value))} />
-              {globalRemise > 0 && (
-                <span class="text-sm text-error font-mono">-{globalDiscountAmt.toFixed(2)}</span>
-              )}
-            </div>
           </div>
-        )}
 
-        {/* Expenses section */}
-        <div class="card bg-base-100 shadow p-4 mb-4">
-          <div class="flex items-center justify-between mb-2">
-            <span class="font-semibold text-sm">{t('purchaseExpenses')}</span>
-            <button class="btn btn-xs btn-ghost text-primary" onClick={addExpense}>{t('addExpense')}</button>
-          </div>
-          {expenses.length === 0 && (
-            <p class="text-xs text-base-content/40">{t('noLines')}</p>
-          )}
-          {expenses.map((e, i) => (
-            <div key={i} class="flex gap-2 items-end mb-2">
-              <label class="form-control flex-1">
-                <input class="input input-bordered input-sm" placeholder={t('expenseLabel')}
-                  value={e.label} onInput={(ev) => updateExpense(i, 'label', ev.target.value)} />
-              </label>
-              <label class="form-control w-32">
-                <input type="number" min="0" step="any" class="input input-bordered input-sm"
-                  placeholder={t('expenseAmountShort')}
-                  value={e.amount} onInput={(ev) => updateExpense(i, 'amount', Number(ev.target.value))} />
-              </label>
-              <button class="btn btn-xs btn-ghost text-error" onClick={() => removeExpense(i)}>✕</button>
-            </div>
-          ))}
-          {expenses.length > 0 && (
-            <div class="text-end font-mono text-sm font-bold mt-1">
-              {t('purchaseTotal')}: {expensesTotal.toFixed(2)}
-            </div>
-          )}
-        </div>
-
-        {/* Split expenses into items toggle */}
-        {expensesTotal > 0 && (
-          <label class="flex items-center gap-2 mt-2 mb-4 cursor-pointer">
-            <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
-              checked={distributeExpenses}
-              onChange={(e) => setDistributeExpenses(e.target.checked)} />
-            <span class="text-sm">{t('distributeExpensesLabel')}</span>
-          </label>
-        )}
-
-        {formError && <p class="text-error text-sm mb-3">{formError}</p>}
-
-        <div class="flex gap-2">
-          <button class="btn btn-primary btn-sm" onClick={handleSave}>{t('saveChanges')}</button>
-          <button class="btn btn-sm btn-ghost" onClick={() => setFormOpen(false)}>{t('back')}</button>
         </div>
 
         {/* ── Product search dialog ── */}
@@ -810,6 +861,11 @@ export default function Purchases({ path }) {
                   ? <span class="loading loading-spinner loading-xs" />
                   : t('search')}
               </button>
+              {canAddProduct && (
+                <button class="btn btn-accent btn-sm" onClick={() => setQuickAddOpen(true)}>
+                  + {t('quickAddProduct')}
+                </button>
+              )}
             </div>
 
             <div class="overflow-x-auto" style="max-height: 320px; overflow-y: auto">
@@ -829,7 +885,7 @@ export default function Purchases({ path }) {
                 <tbody>
                   {dialogResults.length === 0 && !dialogLoading && (
                     <tr>
-                      <td colSpan={8} class="text-center text-base-content/40 py-8">
+                      <td colSpan={8} class="text-center text-base-content/80 py-8">
                         {dialogQ.trim() ? t('noProducts') : t('searchAddProduct')}
                       </td>
                     </tr>
@@ -837,7 +893,7 @@ export default function Purchases({ path }) {
                   {dialogResults.map((p) => (
                     <tr key={p.id} class="cursor-pointer hover" onClick={() => selectProduct(p)}>
                       <td class="font-medium">{p.name}</td>
-                      <td class="text-sm text-base-content/60">{p.barcodes?.slice(0, 2).join(', ') || '—'}</td>
+                      <td class="text-sm text-base-content/80">{p.barcodes?.slice(0, 2).join(', ') || '—'}</td>
                       <td class="text-sm">{brandMap.get(p.brand_id) || '—'}</td>
                       <td class="text-sm">{catMap.get(p.category_id) || '—'}</td>
                       <td class={`text-end text-sm font-mono ${p.qty_available <= p.qty_min ? 'text-error' : ''}`}>
@@ -864,6 +920,107 @@ export default function Purchases({ path }) {
             <button>close</button>
           </form>
         </dialog>
+
+        {/* ── Add Line dialog ── */}
+        <dialog id="line-dialog" class="modal modal-bottom sm:modal-middle">
+          <div class="modal-box w-full sm:max-w-lg">
+            <h3 class="font-bold text-base mb-4">{lineForm.product_name}</h3>
+            <div class="grid grid-cols-3 gap-3">
+              <label class="form-control">
+                <span class="label-text text-xs">{t('qty')}</span>
+                <input type="number" min="0" step="any" autoFocus
+                  class="input input-bordered input-sm font-mono"
+                  value={lineForm.qty}
+                  onInput={(e) => setLineForm(f => ({ ...f, qty: Number(e.target.value) }))}
+                  onKeyDown={(e) => e.key === 'Enter' && confirmLineDialog()} />
+              </label>
+              <label class="form-control">
+                <span class="label-text text-xs">{t('prixAchat')}</span>
+                <input type="number" min="0" step="any"
+                  class="input input-bordered input-sm font-mono"
+                  value={lineForm.prix_achat}
+                  onInput={(e) => setLineForm(f => ({ ...f, prix_achat: Number(e.target.value) }))}
+                  onKeyDown={(e) => e.key === 'Enter' && confirmLineDialog()} />
+              </label>
+              <label class="form-control">
+                <span class="label-text text-xs">{t('remise')} %</span>
+                <input type="number" min="0" max="100" step="any"
+                  class="input input-bordered input-sm font-mono"
+                  value={lineForm.remise}
+                  onInput={(e) => setLineForm(f => ({ ...f, remise: Number(e.target.value) }))}
+                  onKeyDown={(e) => e.key === 'Enter' && confirmLineDialog()} />
+              </label>
+              {visiblePrices.pv1 && <label class="form-control">
+                <span class="label-text text-xs">{t('prixVente1')}</span>
+                <input type="number" min="0" step="any"
+                  class="input input-bordered input-sm font-mono"
+                  value={lineForm.prix_vente_1}
+                  onInput={(e) => setLineForm(f => ({ ...f, prix_vente_1: Number(e.target.value) }))}
+                  onKeyDown={(e) => e.key === 'Enter' && confirmLineDialog()} />
+              </label>}
+              {visiblePrices.pv2 && <label class="form-control">
+                <span class="label-text text-xs">{t('prixVente2')}</span>
+                <input type="number" min="0" step="any"
+                  class="input input-bordered input-sm font-mono"
+                  value={lineForm.prix_vente_2}
+                  onInput={(e) => setLineForm(f => ({ ...f, prix_vente_2: Number(e.target.value) }))}
+                  onKeyDown={(e) => e.key === 'Enter' && confirmLineDialog()} />
+              </label>}
+              {visiblePrices.pv3 && <label class="form-control">
+                <span class="label-text text-xs">{t('prixVente3')}</span>
+                <input type="number" min="0" step="any"
+                  class="input input-bordered input-sm font-mono"
+                  value={lineForm.prix_vente_3}
+                  onInput={(e) => setLineForm(f => ({ ...f, prix_vente_3: Number(e.target.value) }))}
+                  onKeyDown={(e) => e.key === 'Enter' && confirmLineDialog()} />
+              </label>}
+              {canBatches && (
+                <>
+                  <label class="form-control">
+                    <span class="label-text text-xs">{t('batchNumber')}</span>
+                    <input type="text" class="input input-bordered input-sm"
+                      value={lineForm.lot || ''}
+                      onInput={(e) => setLineForm(f => ({ ...f, lot: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && confirmLineDialog()} />
+                  </label>
+                  <label class="form-control col-span-2">
+                    <span class="label-text text-xs">{t('expiryDate')}</span>
+                    <input type="date" class="input input-bordered input-sm"
+                      value={lineForm.expiry_date || ''}
+                      onInput={(e) => setLineForm(f => ({ ...f, expiry_date: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && confirmLineDialog()} />
+                  </label>
+                </>
+              )}
+            </div>
+            {lineForm.prix_achat > 0 && (
+              <div class="mt-3 text-end text-sm text-base-content/80">
+                {t('purchaseTotal')}: <span class="font-mono font-bold text-primary">{(lineForm.qty * lineForm.prix_achat * (1 - (lineForm.remise || 0) / 100)).toFixed(2)}</span>
+              </div>
+            )}
+            <div class="modal-action">
+              <button class="btn btn-primary btn-sm" onClick={confirmLineDialog}>
+                {t('addToList')} <KBD>F3</KBD>
+              </button>
+              <form method="dialog">
+                <button class="btn btn-sm btn-ghost" onClick={() => setLineForm(emptyLine)}>{t('back')}</button>
+              </form>
+            </div>
+          </div>
+          <form method="dialog" class="modal-backdrop">
+            <button onClick={() => setLineForm(emptyLine)}>close</button>
+          </form>
+        </dialog>
+
+        {/* ── Quick add product modal ── */}
+        <QuickAddProductModal
+          open={quickAddOpen}
+          onClose={() => setQuickAddOpen(false)}
+          onCreated={(p) => {
+            selectProduct(p)
+            document.getElementById('product-dialog')?.close()
+          }}
+        />
 
         {/* ── Purchase variant picker dialog ── */}
         <dialog id="purchase-variant-dialog" class="modal modal-bottom sm:modal-middle">
@@ -931,7 +1088,7 @@ export default function Purchases({ path }) {
                 <tbody>
                   {supplierDialogResults.length === 0 && (
                     <tr>
-                      <td colSpan={4} class="text-center text-base-content/40 py-8">{t('noSuppliers')}</td>
+                      <td colSpan={4} class="text-center text-base-content/80 py-8">{t('noSuppliers')}</td>
                     </tr>
                   )}
                   {supplierDialogResults.map((s) => (
@@ -966,7 +1123,7 @@ export default function Purchases({ path }) {
               <h3 class="font-bold text-lg mb-4">{t('lowStockSuggest')}</h3>
               <div class="overflow-x-auto" style="max-height: 400px; overflow-y: auto">
                 {lowStockItems.length === 0 ? (
-                  <p class="text-center text-base-content/40 py-8">{t('noLowStock')}</p>
+                  <p class="text-center text-base-content/80 py-8">{t('noLowStock')}</p>
                 ) : (
                   <table class="table table-sm">
                     <thead class="sticky top-0 bg-base-100 z-10">
@@ -1037,13 +1194,13 @@ export default function Purchases({ path }) {
           <option value="paid">{t('purchasePaid')}</option>
         </select>
         <label class="flex items-center gap-1 text-sm">
-          <span class="text-base-content/60">{t('dateFrom')}</span>
+          <span class="text-base-content/80">{t('dateFrom')}</span>
           <input type="date" class="input input-bordered input-sm"
             value={filterDateFrom}
             onInput={(e) => { setFilterDateFrom(e.target.value); setPage(1) }} />
         </label>
         <label class="flex items-center gap-1 text-sm">
-          <span class="text-base-content/60">{t('dateTo')}</span>
+          <span class="text-base-content/80">{t('dateTo')}</span>
           <input type="date" class="input input-bordered input-sm"
             value={filterDateTo}
             onInput={(e) => { setFilterDateTo(e.target.value); setPage(1) }} />
@@ -1056,16 +1213,16 @@ export default function Purchases({ path }) {
         <table class="table table-sm w-full">
           <thead class="bg-base-200/60">
             <tr>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('ref')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap">{t('purchaseDate')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('purchaseSupplier')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('supplierInvoice')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('purchaseStatus')}</th>
-              {useVAT && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('htLabel')}</th>}
-              {useVAT && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">TVA</th>}
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{useVAT ? t('ttcLabel') : t('purchaseTotal')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('purchasePaid2')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('purchaseRemaining')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/80">{t('ref')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/80 whitespace-nowrap">{t('purchaseDate')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/80">{t('purchaseSupplier')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/80">{t('supplierInvoice')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/80">{t('purchaseStatus')}</th>
+              {useVAT && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/80 text-end">{t('htLabel')}</th>}
+              {useVAT && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/80 text-end">TVA</th>}
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/80 text-end">{useVAT ? t('ttcLabel') : t('purchaseTotal')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/80 text-end">{t('purchasePaid2')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/80 text-end">{t('purchaseRemaining')}</th>
               {canWrite && <th class="px-3 py-2.5 w-28"></th>}
             </tr>
           </thead>
@@ -1073,7 +1230,7 @@ export default function Purchases({ path }) {
             {items.length === 0 && (
               <tr>
                 <td colSpan={(canWrite ? 9 : 8) + (useVAT ? 2 : 0)} class="px-3 py-12 text-center">
-                  <div class="flex flex-col items-center gap-2 text-base-content/30">
+                  <div class="flex flex-col items-center gap-2 text-base-content/80">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
                     </svg>
@@ -1086,10 +1243,10 @@ export default function Purchases({ path }) {
               const remaining = p.total - p.paid_amount
               return (
                 <tr key={p.id} class="border-b border-base-200 hover:bg-base-50 transition-colors">
-                  <td class="px-3 py-2.5 font-mono text-xs text-base-content/70">{p.ref || '—'}</td>
+                  <td class="px-3 py-2.5 font-mono text-xs text-base-content/80">{p.ref || '—'}</td>
                   <td class="px-3 py-2.5 text-sm">{new Date(p.created_at).toLocaleDateString()}</td>
                   <td class="px-3 py-2.5 font-medium">{p.supplier_name}</td>
-                  <td class="px-3 py-2.5 text-sm text-base-content/60">{p.supplier_invoice || '—'}</td>
+                  <td class="px-3 py-2.5 text-sm text-base-content/80">{p.supplier_invoice || '—'}</td>
                   <td class="px-3 py-2.5">
                     <span class={`badge badge-xs ${STATUS_BADGE[p.status] || 'badge-ghost'}`}>
                       {t('purchase' + p.status.charAt(0).toUpperCase() + p.status.slice(1))}
@@ -1107,11 +1264,11 @@ export default function Purchases({ path }) {
                       <div class="flex gap-1 justify-end flex-wrap">
                         {/* Print — always available */}
                         <div class="tooltip tooltip-left" data-tip={t('printPurchase')}>
-                          <button class="btn btn-xs btn-ghost btn-square" onClick={async () => {
+                          <button class="btn btn-sm btn-ghost btn-square" onClick={async () => {
                             const full = await api.getPurchase(p.id)
                             handlePrint(full)
                           }}>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                               <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
                             </svg>
                           </button>
@@ -1120,8 +1277,8 @@ export default function Purchases({ path }) {
                         {/* Duplicate — always available with add perm */}
                         {canAdd && (
                           <div class="tooltip tooltip-left" data-tip={t('duplicatePurchase')}>
-                            <button class="btn btn-xs btn-ghost btn-square" onClick={() => handleDuplicate(p.id)}>
-                              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <button class="btn btn-sm btn-ghost btn-square" onClick={() => handleDuplicate(p.id)}>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.5a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
                               </svg>
                             </button>
@@ -1132,8 +1289,8 @@ export default function Purchases({ path }) {
                           <>
                             {canEdit && (
                               <div class="tooltip tooltip-left" data-tip={t('edit')}>
-                                <button class="btn btn-xs btn-ghost btn-square" onClick={() => openEdit(p.id)}>
-                                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <button class="btn btn-sm btn-ghost btn-square" onClick={() => openEdit(p.id)}>
+                                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
                                   </svg>
                                 </button>
@@ -1141,8 +1298,8 @@ export default function Purchases({ path }) {
                             )}
                             {canValidate && (
                               <div class="tooltip tooltip-left" data-tip={t('validatePurchase')}>
-                                <button class="btn btn-xs btn-ghost btn-square text-success" onClick={() => openPreview(p)}>
-                                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <button class="btn btn-sm btn-ghost btn-square text-success" onClick={() => openPreview(p)}>
+                                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
                                 </button>
@@ -1150,8 +1307,8 @@ export default function Purchases({ path }) {
                             )}
                             {canDelete && (
                               <div class="tooltip tooltip-left" data-tip={t('disable')}>
-                                <button class="btn btn-xs btn-ghost btn-square text-error" onClick={() => openDelete(p)}>
-                                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <button class="btn btn-sm btn-ghost btn-square text-error" onClick={() => openDelete(p)}>
+                                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                                   </svg>
                                 </button>
@@ -1162,8 +1319,8 @@ export default function Purchases({ path }) {
 
                         {p.status === 'partially_validated' && canValidate && (
                           <div class="tooltip tooltip-left" data-tip={t('validatePurchase')}>
-                            <button class="btn btn-xs btn-ghost btn-square text-success" onClick={() => openPreview(p)}>
-                              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <button class="btn btn-sm btn-ghost btn-square text-success" onClick={() => openPreview(p)}>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                             </button>
@@ -1173,15 +1330,15 @@ export default function Purchases({ path }) {
                         {(p.status === 'validated' || p.status === 'partially_validated') && canPay && (
                           <>
                             <div class="tooltip tooltip-left" data-tip={t('recordPayment')}>
-                              <button class="btn btn-xs btn-ghost btn-square text-primary" onClick={() => openPay(p)}>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                              <button class="btn btn-sm btn-ghost btn-square text-primary" onClick={() => openPay(p)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                   <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
                                 </svg>
                               </button>
                             </div>
                             <div class="tooltip tooltip-left" data-tip={t('purchasePayments')}>
-                              <button class="btn btn-xs btn-ghost btn-square" onClick={() => openPayHistory(p)}>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                              <button class="btn btn-sm btn-ghost btn-square" onClick={() => openPayHistory(p)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                               </button>
@@ -1192,8 +1349,8 @@ export default function Purchases({ path }) {
                         {/* Return — for validated/paid purchases */}
                         {(p.status === 'validated' || p.status === 'paid' || p.status === 'partially_validated') && canValidate && !(p.ref || '').startsWith('RET-') && (
                           <div class="tooltip tooltip-left" data-tip={t('returnPurchase')}>
-                            <button class="btn btn-xs btn-ghost btn-square text-warning" onClick={() => openReturn(p)}>
-                              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <button class="btn btn-sm btn-ghost btn-square text-warning" onClick={() => openReturn(p)}>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
                               </svg>
                             </button>
@@ -1202,8 +1359,8 @@ export default function Purchases({ path }) {
 
                         {p.status === 'paid' && canPay && (
                           <div class="tooltip tooltip-left" data-tip={t('purchasePayments')}>
-                            <button class="btn btn-xs btn-ghost btn-square" onClick={() => openPayHistory(p)}>
-                              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <button class="btn btn-sm btn-ghost btn-square" onClick={() => openPayHistory(p)}>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                             </button>
@@ -1220,10 +1377,10 @@ export default function Purchases({ path }) {
         </div>
         {pages > 1 && (
           <div class="flex items-center justify-between px-4 py-3 border-t border-base-200 bg-base-50">
-            <span class="text-xs text-base-content/50">{page} / {pages}</span>
+            <span class="text-xs text-base-content/80">{page} / {pages}</span>
             <div class="join">
-              <button class="join-item btn btn-xs btn-ghost border border-base-300" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
-              <button class="join-item btn btn-xs btn-ghost border border-base-300" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>›</button>
+              <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
+              <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>›</button>
             </div>
           </div>
         )}
@@ -1232,7 +1389,7 @@ export default function Purchases({ path }) {
       {/* Payment Modal */}
       <Modal id="pay-modal" title={t('recordPayment')}>
         <p class="text-sm mb-1">{payTarget?.supplier_name}</p>
-        <p class="text-xs text-base-content/60 mb-3">
+        <p class="text-xs text-base-content/80 mb-3">
           {t('purchaseRemaining')}: <span class="font-mono">{payTarget ? (payTarget.total - payTarget.paid_amount).toFixed(2) : 0}</span>
         </p>
         <label class="form-control mb-3">
@@ -1256,7 +1413,7 @@ export default function Purchases({ path }) {
       <Modal id="pay-history-modal" title={t('purchasePayments')}>
         <p class="text-sm mb-3">{payHistoryTarget?.supplier_name} — {payHistoryTarget?.ref}</p>
         {payHistory.length === 0 ? (
-          <p class="text-base-content/40 text-sm py-4 text-center">{t('noPurchasePayments')}</p>
+          <p class="text-base-content/80 text-sm py-4 text-center">{t('noPurchasePayments')}</p>
         ) : (
           <div class="overflow-x-auto" style="max-height: 300px; overflow-y: auto">
             <table class="table table-sm">
@@ -1272,7 +1429,7 @@ export default function Purchases({ path }) {
                   <tr key={ph.id}>
                     <td class="text-sm">{new Date(ph.created_at).toLocaleString()}</td>
                     <td class="text-end font-mono text-sm">{ph.amount.toFixed(2)}</td>
-                    <td class="text-sm text-base-content/60">{ph.note || '—'}</td>
+                    <td class="text-sm text-base-content/80">{ph.note || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1323,7 +1480,7 @@ export default function Purchases({ path }) {
             </table>
           </div>
         ) : (
-          <p class="text-center text-base-content/40 py-4">{t('noLines')}</p>
+          <p class="text-center text-base-content/80 py-4">{t('noLines')}</p>
         )}
         <div class="modal-action">
           <button class="btn btn-primary btn-sm" onClick={() => handleValidate(previewTarget?.id)}>
@@ -1361,12 +1518,12 @@ export default function Purchases({ path }) {
                           const v = Math.min(Math.max(0, Number(e.target.value)), rl.returnable)
                           setReturnLines(prev => prev.map((r, j) => r.product_id === rl.product_id ? { ...r, return_qty: v } : r))
                         }} />
-                      <span class="text-xs text-base-content/40 ml-1">/ {rl.returnable}</span>
+                      <span class="text-xs text-base-content/80 ml-1">/ {rl.returnable}</span>
                     </td>
                   </tr>
                 ))}
                 {returnLines.every(rl => rl.returnable <= 0) && (
-                  <tr><td colSpan={4} class="text-center text-base-content/40 py-4">{t('noReturnQty')}</td></tr>
+                  <tr><td colSpan={4} class="text-center text-base-content/80 py-4">{t('noReturnQty')}</td></tr>
                 )}
               </tbody>
             </table>

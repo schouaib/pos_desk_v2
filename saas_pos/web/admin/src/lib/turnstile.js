@@ -27,7 +27,7 @@ export function useTurnstile() {
       // wait for script to load
       interval = setInterval(() => {
         if (window.turnstile) { clearInterval(interval); interval = null; render() }
-      }, 100)
+      }, 500)
     }
 
     return () => {

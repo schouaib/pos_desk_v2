@@ -732,19 +732,19 @@ export default function Clients({ path }) {
         <table class="table table-sm w-full">
           <thead class="bg-base-200/60">
             <tr>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap">{t('clientCode')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap">{t('clientName')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap">{t('clientPhone')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap">{t('clientEmail')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap text-end">{t('outstandingBalance')}</th>
-              {canWrite && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap"></th>}
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 whitespace-nowrap">{t('clientCode')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 whitespace-nowrap">{t('clientName')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 whitespace-nowrap">{t('clientPhone')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 whitespace-nowrap">{t('clientEmail')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 whitespace-nowrap text-end">{t('outstandingBalance')}</th>
+              {canWrite && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 whitespace-nowrap"></th>}
             </tr>
           </thead>
           <tbody>
             {items.length === 0 && (
               <tr>
                 <td colSpan={canWrite ? 6 : 5} class="py-12 text-center">
-                  <div class="flex flex-col items-center gap-2 text-base-content/30">
+                  <div class="flex flex-col items-center gap-2 text-base-content/50">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
                     </svg>
@@ -755,7 +755,7 @@ export default function Clients({ path }) {
             )}
             {items.map((c) => (
               <tr key={c.id} class="border-b border-base-200 hover:bg-base-50 transition-colors">
-                <td class="px-3 py-2.5 font-mono text-xs text-base-content/60">{c.code}</td>
+                <td class="px-3 py-2.5 font-mono text-xs text-base-content/80">{c.code}</td>
                 <td class="px-3 py-2.5 font-medium">{c.name}</td>
                 <td class="px-3 py-2.5 text-sm">{c.phone || '—'}</td>
                 <td class="px-3 py-2.5 text-sm">{c.email || '—'}</td>
@@ -769,8 +769,8 @@ export default function Clients({ path }) {
                     <div class="flex gap-1 justify-end">
                       {canViewSales && (
                         <div class="tooltip tooltip-left" data-tip={t('salesHistory')}>
-                          <button class="btn btn-xs btn-ghost btn-square text-secondary" onClick={() => openClientSales(c)}>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <button class="btn btn-sm btn-ghost btn-square text-secondary" onClick={() => openClientSales(c)}>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                               <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
                             </svg>
                           </button>
@@ -778,8 +778,8 @@ export default function Clients({ path }) {
                       )}
                       {canPayments && (
                         <div class="tooltip tooltip-left" data-tip={t('clientStatement')}>
-                          <button class="btn btn-xs btn-ghost btn-square text-primary" onClick={() => openStatement(c)}>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <button class="btn btn-sm btn-ghost btn-square text-primary" onClick={() => openStatement(c)}>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
                             </svg>
                           </button>
@@ -787,8 +787,8 @@ export default function Clients({ path }) {
                       )}
                       {canEdit && (
                         <div class="tooltip tooltip-left" data-tip={t('edit')}>
-                          <button class="btn btn-xs btn-ghost btn-square" onClick={() => openEdit(c)}>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <button class="btn btn-sm btn-ghost btn-square" onClick={() => openEdit(c)}>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                               <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
                             </svg>
                           </button>
@@ -796,8 +796,8 @@ export default function Clients({ path }) {
                       )}
                       {canDelete && (
                         <div class="tooltip tooltip-left" data-tip={t('deleteClient')}>
-                          <button class="btn btn-xs btn-ghost btn-square text-error" onClick={() => openDelete(c)}>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <button class="btn btn-sm btn-ghost btn-square text-error" onClick={() => openDelete(c)}>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                               <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                             </svg>
                           </button>
@@ -813,10 +813,10 @@ export default function Clients({ path }) {
       </div>
       {pages > 1 && (
         <div class="flex items-center justify-between px-4 py-3 border-t border-base-200 bg-base-50">
-          <span class="text-xs text-base-content/50">{page} / {pages}</span>
+          <span class="text-xs text-base-content/70">{page} / {pages}</span>
           <div class="join">
-            <button class="join-item btn btn-xs btn-ghost border border-base-300" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
-            <button class="join-item btn btn-xs btn-ghost border border-base-300" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>›</button>
+            <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
+            <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>›</button>
           </div>
         </div>
       )}
@@ -826,7 +826,7 @@ export default function Clients({ path }) {
       <Modal id="stmt-modal" size="xl" title={
         <div>
           <span>{stmtTarget?.name}</span>
-          <span class="text-xs font-mono text-base-content/40 ms-2">{stmtTarget?.code}</span>
+          <span class="text-xs font-mono text-base-content/70 ms-2">{stmtTarget?.code}</span>
           <div class={`font-mono font-bold text-sm mt-0.5 ${stmtTarget?.balance > 0 ? 'text-error' : 'text-success'}`}>
             {t('outstandingBalance')}: {stmtTarget?.balance?.toFixed(2)}
           </div>
@@ -835,7 +835,7 @@ export default function Clients({ path }) {
         {/* Add payment form */}
         {canPayments && (
           <div class="-mx-1 px-4 py-3 bg-base-200 rounded-lg border border-base-300 mb-4">
-            <p class="text-xs font-semibold text-base-content/60 mb-2">{t('addPayment')}</p>
+            <p class="text-xs font-semibold text-base-content/80 mb-2">{t('addPayment')}</p>
             <div class="flex gap-2">
               <label class="form-control flex-1">
                 <span class="label-text text-xs">{t('paymentAmountLabel')}</span>
@@ -864,16 +864,16 @@ export default function Clients({ path }) {
 
         {/* Statement ledger */}
         <div class="flex items-center justify-between mb-3">
-          <p class="text-xs font-semibold text-base-content/60">{t('clientStatement')}</p>
+          <p class="text-xs font-semibold text-base-content/80">{t('clientStatement')}</p>
           {statement.length > 0 && (
-            <span class="text-xs text-base-content/40">{statement.length} {t('of')} {statement.length}</span>
+            <span class="text-xs text-base-content/70">{statement.length} {t('of')} {statement.length}</span>
           )}
         </div>
         <div class="space-y-2 max-h-[50vh] overflow-y-auto pe-1">
           {stmtLoading ? (
             <div class="flex justify-center py-8"><span class="loading loading-spinner loading-md" /></div>
           ) : stmtPageRows.length === 0 ? (
-            <p class="text-center text-sm text-base-content/40 py-8">{t('noStatement')}</p>
+            <p class="text-center text-sm text-base-content/70 py-8">{t('noStatement')}</p>
           ) : stmtPageRows.map((e) => (
             <div key={e.id} class={`rounded-lg border ${e.type === 'sale' ? 'border-error/20 bg-error/5' : 'border-success/20 bg-success/5'}`}>
               <div class="px-3 py-2.5">
@@ -882,7 +882,7 @@ export default function Clients({ path }) {
                     <span class={`badge badge-xs shrink-0 ${e.type === 'sale' ? 'badge-error' : 'badge-success'}`}>
                       {e.type === 'sale' ? t('stmtSale') : t('stmtPayment')}
                     </span>
-                    <span class="text-xs font-mono text-base-content/50 truncate">{e.ref || '—'}</span>
+                    <span class="text-xs font-mono text-base-content/70 truncate">{e.ref || '—'}</span>
                   </div>
                   <div class="text-end shrink-0">
                     {e.type === 'sale'
@@ -892,7 +892,7 @@ export default function Clients({ path }) {
                   </div>
                 </div>
                 <div class="flex items-center justify-between mt-1">
-                  <span class="text-xs text-base-content/40">
+                  <span class="text-xs text-base-content/70">
                     {new Date(e.date).toLocaleDateString()} {new Date(e.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <div class="flex items-center gap-2">
@@ -909,9 +909,9 @@ export default function Clients({ path }) {
                 <div class="border-t border-error/10 px-3 py-2 space-y-1">
                   {e.lines.map((l, i) => (
                     <div key={i} class="flex items-center justify-between gap-2 text-xs">
-                      <span class="text-base-content/70 truncate flex-1">{l.product_name}</span>
-                      <span class="text-base-content/40 shrink-0">{l.qty} × {l.unit_price.toFixed(2)}</span>
-                      <span class="font-mono text-base-content/60 shrink-0">{l.total_ttc.toFixed(2)}</span>
+                      <span class="text-base-content/80 truncate flex-1">{l.product_name}</span>
+                      <span class="text-base-content/70 shrink-0">{l.qty} × {l.unit_price.toFixed(2)}</span>
+                      <span class="font-mono text-base-content/80 shrink-0">{l.total_ttc.toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -923,7 +923,7 @@ export default function Clients({ path }) {
         {/* Pagination */}
         {stmtTotalPages > 1 && (
           <div class="flex items-center justify-between mt-3 pt-2 border-t border-base-300">
-            <span class="text-xs text-base-content/40">
+            <span class="text-xs text-base-content/70">
               {t('showing')} {(stmtPage - 1) * STMT_PAGE_SIZE + 1}–{Math.min(stmtPage * STMT_PAGE_SIZE, stmtRows.length)} {t('of')} {stmtRows.length}
             </span>
             <div class="flex gap-1">
@@ -1031,7 +1031,7 @@ export default function Clients({ path }) {
             <button class="btn btn-xs btn-ghost" onClick={selectAllSales}>{t('selectAll')}</button>
             <button class="btn btn-xs btn-ghost" onClick={clearAllSales}>{t('clearAll')}</button>
             {selectedSales.size > 0 && (
-              <span class="text-xs text-base-content/40 ms-1">{selectedSales.size} {t('selected')}</span>
+              <span class="text-xs text-base-content/70 ms-1">{selectedSales.size} {t('selected')}</span>
             )}
           </div>
         )}
@@ -1041,7 +1041,7 @@ export default function Clients({ path }) {
           {salesLoading ? (
             <div class="flex justify-center py-8"><span class="loading loading-spinner loading-md" /></div>
           ) : salesResult.items.length === 0 ? (
-            <p class="text-center text-sm text-base-content/40 py-8">{t('noSales')}</p>
+            <p class="text-center text-sm text-base-content/70 py-8">{t('noSales')}</p>
           ) : salesResult.items.map((s) => (
             <div key={s.id} class="rounded-lg border border-base-300 overflow-hidden">
               {/* Sale header */}
@@ -1053,7 +1053,7 @@ export default function Clients({ path }) {
                 {selectedSales.has(s.id) && (
                   <div class="tooltip tooltip-right shrink-0" data-tip={t('includeProductDetails')}>
                     <button
-                      class={`btn btn-xs btn-square shrink-0 ${saleLinesToPrint.has(s.id) ? 'btn-primary' : 'btn-ghost text-base-content/30'}`}
+                      class={`btn btn-xs btn-square shrink-0 ${saleLinesToPrint.has(s.id) ? 'btn-primary' : 'btn-ghost text-base-content/50'}`}
                       onClick={(e) => toggleSaleLines(s.id, e)}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1070,14 +1070,14 @@ export default function Clients({ path }) {
                     <span class={`badge badge-xs shrink-0 ${s.sale_type === 'cash' ? 'badge-success' : 'badge-warning'}`}>
                       {s.sale_type === 'cash' ? t('cashSale') : t('creditSale')}
                     </span>
-                    <span class="font-mono text-xs text-base-content/60 shrink-0">{s.ref}</span>
-                    <span class="text-xs text-base-content/40 truncate">
+                    <span class="font-mono text-xs text-base-content/80 shrink-0">{s.ref}</span>
+                    <span class="text-xs text-base-content/70 truncate">
                       {new Date(s.created_at).toLocaleDateString()} {new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                   <div class="flex items-center gap-2 shrink-0">
                     <span class="font-mono text-sm font-semibold">{s.total.toFixed(2)}</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class={`w-3.5 h-3.5 text-base-content/40 transition-transform ${expandedSale === s.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class={`w-3.5 h-3.5 text-base-content/70 transition-transform ${expandedSale === s.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
@@ -1088,7 +1088,7 @@ export default function Clients({ path }) {
                 <div class="border-t border-base-300 bg-base-50">
                   <table class="table table-xs w-full">
                     <thead>
-                      <tr class="text-base-content/50">
+                      <tr class="text-base-content/70">
                         <th>{t('productName')}</th>
                         <th class="text-center">{t('qty')}</th>
                         <th class="text-end">{t('blColUnitHT')}</th>
@@ -1107,7 +1107,7 @@ export default function Clients({ path }) {
                     </tbody>
                     <tfoot>
                       <tr class="font-semibold border-t border-base-300">
-                        <td colspan="3" class="text-end text-xs text-base-content/60">{t('totalTTC')}</td>
+                        <td colspan="3" class="text-end text-xs text-base-content/80">{t('totalTTC')}</td>
                         <td class="text-end font-mono">{s.total.toFixed(2)}</td>
                       </tr>
                     </tfoot>
@@ -1121,7 +1121,7 @@ export default function Clients({ path }) {
         {/* Pagination */}
         {salesResult.total > 10 && (
           <div class="flex items-center justify-between mt-3 pt-3 border-t border-base-300">
-            <span class="text-xs text-base-content/40">
+            <span class="text-xs text-base-content/70">
               {t('showing')} {(salesPage - 1) * 10 + 1}–{Math.min(salesPage * 10, salesResult.total)} {t('of')} {salesResult.total}
             </span>
             <div class="flex gap-1">
@@ -1172,7 +1172,7 @@ export default function Clients({ path }) {
         <div class="modal-box max-w-2xl">
           <h3 class="font-bold text-lg mb-4">{t('archivedClients')}</h3>
           {archivedItems.length === 0 ? (
-            <p class="text-center text-base-content/50 py-8">{t('noArchivedClients')}</p>
+            <p class="text-center text-base-content/70 py-8">{t('noArchivedClients')}</p>
           ) : (
             <table class="table table-sm w-full">
               <thead>

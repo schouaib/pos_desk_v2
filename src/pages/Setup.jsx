@@ -71,14 +71,14 @@ export default function Setup({ onActivated }) {
               </svg>
             </div>
             <h1 class="text-2xl font-bold">CiPOSdz</h1>
-            <p class="text-base-content/60 text-sm mt-1">
+            <p class="text-base-content/80 text-sm mt-1">
               {t('activationRequired') || 'Activate this POS terminal'}
             </p>
           </div>
 
           {/* Machine ID display */}
           <div class="bg-base-200 rounded-lg p-3 mb-4">
-            <label class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">
+            <label class="text-xs font-semibold text-base-content/70 uppercase tracking-wide">
               {t('machineId') || 'Machine ID'}
             </label>
             <div class="flex items-center gap-2 mt-1">
@@ -99,7 +99,7 @@ export default function Setup({ onActivated }) {
                 )}
               </button>
             </div>
-            <p class="text-[10px] text-base-content/40 mt-1">
+            <p class="text-xs text-base-content/70 mt-1">
               {t('machineIdHint') || 'Send this ID to your administrator to get an activation key'}
             </p>
           </div>
@@ -135,7 +135,7 @@ export default function Setup({ onActivated }) {
           </form>
 
           <div class="text-center mt-6">
-            <span class="text-xs text-base-content/30" id="app-version">v1.0.0</span>
+            <span class="text-xs text-base-content/50" id="app-version">v1.0.0</span>
           </div>
         </div>
       </div>

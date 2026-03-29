@@ -49,10 +49,12 @@ func Create(tenantID, userID, userEmail string, input CreateInput) (*StockAdjust
 	}
 
 	// Set qty directly
-	productCol().UpdateOne(ctx,
+	if _, err := productCol().UpdateOne(ctx,
 		bson.M{"_id": pid, "tenant_id": tid},
 		bson.M{"$set": bson.M{"qty_available": input.QtyAfter, "updated_at": time.Now()}},
-	)
+	); err != nil {
+		return nil, errors.New("failed to update stock")
+	}
 
 	adj := &StockAdjustment{
 		ID:             primitive.NewObjectID(),
@@ -104,10 +106,12 @@ func createVariantAdjustment(ctx context.Context, tenantID string, tid, pid prim
 	}
 
 	// Update variant qty
-	database.Col("product_variants").UpdateOne(ctx,
+	if _, err := database.Col("product_variants").UpdateOne(ctx,
 		bson.M{"_id": vid, "tenant_id": tid},
 		bson.M{"$set": bson.M{"qty_available": input.QtyAfter, "updated_at": time.Now()}},
-	)
+	); err != nil {
+		return nil, errors.New("failed to update variant stock")
+	}
 
 	// Sync parent product qty
 	_ = variant.SyncParentStock(tenantID, pid)
@@ -166,7 +170,9 @@ func List(tenantID, search string, from, to time.Time, page, limit int) (*ListRe
 	defer cur.Close(ctx)
 
 	var items []StockAdjustment
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []StockAdjustment{}
 	}

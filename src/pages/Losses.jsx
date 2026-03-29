@@ -112,12 +112,12 @@ export default function Losses({ path }) {
         <table class="table table-sm w-full">
           <thead class="bg-base-200/60">
             <tr>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap">{t('lossDate')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('productName')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('barcodes')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('lossType')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('lossQty')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('lossRemark')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 whitespace-nowrap">{t('lossDate')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('productName')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('barcodes')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('lossType')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('lossQty')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('lossRemark')}</th>
             </tr>
           </thead>
           <tbody>
@@ -132,25 +132,25 @@ export default function Losses({ path }) {
               <tr key={item.id} class="border-b border-base-200 hover:bg-base-50 transition-colors">
                 <td class="px-3 py-2.5 text-sm whitespace-nowrap">
                   {new Date(item.created_at).toLocaleDateString()}{' '}
-                  <span class="text-base-content/40 text-xs">
+                  <span class="text-base-content/70 text-xs">
                     {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </td>
                 <td class="px-3 py-2.5 font-medium text-sm">{item.product_name}</td>
-                <td class="px-3 py-2.5 text-sm text-base-content/60">{item.barcode || '—'}</td>
+                <td class="px-3 py-2.5 text-sm text-base-content/80">{item.barcode || '—'}</td>
                 <td class="px-3 py-2.5">
                   <span class={`badge badge-xs ${TYPE_BADGE[item.type] || 'badge-ghost'}`}>
                     {t('loss' + item.type.charAt(0).toUpperCase() + item.type.slice(1))}
                   </span>
                 </td>
                 <td class="px-3 py-2.5 font-mono text-sm text-error">-{item.qty}</td>
-                <td class="px-3 py-2.5 text-sm text-base-content/70">{item.remark || '—'}</td>
+                <td class="px-3 py-2.5 text-sm text-base-content/80">{item.remark || '—'}</td>
               </tr>
             ))}
             {!loading && items.length === 0 && (
               <tr>
                 <td colSpan={6} class="px-3 py-12 text-center">
-                  <div class="flex flex-col items-center gap-2 text-base-content/30">
+                  <div class="flex flex-col items-center gap-2 text-base-content/50">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
                     </svg>
@@ -167,7 +167,7 @@ export default function Losses({ path }) {
       {/* Pagination */}
       {total > 0 && (
         <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/60">{t('showing')} {start}–{end} {t('of')} {total}</span>
+          <span class="text-base-content/80">{t('showing')} {start}–{end} {t('of')} {total}</span>
           <div class="join">
             <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
             {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (

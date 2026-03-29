@@ -78,7 +78,9 @@ func List(tenantID string, from, to time.Time, page, limit int) (*ListResult, er
 	defer cur.Close(ctx)
 
 	var items []Retrait
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []Retrait{}
 	}
@@ -108,7 +110,9 @@ func SumForPeriod(tenantID string, from, to time.Time) (float64, error) {
 	var results []struct {
 		Total float64 `bson:"total"`
 	}
-	cur.All(ctx, &results)
+	if err := cur.All(ctx, &results); err != nil {
+		return 0, err
+	}
 	if len(results) == 0 {
 		return 0, nil
 	}
@@ -152,7 +156,9 @@ func SumByUser(tenantID string, from, to time.Time, userID string) (map[string]U
 		UserEmail string  `bson:"user_email"`
 		Total     float64 `bson:"total"`
 	}
-	cur.All(ctx, &rows)
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
 
 	result := make(map[string]UserSum, len(rows))
 	for _, r := range rows {

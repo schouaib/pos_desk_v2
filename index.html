@@ -1,11 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CiPOSdz</title>
   </head>
   <body>
+    <script>
+      document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'light');
+      var ts=localStorage.getItem('textSize');if(ts){var m={small:'14px',medium:'16px',large:'18px'};document.documentElement.style.fontSize=m[ts]||'16px'}
+    </script>
     <div id="app"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

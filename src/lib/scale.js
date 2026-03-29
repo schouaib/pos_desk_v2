@@ -58,26 +58,9 @@ export async function readWeight() {
   }
 }
 
-// Poll weight every 500ms
-export function startWeightPolling(interval = 500) {
-  stopWeightPolling()
-  weightPollTimer = setInterval(async () => {
-    try {
-      const data = await api.scaleGetWeight()
-      scaleWeight.value = data.weight
-      scaleError.value = ''
-    } catch {
-      // Silent fail during polling
-    }
-  }, interval)
-}
-
-export function stopWeightPolling() {
-  if (weightPollTimer) {
-    clearInterval(weightPollTimer)
-    weightPollTimer = null
-  }
-}
+// Weight polling removed — weight is read from barcode label scan instead
+export function startWeightPolling() {}
+export function stopWeightPolling() {}
 
 // Sync PLU data to scale
 export async function syncPLU() {

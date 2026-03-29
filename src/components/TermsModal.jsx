@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'preact/hooks'
+import { useI18n } from '../lib/i18n'
 
 const TERMS_ACCEPTED_KEY = 'ciposdz_terms_accepted_v1'
 
@@ -7,6 +8,7 @@ export function isTermsAccepted() {
 }
 
 export function TermsModal({ onAccept }) {
+  const { t } = useI18n()
   const [scrolledToBottom, setScrolledToBottom] = useState(false)
   const [checked, setChecked] = useState(false)
   const scrollRef = useRef()
@@ -21,7 +23,6 @@ export function TermsModal({ onAccept }) {
       }
     }
     el.addEventListener('scroll', onScroll)
-    // Check if content fits without scroll
     if (el.scrollHeight <= el.clientHeight + 50) setScrolledToBottom(true)
     return () => el.removeEventListener('scroll', onScroll)
   }, [])
@@ -42,77 +43,77 @@ export function TermsModal({ onAccept }) {
             </svg>
           </div>
           <div>
-            <h2 class="font-bold text-lg">شروط وأحكام الاستخدام</h2>
-            <p class="text-xs text-base-content/50">يجب قراءة والموافقة على الشروط قبل المتابعة</p>
+            <h2 class="font-bold text-lg">{t('termsOfUse')}</h2>
+            <p class="text-xs text-base-content/70">{t('termsMustRead')}</p>
           </div>
         </div>
 
         {/* Scrollable content */}
         <div ref={scrollRef} class="overflow-y-auto flex-1 p-5 text-sm leading-relaxed space-y-4">
           <div class="bg-warning/10 border border-warning/30 rounded-lg p-3 text-sm">
-            <p class="font-bold text-warning mb-1">تنبيه هام</p>
-            <p class="text-base-content/80">هذه الاتفاقية تمثل عقدًا قانونيًا ملزمًا بين المطور <strong>Chouaib SEGHIER</strong> والمستخدم. يُرجى قراءة جميع البنود بعناية.</p>
+            <p class="font-bold text-warning mb-1">{t('termsImportantNotice')}</p>
+            <p class="text-base-content/80" dangerouslySetInnerHTML={{ __html: t('termsNoticeBody') }} />
           </div>
 
           <div>
-            <h3 class="font-bold text-primary mb-2">المادة 2: طبيعة البرنامج</h3>
-            <p>البرنامج هو أداة تقنية محايدة لإدارة عمليات البيع والمخزون فقط. لا يُعتبر المطور بائعًا أو شريكًا تجاريًا أو ضامنًا للمستخدم بأي شكل من الأشكال.</p>
+            <h3 class="font-bold text-primary mb-2">{t('termsSoftwareNature')}</h3>
+            <p>{t('termsSoftwareNatureBody')}</p>
           </div>
 
           <div>
-            <h3 class="font-bold text-primary mb-2">المادة 3: حماية الملكية الفكرية</h3>
-            <p>هذا البرنامج محمي بموجب الأمر رقم 03-05 المتعلق بحقوق المؤلف والاتفاقيات الدولية. جميع الحقوق محفوظة حصريًا للسيد Chouaib SEGHIER. يُحظر النسخ أو التعديل أو التوزيع أو الهندسة العكسية.</p>
+            <h3 class="font-bold text-primary mb-2">{t('termsIPProtection')}</h3>
+            <p>{t('termsIPProtectionBody')}</p>
           </div>
 
           <div>
-            <h3 class="font-bold text-error mb-2">المادة 5: إخلاء كامل للمسؤولية — النشاط التجاري</h3>
-            <p class="mb-2">يُخلي السيد Chouaib SEGHIER مسؤوليته إخلاءً كاملًا، مطلقًا، نهائيًا، وغير قابل للرجوع عن أي وكل استخدام للبرنامج. المستخدم هو المسؤول الوحيد عن:</p>
+            <h3 class="font-bold text-error mb-2">{t('termsDisclaimerBusiness')}</h3>
+            <p class="mb-2">{t('termsDisclaimerBusinessBody')}</p>
             <ul class="space-y-1 pr-4 text-xs">
-              <li>• مشروعية جميع المنتجات والخدمات المباعة</li>
-              <li>• الامتثال لجميع القوانين التجارية والضريبية والجمركية</li>
-              <li>• الحصول على جميع التراخيص والتصاريح اللازمة</li>
-              <li>• صحة الأسعار والمعلومات المُدخلة</li>
+              <li>• {t('termsDisclaimerList1')}</li>
+              <li>• {t('termsDisclaimerList2')}</li>
+              <li>• {t('termsDisclaimerList3')}</li>
+              <li>• {t('termsDisclaimerList4')}</li>
             </ul>
-            <p class="mt-2 text-xs text-error font-semibold">يُخلي المطور مسؤوليته عن: بيع منتجات مقلدة أو محظورة أو منتهية الصلاحية، التهرب الضريبي، انتهاك حقوق الملكية الفكرية للغير، أي ممارسات تجارية مخالفة للقانون، وأي أضرار تلحق بالمستهلكين أو الأطراف الثالثة.</p>
+            <p class="mt-2 text-xs text-error font-semibold">{t('termsDisclaimerWarning')}</p>
           </div>
 
           <div>
-            <h3 class="font-bold text-error mb-2">المادة 6: إخلاء المسؤولية — البيانات</h3>
-            <p>المستخدم مسؤول عن حماية بياناته والنسخ الاحتياطي. لا يتحمل المطور أي مسؤولية عن فقدان البيانات أو تلفها أو سرقتها أو اختراقها أو انقطاع الخدمة لأي سبب كان.</p>
+            <h3 class="font-bold text-error mb-2">{t('termsDisclaimerData')}</h3>
+            <p>{t('termsDisclaimerDataBody')}</p>
           </div>
 
           <div>
-            <h3 class="font-bold text-primary mb-2">المادة 7: البرنامج "كما هو"</h3>
-            <p>يُقدَّم البرنامج "كما هو" (AS IS) و"حسب التوفر" (AS AVAILABLE) و"مع جميع العيوب" (WITH ALL FAULTS) دون أي ضمانات صريحة أو ضمنية.</p>
+            <h3 class="font-bold text-primary mb-2">{t('termsAsIs')}</h3>
+            <p>{t('termsAsIsBody')}</p>
           </div>
 
           <div>
-            <h3 class="font-bold text-primary mb-2">المادة 8: تحديد المسؤولية</h3>
-            <p>المسؤولية القصوى للمطور لا تتجاوز المبلغ المدفوع خلال 3 أشهر السابقة. لا يتحمل المطور أي أضرار غير مباشرة أو تبعية أو خسارة أرباح.</p>
+            <h3 class="font-bold text-primary mb-2">{t('termsLiability')}</h3>
+            <p>{t('termsLiabilityBody')}</p>
           </div>
 
           <div>
-            <h3 class="font-bold text-warning mb-2">المادة 9: التعويض والحماية</h3>
-            <p>يتعهد المستخدم بتعويض وحماية السيد Chouaib SEGHIER من أي دعاوى أو مطالبات أو غرامات أو تكاليف قانونية ناتجة عن استخدام المستخدم للبرنامج.</p>
+            <h3 class="font-bold text-warning mb-2">{t('termsIndemnification')}</h3>
+            <p>{t('termsIndemnificationBody')}</p>
           </div>
 
           <div>
-            <h3 class="font-bold text-primary mb-2">المادة 11: التنازل عن حق التقاضي</h3>
-            <p>بقبول هذه الشروط، يتنازل المستخدم عن حقه في رفع أي دعوى ضد المطور فيما يتعلق بالخسائر المالية أو فقدان البيانات أو أي ضرر غير مباشر.</p>
+            <h3 class="font-bold text-primary mb-2">{t('termsWaiver')}</h3>
+            <p>{t('termsWaiverBody')}</p>
           </div>
 
           <div>
-            <h3 class="font-bold text-primary mb-2">المادة 12: القانون الواجب التطبيق</h3>
-            <p>تخضع هذه الاتفاقية لقوانين الجمهورية الجزائرية الديمقراطية الشعبية. تختص المحاكم الجزائرية حصريًا بالنظر في أي نزاع.</p>
+            <h3 class="font-bold text-primary mb-2">{t('termsGoverningLaw')}</h3>
+            <p>{t('termsGoverningLawBody')}</p>
           </div>
 
-          <div class="bg-base-200 rounded-lg p-3 text-xs text-center text-base-content/50">
-            <p>هذا ملخص للشروط الرئيسية. للاطلاع على النص الكامل (15 مادة)، يمكنك مراجعة صفحة الشروط والأحكام الكاملة داخل التطبيق.</p>
+          <div class="bg-base-200 rounded-lg p-3 text-xs text-center text-base-content/70">
+            <p>{t('termsSummaryNote')}</p>
           </div>
 
           {!scrolledToBottom && (
-            <div class="text-center text-xs text-base-content/40 animate-bounce pt-2">
-              ↓ يرجى التمرير لقراءة جميع الشروط ↓
+            <div class="text-center text-xs text-base-content/70 animate-bounce pt-2">
+              {t('termsScrollDown')}
             </div>
           )}
         </div>
@@ -127,9 +128,7 @@ export function TermsModal({ onAccept }) {
               onChange={(e) => setChecked(e.target.checked)}
               disabled={!scrolledToBottom}
             />
-            <span class="text-sm leading-relaxed">
-              أُقر بأنني قرأت وفهمت جميع شروط وأحكام الاستخدام، وأوافق عليها بالكامل دون أي تحفظ. أتحمل كامل المسؤولية عن استخدامي للبرنامج وأُعفي السيد <strong>Chouaib SEGHIER</strong> من أي مسؤولية.
-            </span>
+            <span class="text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: t('termsAcceptCheckbox') }} />
           </label>
 
           <div class="flex gap-2">
@@ -138,12 +137,12 @@ export function TermsModal({ onAccept }) {
               disabled={!checked || !scrolledToBottom}
               onClick={handleAccept}
             >
-              أوافق على الشروط والأحكام
+              {t('termsAcceptButton')}
             </button>
           </div>
 
-          <p class="text-xs text-center text-base-content/40">
-            © {new Date().getFullYear()} Chouaib SEGHIER — جميع الحقوق محفوظة
+          <p class="text-xs text-center text-base-content/70">
+            {t('termsAllRightsReserved').replace('{year}', new Date().getFullYear())}
           </p>
         </div>
       </div>

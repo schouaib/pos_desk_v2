@@ -44,7 +44,8 @@ func HandleValidate(c *fiber.Ctx) error {
 
 // HandleCreateKey creates a new activation key for the tenant.
 func HandleCreateKey(c *fiber.Ctx) error {
-	tenantID, _ := primitive.ObjectIDFromHex(c.Locals("tenant_id").(string))
+	tidStr, _ := c.Locals("tenant_id").(string)
+	tenantID, _ := primitive.ObjectIDFromHex(tidStr)
 	var req CreateKeyRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, "invalid body")
@@ -59,7 +60,8 @@ func HandleCreateKey(c *fiber.Ctx) error {
 
 // HandleListKeys returns all activation keys for the tenant.
 func HandleListKeys(c *fiber.Ctx) error {
-	tenantID, _ := primitive.ObjectIDFromHex(c.Locals("tenant_id").(string))
+	tidStr, _ := c.Locals("tenant_id").(string)
+	tenantID, _ := primitive.ObjectIDFromHex(tidStr)
 	keys, err := ListKeys(c.Context(), tenantID)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, err.Error())
@@ -72,7 +74,8 @@ func HandleListKeys(c *fiber.Ctx) error {
 
 // HandleRevokeKey deactivates an activation key.
 func HandleRevokeKey(c *fiber.Ctx) error {
-	tenantID, _ := primitive.ObjectIDFromHex(c.Locals("tenant_id").(string))
+	tidStr, _ := c.Locals("tenant_id").(string)
+	tenantID, _ := primitive.ObjectIDFromHex(tidStr)
 	id, err := primitive.ObjectIDFromHex(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid id")
@@ -86,7 +89,8 @@ func HandleRevokeKey(c *fiber.Ctx) error {
 
 // HandleReactivateKey re-enables a previously revoked key.
 func HandleReactivateKey(c *fiber.Ctx) error {
-	tenantID, _ := primitive.ObjectIDFromHex(c.Locals("tenant_id").(string))
+	tidStr, _ := c.Locals("tenant_id").(string)
+	tenantID, _ := primitive.ObjectIDFromHex(tidStr)
 	id, err := primitive.ObjectIDFromHex(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid id")
@@ -100,7 +104,8 @@ func HandleReactivateKey(c *fiber.Ctx) error {
 
 // HandleDeleteKey removes an activation key.
 func HandleDeleteKey(c *fiber.Ctx) error {
-	tenantID, _ := primitive.ObjectIDFromHex(c.Locals("tenant_id").(string))
+	tidStr, _ := c.Locals("tenant_id").(string)
+	tenantID, _ := primitive.ObjectIDFromHex(tidStr)
 	id, err := primitive.ObjectIDFromHex(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid id")
@@ -114,7 +119,8 @@ func HandleDeleteKey(c *fiber.Ctx) error {
 
 // HandleRemoveInstall removes a machine from an activation key.
 func HandleRemoveInstall(c *fiber.Ctx) error {
-	tenantID, _ := primitive.ObjectIDFromHex(c.Locals("tenant_id").(string))
+	tidStr, _ := c.Locals("tenant_id").(string)
+	tenantID, _ := primitive.ObjectIDFromHex(tidStr)
 	id, err := primitive.ObjectIDFromHex(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid id")

@@ -61,11 +61,11 @@ export default function SaleReturns({ path }) {
           <table class="table table-sm w-full">
             <thead class="bg-base-200/60">
               <tr>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('ref')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('originalSale')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('saleDate')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('saleCashier')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('saleTotalTTC')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('ref')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('originalSale')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('saleDate')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('saleCashier')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('saleTotalTTC')}</th>
                 <th class="px-3 py-2.5 w-8"></th>
               </tr>
             </thead>
@@ -74,7 +74,7 @@ export default function SaleReturns({ path }) {
                 <tr><td colSpan={6} class="py-10 text-center"><span class="loading loading-spinner loading-md text-primary" /></td></tr>
               )}
               {!loading && items.length === 0 && (
-                <tr><td colSpan={6} class="py-12 text-center text-base-content/30 text-sm">{t('noReturns')}</td></tr>
+                <tr><td colSpan={6} class="py-12 text-center text-base-content/50 text-sm">{t('noReturns')}</td></tr>
               )}
               {!loading && items.map(r => (
                 <>
@@ -87,7 +87,7 @@ export default function SaleReturns({ path }) {
                     <td class="px-3 py-2.5 text-end font-mono text-sm text-error font-semibold">{r.total?.toFixed(2)}</td>
                     <td class="px-3 py-2.5">
                       <svg xmlns="http://www.w3.org/2000/svg"
-                        class={`w-3.5 h-3.5 transition-transform duration-200 text-base-content/40 ${expanded === r.id ? 'rotate-180' : ''}`}
+                        class={`w-3.5 h-3.5 transition-transform duration-200 text-base-content/70 ${expanded === r.id ? 'rotate-180' : ''}`}
                         fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                       </svg>
@@ -106,7 +106,7 @@ export default function SaleReturns({ path }) {
                                   <td class="text-center font-mono text-xs">{l.qty}</td>
                                   <td class="text-end font-mono text-xs">{l.total_ht?.toFixed(2)}</td>
                                   <td class="text-end font-mono text-xs font-medium">{l.total_ttc?.toFixed(2)}</td>
-                                  <td class="text-xs text-base-content/60">{l.reason || '—'}</td>
+                                  <td class="text-xs text-base-content/80">{l.reason || '—'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -124,7 +124,7 @@ export default function SaleReturns({ path }) {
 
       {total > 0 && (
         <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/60">{t('showing')} {Math.min((page - 1) * limit + 1, total)}–{Math.min(page * limit, total)} {t('of')} {total}</span>
+          <span class="text-base-content/80">{t('showing')} {Math.min((page - 1) * limit + 1, total)}–{Math.min(page * limit, total)} {t('of')} {total}</span>
           <div class="join">
             <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
             <button class="join-item btn btn-sm btn-active">{page}</button>

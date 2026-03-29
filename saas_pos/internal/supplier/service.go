@@ -295,7 +295,9 @@ func ListArchived(tenantID, q string, page, limit int) (*ListResult, error) {
 	}
 	defer cur.Close(ctx)
 	items := []Supplier{}
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	pages := int(math.Ceil(float64(total) / float64(limit)))
 	if pages == 0 {
 		pages = 1

@@ -96,6 +96,29 @@ func GetCurrent(tenantID, userID string) (*Session, error) {
 	return &session, nil
 }
 
+// AdjustLastClosing subtracts an amount from the most recent closed session's closing_amount.
+// Used when a return happens after the caisse was closed.
+func AdjustLastClosing(tenantID, userID string, amount float64) error {
+	ctx := context.Background()
+	// Find the most recent closed session for this user
+	opts := options.FindOne().SetSort(bson.M{"closed_at": -1})
+	var session Session
+	err := col().FindOne(ctx, bson.M{
+		"tenant_id": tenantID,
+		"user_id":   userID,
+		"status":    "closed",
+	}, opts).Decode(&session)
+	if err != nil {
+		return err
+	}
+	// Subtract the return amount from closing_amount
+	_, err = col().UpdateOne(ctx,
+		bson.M{"_id": session.ID},
+		bson.M{"$inc": bson.M{"closing_amount": -amount}},
+	)
+	return err
+}
+
 // UserCaisseSummary holds the total opening and closing amounts for a user in a date range.
 type UserCaisseSummary struct {
 	Email         string  `bson:"email"`
@@ -131,7 +154,9 @@ func SumByUser(tenantID string, from, to time.Time) (map[string]UserCaisseSummar
 		ClosingAmount float64 `bson:"closing_amount"`
 	}
 	var rows []row
-	cur.All(ctx, &rows)
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
 
 	result := make(map[string]UserCaisseSummary, len(rows))
 	for _, r := range rows {
@@ -210,7 +235,9 @@ func ListHistory(tenantID string, page, limit int) ([]Session, int64, error) {
 	defer cur.Close(ctx)
 
 	var items []Session
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, 0, err
+	}
 	if items == nil {
 		items = []Session{}
 	}

@@ -46,3 +46,4 @@ export function hasPerm(module, action) {
 export function hasFeature(feature) {
   return !!jwtPayload.value?.features?.[feature]
 }
+

@@ -46,8 +46,13 @@ func RequireRole(roles ...string) fiber.Handler {
 }
 
 // GetClaims is a helper to extract claims from context.
+// Always returns a valid pointer — panics are impossible because Auth() middleware
+// guarantees claims are set before any handler runs.
 func GetClaims(c *fiber.Ctx) *jwt.Claims {
-	claims, _ := c.Locals(LocalsClaims).(*jwt.Claims)
+	claims, ok := c.Locals(LocalsClaims).(*jwt.Claims)
+	if !ok || claims == nil {
+		return &jwt.Claims{}
+	}
 	return claims
 }
 

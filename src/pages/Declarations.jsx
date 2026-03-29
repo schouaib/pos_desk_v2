@@ -91,7 +91,7 @@ const Icon = ({ d, className = 'w-5 h-5' }) => (
 function SectionTitle({ children }) {
   return (
     <div class="flex items-center gap-2 mb-3 mt-6">
-      <span class="text-xs font-semibold uppercase tracking-widest text-base-content/40">{children}</span>
+      <span class="text-xs font-semibold uppercase tracking-widest text-base-content/70">{children}</span>
       <div class="flex-1 h-px bg-base-300" />
     </div>
   )
@@ -100,7 +100,7 @@ function SectionTitle({ children }) {
 function DecRow({ label, value, bold, highlight, indent, loading }) {
   return (
     <div class={`flex items-center justify-between py-2.5 px-4 ${highlight ? 'bg-primary/5 rounded-lg' : 'border-b border-base-200'} ${indent ? 'ms-6' : ''}`}>
-      <span class={`text-sm ${bold ? 'font-bold' : 'text-base-content/70'}`}>{label}</span>
+      <span class={`text-sm ${bold ? 'font-bold' : 'text-base-content/80'}`}>{label}</span>
       <span class={`text-sm tabular-nums ${bold ? 'font-bold text-primary' : ''}`}>
         {loading ? <span class="loading loading-dots loading-xs" /> : (value ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </span>
@@ -233,7 +233,7 @@ function G50Tab() {
             <div class="flex items-center justify-between">
               <div>
                 <h3 class="text-lg font-bold">G50 — {t('declG50Title')}</h3>
-                <p class="text-xs text-base-content/50 mt-0.5">{t('declG50Subtitle')}</p>
+                <p class="text-xs text-base-content/70 mt-0.5">{t('declG50Subtitle')}</p>
               </div>
               <div class="text-end">
                 <p class="text-sm font-semibold">{month}</p>
@@ -356,7 +356,7 @@ function G50ATab() {
         <div class="card-body p-0">
           <div class="bg-primary/5 p-4 rounded-t-xl border-b border-base-200">
             <h3 class="text-lg font-bold">G50A — {t('declG50ATitle')}</h3>
-            <p class="text-xs text-base-content/50 mt-0.5">{t('declG50ASubtitle')}</p>
+            <p class="text-xs text-base-content/70 mt-0.5">{t('declG50ASubtitle')}</p>
           </div>
 
           <div class="overflow-x-auto">
@@ -376,12 +376,12 @@ function G50ATab() {
                 {loading ? (
                   <tr><td colspan="7" class="text-center py-8"><span class="loading loading-spinner loading-md" /></td></tr>
                 ) : clients.length === 0 ? (
-                  <tr><td colspan="7" class="text-center py-8 text-base-content/40">{t('noData')}</td></tr>
+                  <tr><td colspan="7" class="text-center py-8 text-base-content/70">{t('noData')}</td></tr>
                 ) : clients.map((c, i) => (
                   <tr key={c.id} class="hover">
-                    <td class="text-base-content/40">{i + 1}</td>
+                    <td class="text-base-content/70">{i + 1}</td>
                     <td class="font-medium">{c.name}</td>
-                    <td class="text-xs text-base-content/50">{c.nif || '—'}</td>
+                    <td class="text-xs text-base-content/70">{c.nif || '—'}</td>
                     <td class="text-end">{c.count}</td>
                     <td class="text-end tabular-nums">{c.totalHT.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })}</td>
                     <td class="text-end tabular-nums">{c.totalVAT.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })}</td>
@@ -510,7 +510,7 @@ function G11Tab() {
           <div class="card-body p-0">
             <div class="bg-success/5 p-4 rounded-t-xl border-b border-base-200">
               <h3 class="text-lg font-bold">{t('declTCR')}</h3>
-              <p class="text-xs text-base-content/50">{t('declTCRSubtitle')}</p>
+              <p class="text-xs text-base-content/70">{t('declTCRSubtitle')}</p>
             </div>
 
             <div class="p-2">
@@ -536,7 +536,7 @@ function G11Tab() {
           <div class="card-body p-0">
             <div class="bg-info/5 p-4 rounded-t-xl border-b border-base-200">
               <h3 class="text-lg font-bold">{t('declBilan')}</h3>
-              <p class="text-xs text-base-content/50">{t('declBilanSubtitle')}</p>
+              <p class="text-xs text-base-content/70">{t('declBilanSubtitle')}</p>
             </div>
 
             <div class="p-2">
@@ -655,7 +655,7 @@ function G12Tab() {
         <div class="card-body p-0">
           <div class="bg-warning/5 p-4 rounded-t-xl border-b border-base-200">
             <h3 class="text-lg font-bold">G12 — {t('declG12Title')}</h3>
-            <p class="text-xs text-base-content/50">{t('declG12Subtitle')}</p>
+            <p class="text-xs text-base-content/70">{t('declG12Subtitle')}</p>
           </div>
 
           <div class="p-2">
@@ -681,8 +681,8 @@ function G12Tab() {
 
             {/* IRG bracket info */}
             <div class="mt-4 px-4 pb-4">
-              <p class="text-xs font-semibold text-base-content/40 mb-2">{t('declIRGBrackets')}</p>
-              <div class="text-xs text-base-content/50 space-y-1">
+              <p class="text-xs font-semibold text-base-content/70 mb-2">{t('declIRGBrackets')}</p>
+              <div class="text-xs text-base-content/70 space-y-1">
                 <p>0 - 240,000 DA: 0%</p>
                 <p>240,001 - 480,000 DA: 23%</p>
                 <p>480,001 - 960,000 DA: 27%</p>
@@ -793,7 +793,7 @@ function G20Tab() {
         <div class="card-body p-0">
           <div class="bg-error/5 p-4 rounded-t-xl border-b border-base-200">
             <h3 class="text-lg font-bold">G20 — {t('declG20Title')}</h3>
-            <p class="text-xs text-base-content/50">{t('declG20Subtitle')}</p>
+            <p class="text-xs text-base-content/70">{t('declG20Subtitle')}</p>
           </div>
 
           <div class="p-2">

@@ -62,10 +62,12 @@ func Create(tenantID string, input CreateInput) (*ProductBatch, error) {
 	}
 
 	// Also increment product qty_available
-	database.Col("products").UpdateOne(ctx,
+	if _, err := database.Col("products").UpdateOne(ctx,
 		bson.M{"_id": pid, "tenant_id": tid},
 		bson.M{"$inc": bson.M{"qty_available": input.Qty}},
-	)
+	); err != nil {
+		return nil, errors.New("failed to update stock")
+	}
 
 	return &b, nil
 }
@@ -127,7 +129,9 @@ func ListByProduct(tenantID, productID string, page, limit int) (*ListResult, er
 	defer cur.Close(ctx)
 
 	var items []ProductBatch
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []ProductBatch{}
 	}
@@ -151,7 +155,9 @@ func DecrementFIFO(tenantID string, productID primitive.ObjectID, qty float64) {
 	defer cur.Close(ctx)
 
 	var batches []ProductBatch
-	cur.All(ctx, &batches)
+	if err := cur.All(ctx, &batches); err != nil {
+		return
+	}
 
 	remaining := qty
 	for _, b := range batches {
@@ -188,7 +194,9 @@ func ListExpiring(tenantID string, daysBefore int) ([]ProductBatch, error) {
 	defer cur.Close(ctx)
 
 	var items []ProductBatch
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []ProductBatch{}
 	}
@@ -229,7 +237,9 @@ func ListExpiringPaginated(tenantID string, daysBefore, page, limit int) (*Pagin
 	defer cur.Close(ctx)
 
 	var items []ProductBatch
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []ProductBatch{}
 	}
@@ -283,7 +293,10 @@ func ListAlerts(tenantID string) ([]ProductBatch, error) {
 			continue
 		}
 		var batches []ProductBatch
-		cur.All(ctx, &batches)
+		if err := cur.All(ctx, &batches); err != nil {
+			cur.Close(ctx)
+			continue
+		}
 		cur.Close(ctx)
 		allAlerts = append(allAlerts, batches...)
 	}

@@ -24,8 +24,15 @@ const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 function cachedGet(path) {
   const entry = _refCache.get(path)
   if (entry && Date.now() - entry.ts < CACHE_TTL) return entry.promise
+  // Evict expired entries first, then oldest if still over limit
   if (_refCache.size >= CACHE_MAX) {
-    _refCache.delete(_refCache.keys().next().value)
+    const now = Date.now()
+    for (const [k, v] of _refCache) {
+      if (now - v.ts >= CACHE_TTL) _refCache.delete(k)
+    }
+    while (_refCache.size >= CACHE_MAX) {
+      _refCache.delete(_refCache.keys().next().value)
+    }
   }
   const promise = request('GET', path).catch(e => { _refCache.delete(path); throw e })
   _refCache.set(path, { promise, ts: Date.now() })
@@ -53,6 +60,7 @@ async function request(method, path, body, { timeout = 15000 } = {}) {
     })
   } catch (err) {
     clearTimeout(timer)
+    console.error('[API]', method, `${BASE}${path}`, err.message, { _machineId: !!_machineId, _activationKey: !!_activationKey })
     if (err.name === 'AbortError') throw new Error('Request timed out')
     throw new Error('server_unreachable')
   } finally {
@@ -168,10 +176,16 @@ export const api = {
     })
     if (!res.ok) throw new Error('Export failed')
     const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = 'products.csv'; a.click()
-    URL.revokeObjectURL(url)
+    if (window.__TAURI_INTERNALS__) {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()))
+      await invoke('save_to_downloads', { filename: 'products.csv', data: bytes })
+    } else {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = 'products.csv'; a.click()
+      URL.revokeObjectURL(url)
+    }
   },
   listPriceHistory: (productId, params) => request('GET', `/tenant/products/${encodeURIComponent(productId)}/price-history?${new URLSearchParams(params)}`),
   listProductSuppliers: (productId) => request('GET', `/tenant/products/${encodeURIComponent(productId)}/suppliers`),

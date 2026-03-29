@@ -4,20 +4,13 @@ import { I18nProvider } from './lib/i18n'
 import './index.css'
 
 // ─── Production security: disable DevTools & right-click ────────────
-if (window.__TAURI_INTERNALS__) {
-  // Block DevTools shortcuts
+if (import.meta.env.PROD && window.__TAURI_INTERNALS__) {
   document.addEventListener('keydown', (e) => {
-    // F12
     if (e.key === 'F12') e.preventDefault()
-    // Ctrl+Shift+I / Cmd+Option+I (DevTools)
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I') e.preventDefault()
-    // Ctrl+Shift+J / Cmd+Option+J (Console)
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'J') e.preventDefault()
-    // Ctrl+U / Cmd+U (View Source)
-    if ((e.ctrlKey || e.metaKey) && e.key === 'u') e.preventDefault()
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'i')) e.preventDefault()
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'J' || e.key === 'j')) e.preventDefault()
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U')) e.preventDefault()
   })
-
-  // Block right-click context menu
   document.addEventListener('contextmenu', (e) => e.preventDefault())
 }
 

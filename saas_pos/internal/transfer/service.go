@@ -150,7 +150,9 @@ func List(tenantID string, page, limit int) (*ListResult, error) {
 	defer cur.Close(ctx)
 
 	var items []StockTransfer
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []StockTransfer{}
 	}

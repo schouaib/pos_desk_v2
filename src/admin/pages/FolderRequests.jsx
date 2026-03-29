@@ -25,7 +25,7 @@ export default function FolderRequests() {
       <h2 class="text-2xl font-bold mb-6">{t('folderRequests') || 'Folder Requests'}</h2>
       {error && <div class="alert alert-error mb-4">{error}</div>}
       {requests.length === 0 ? (
-        <p class="text-base-content/60 text-center py-10">{t('noPendingRequests') || 'No pending requests'}</p>
+        <p class="text-base-content/80 text-center py-10">{t('noPendingRequests') || 'No pending requests'}</p>
       ) : (
         <div class="card bg-base-100 shadow overflow-hidden">
           <table class="table table-sm w-full">
@@ -42,7 +42,7 @@ export default function FolderRequests() {
                 <tr key={req.id} class="border-b border-base-200">
                   <td class="px-3 py-2 font-medium">{req.tenant_name}</td>
                   <td class="px-3 py-2">{req.folder_name}</td>
-                  <td class="px-3 py-2 text-sm text-base-content/60">{new Date(req.created_at).toLocaleDateString()}</td>
+                  <td class="px-3 py-2 text-sm text-base-content/80">{new Date(req.created_at).toLocaleDateString()}</td>
                   <td class="px-3 py-2 space-x-2">
                     <button class="btn btn-xs btn-success" onClick={() => approve(req.id)}>{t('approve') || 'Approve'}</button>
                     <button class="btn btn-xs btn-error btn-outline" onClick={() => reject(req.id)}>{t('reject') || 'Reject'}</button>

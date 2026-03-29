@@ -79,7 +79,9 @@ func ListByProduct(tenantID, productID string) ([]DiscountRule, error) {
 	defer cur.Close(ctx)
 
 	var items []DiscountRule
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []DiscountRule{}
 	}
@@ -163,7 +165,9 @@ func GetApplicable(tenantID string, productID primitive.ObjectID, qty float64, d
 	defer cur.Close(ctx)
 
 	var rules []DiscountRule
-	cur.All(ctx, &rules)
+	if err := cur.All(ctx, &rules); err != nil {
+		return nil
+	}
 
 	for _, r := range rules {
 		if r.EndDate != nil && date.After(*r.EndDate) {

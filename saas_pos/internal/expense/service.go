@@ -164,7 +164,9 @@ func List(tenantID, search string, from, to time.Time, page, limit int) (*ListRe
 	defer cur.Close(ctx)
 
 	var items []Expense
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []Expense{}
 	}
@@ -193,7 +195,9 @@ func SumForPeriod(tenantID string, from, to time.Time) (float64, error) {
 	defer cur.Close(ctx)
 
 	var expenses []Expense
-	cur.All(ctx, &expenses)
+	if err := cur.All(ctx, &expenses); err != nil {
+		return 0, err
+	}
 
 	var total float64
 	for _, exp := range expenses {

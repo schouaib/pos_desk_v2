@@ -148,6 +148,11 @@ func Create(tenantID, cashierID, cashierEmail string, input CreateInput) (*Sale,
 		if discount < 0 {
 			discount = 0
 		}
+		// Cap discount to line total to prevent negative amounts
+		lineTotal := li.Qty * li.UnitPrice
+		if discount > lineTotal {
+			discount = lineTotal
+		}
 
 		// qty can be negative (return). Negative qty → negative lineHT/TTC.
 		lineHT := li.Qty*li.UnitPrice - discount
@@ -247,7 +252,8 @@ func Create(tenantID, cashierID, cashierEmail string, input CreateInput) (*Sale,
 		Total:         totalTTC,
 		TotalEarning:  totalEarning,
 		PaymentMethod: input.PaymentMethod,
-		Timbre:        CalcTimbre(totalTTC, input.PaymentMethod),
+		Timbre:        func() float64 { if input.HasFacture { return CalcTimbre(totalTTC, input.PaymentMethod) }; return 0 }(),
+		HasFacture:    input.HasFacture,
 		AmountPaid:    input.AmountPaid,
 		Change:        change,
 		ClientID:      clientID,
@@ -306,7 +312,9 @@ func List(tenantID string, from, to time.Time, page, limit int, ref string) (*Li
 	defer cur.Close(ctx)
 
 	var items []Sale
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []Sale{}
 	}
@@ -344,7 +352,9 @@ func ListByClient(tenantID, clientID string, from, to time.Time, page, limit int
 	defer cur.Close(ctx)
 
 	var items []Sale
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []Sale{}
 	}
@@ -381,7 +391,9 @@ func Stats(tenantID string, from, to time.Time) (*StatsResult, error) {
 		TotalRevenue float64 `bson:"total_revenue"`
 		TotalEarning float64 `bson:"total_earning"`
 	}
-	cur.All(ctx, &agg)
+	if err := cur.All(ctx, &agg); err != nil {
+		return &StatsResult{Count: count}, nil
+	}
 
 	result := &StatsResult{Count: count}
 	if len(agg) > 0 {
@@ -438,7 +450,7 @@ func SalesStatistics(tenantID string, from, to time.Time, includeLosses bool) (*
 					bson.M{"$ne": bson.A{"$sale_type", "credit"}},
 				}}, "$total", 0},
 			}},
-			"total_timbre": bson.M{"$sum": bson.M{"$ifNull": bson.A{"$timbre", 0}}},
+			"total_timbre": bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$eq": bson.A{"$has_facture", true}}, bson.M{"$ifNull": bson.A{"$timbre", 0}}, 0}}},
 		}}},
 	}
 
@@ -460,7 +472,9 @@ func SalesStatistics(tenantID string, from, to time.Time, includeLosses bool) (*
 		VirementPaymentTTC float64 `bson:"virement_payment_ttc"`
 		TotalTimbre        float64 `bson:"total_timbre"`
 	}
-	cur.All(ctx, &agg)
+	if err := cur.All(ctx, &agg); err != nil {
+		return &SalesStatisticsResult{SalesCount: count}, nil
+	}
 
 	res := &SalesStatisticsResult{SalesCount: count}
 	if len(agg) > 0 {
@@ -554,7 +568,7 @@ func UserSummary(tenantID string, from, to time.Time, userID, caisseID string) (
 			"virement_sales_total": bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$and": bson.A{isSale, isVirement, isNotCredit}}, "$total", 0}}},
 			"returns_count":        bson.M{"$sum": bson.M{"$cond": bson.A{isReturn, 1, 0}}},
 			"returns_total":        bson.M{"$sum": bson.M{"$cond": bson.A{isReturn, "$total", 0}}},
-			"timbre_total":         bson.M{"$sum": bson.M{"$ifNull": bson.A{"$timbre", 0}}},
+			"timbre_total":         bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$eq": bson.A{"$has_facture", true}}, bson.M{"$ifNull": bson.A{"$timbre", 0}}, 0}}},
 		}}},
 		{{Key: "$sort", Value: bson.M{"sales_total": -1}}},
 	}
@@ -578,7 +592,9 @@ func UserSummary(tenantID string, from, to time.Time, userID, caisseID string) (
 		TimbreTotal        float64 `bson:"timbre_total"`
 	}
 	var rows []saleAgg
-	cur.All(ctx, &rows)
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
 
 	// Build a map of user_id → retraits total
 	retraitsByUser, _ := retrait.SumByUser(tenantID, from, to, userID)

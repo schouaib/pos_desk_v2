@@ -143,10 +143,27 @@ func Create(tenantID string, input CreateInput) (*Product, error) {
 	if _, err = col().InsertOne(ctx, p); err != nil {
 		return nil, err
 	}
+
+	// Record initial stock movement so it appears in movement history
+	if p.QtyAvailable > 0 {
+		database.Col("stock_adjustments").InsertOne(ctx, bson.M{
+			"_id":              primitive.NewObjectID(),
+			"tenant_id":        tenantID,
+			"product_id":       p.ID,
+			"product_name":     p.Name,
+			"qty_before":       0,
+			"qty_after":        p.QtyAvailable,
+			"reason":           "stock initial",
+			"created_by":       "",
+			"created_by_email": "",
+			"created_at":       now,
+		})
+	}
+
 	return &p, nil
 }
 
-func List(tenantID string, query string, page, limit int, categoryID ...string) (*ListResult, error) {
+func List(tenantID string, query string, page, limit int, filters ...string) (*ListResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -163,10 +180,16 @@ func List(tenantID string, query string, page, limit int, categoryID ...string) 
 
 	filter := bson.M{"tenant_id": tid, "archived": bson.M{"$ne": true}}
 
-	// Optional category filter
-	if len(categoryID) > 0 && categoryID[0] != "" {
-		if catOID, err := primitive.ObjectIDFromHex(categoryID[0]); err == nil {
+	// Optional category filter (filters[0])
+	if len(filters) > 0 && filters[0] != "" {
+		if catOID, err := primitive.ObjectIDFromHex(filters[0]); err == nil {
 			filter["category_id"] = catOID
+		}
+	}
+	// Optional brand filter (filters[1])
+	if len(filters) > 1 && filters[1] != "" {
+		if brOID, err := primitive.ObjectIDFromHex(filters[1]); err == nil {
+			filter["brand_id"] = brOID
 		}
 	}
 
@@ -672,6 +695,11 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 	})
 
 	total := int64(len(allItems))
+	var sumQty float64
+	for _, m := range allItems {
+		sumQty += m.Qty
+	}
+
 	start := (page - 1) * limit
 	if start > len(allItems) {
 		start = len(allItems)
@@ -685,7 +713,7 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 	if pages == 0 {
 		pages = 1
 	}
-	return &MovementsResult{Items: allItems[start:end], Total: total, Page: page, Limit: limit, Pages: pages}, nil
+	return &MovementsResult{Items: allItems[start:end], Total: total, SumQty: sumQty, Page: page, Limit: limit, Pages: pages}, nil
 }
 
 // LowStockResult holds paginated low-stock products.
@@ -738,7 +766,9 @@ func ListLowStock(tenantID, query string, page, limit int) (*ListResult, error) 
 	defer cursor.Close(ctx)
 
 	items := []Product{}
-	cursor.All(ctx, &items)
+	if err := cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
 
 	pages := int(math.Ceil(float64(total) / float64(limit)))
 	if pages == 0 {
@@ -762,7 +792,9 @@ func ExportCSV(tenantID string) ([]byte, error) {
 	defer cur.Close(ctx)
 
 	var products []Product
-	cur.All(ctx, &products)
+	if err := cur.All(ctx, &products); err != nil {
+		return nil, err
+	}
 
 	var buf strings.Builder
 	buf.WriteString("Name,Barcode,Ref,QtyAvailable,QtyMin,PrixAchat,PrixVente1,PrixVente2,PrixVente3,VAT,IsService\n")
@@ -832,7 +864,9 @@ func GetValuation(tenantID string) (*ValuationResult, error) {
 		TotalQty   float64 `bson:"total_qty"`
 		Count      int64   `bson:"count"`
 	}
-	cur.All(ctx, &agg)
+	if err := cur.All(ctx, &agg); err != nil {
+		return &ValuationResult{}, nil
+	}
 
 	result := &ValuationResult{}
 	if len(agg) > 0 {
@@ -901,7 +935,9 @@ func ListArchived(tenantID string, query string, page, limit int) (*ListResult, 
 	defer cursor.Close(ctx)
 
 	items := []Product{}
-	cursor.All(ctx, &items)
+	if err := cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	pages := int(math.Ceil(float64(total) / float64(limit)))
 	if pages == 0 { pages = 1 }
 	return &ListResult{Items: items, Total: total, Page: page, Limit: limit, Pages: pages}, nil
@@ -1098,8 +1134,8 @@ func Delete(tenantID, id string) (archived bool, err error) {
 
 	// Check if product has any purchases
 	purchasesCount, _ := database.Col("purchases").CountDocuments(ctx, bson.M{
-		"tenant_id":        tenantID,
-		"items.product_id": oid,
+		"tenant_id":        tid,
+		"lines.product_id": oid,
 	})
 
 	if salesCount > 0 || purchasesCount > 0 {

@@ -57,11 +57,11 @@ export default function LowStock({ path }) {
           <table class="table table-sm w-full">
             <thead class="bg-base-200/60">
               <tr>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('productName')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('ref')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('qtyAvailable')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('qtyMin')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('deficit')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('productName')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('ref')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('qtyAvailable')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('qtyMin')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('deficit')}</th>
               </tr>
             </thead>
             <tbody>
@@ -75,7 +75,7 @@ export default function LowStock({ path }) {
                     <td class="px-3 py-2.5">
                       <div class="font-medium">{p.name}</div>
                       {p.barcodes?.length > 0 && (
-                        <div class="text-xs text-base-content/50">{p.barcodes.slice(0, 2).join(', ')}</div>
+                        <div class="text-xs text-base-content/70">{p.barcodes.slice(0, 2).join(', ')}</div>
                       )}
                     </td>
                     <td class="px-3 py-2.5 text-sm">{p.ref || '—'}</td>
@@ -110,7 +110,7 @@ export default function LowStock({ path }) {
 
       {total > 0 && (
         <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/60">{t('showing')} {start}–{end} {t('of')} {total}</span>
+          <span class="text-base-content/80">{t('showing')} {start}–{end} {t('of')} {total}</span>
           <div class="join">
             <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
             {(() => {

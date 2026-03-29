@@ -81,6 +81,9 @@ export const saApi = {
   // API Metrics
   getMetrics: (period) => request('GET', `/super-admin/metrics?period=${encodeURIComponent(period)}`),
 
+  // Integration Tests
+  runTests: (suite) => request('POST', `/super-admin/run-tests${suite ? `?suite=${encodeURIComponent(suite)}` : ''}`),
+
   // Product import
   importProducts: async (tenantId, file, conflictMode) => {
     const MAX_FILE_SIZE = 10 * 1024 * 1024

@@ -198,11 +198,11 @@ export default function Users({ path }) {
         <table class="table table-sm w-full">
           <thead class="bg-base-200/60">
             <tr>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('name')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('email')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('role')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('status')}</th>
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 w-28">{t('actions')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('name')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('email')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('role')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('status')}</th>
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 w-28">{t('actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -214,7 +214,7 @@ export default function Users({ path }) {
                 </td>
                 <td class="px-3 py-2.5 text-sm">{u.email}</td>
                 <td class="px-3 py-2.5">
-                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${u.role === 'tenant_admin' ? 'bg-primary/15 text-primary' : 'bg-base-200 text-base-content/60'}`}>
+                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${u.role === 'tenant_admin' ? 'bg-primary/15 text-primary' : 'bg-base-200 text-base-content/80'}`}>
                     {u.role === 'tenant_admin' ? t('admin') : t('cashier')}
                   </span>
                 </td>
@@ -226,28 +226,28 @@ export default function Users({ path }) {
                 <td class="px-3 py-2.5">
                   <div class="flex gap-1">
                     <div class="tooltip tooltip-left" data-tip={t('edit')}>
-                      <button class="btn btn-xs btn-ghost btn-square" onClick={() => openEdit(u)}>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                      <button class="btn btn-sm btn-ghost btn-square" onClick={() => openEdit(u)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
                         </svg>
                       </button>
                     </div>
                     <div class="tooltip tooltip-left" data-tip={t('changePassword') || 'Reset Password'}>
-                      <button class="btn btn-xs btn-ghost btn-square text-warning" onClick={() => openResetPw(u)}>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                      <button class="btn btn-sm btn-ghost btn-square text-warning" onClick={() => openResetPw(u)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
                         </svg>
                       </button>
                     </div>
                     <div class="tooltip tooltip-left" data-tip={u.active ? t('disable') : t('enable')}>
                       <button
-                        class={`btn btn-xs btn-ghost btn-square ${u.active ? 'text-error' : 'text-success'}`}
+                        class={`btn btn-sm btn-ghost btn-square ${u.active ? 'text-error' : 'text-success'}`}
                         onClick={() => toggleUser(u)}
                         disabled={u.id === authUser.value?.id}
                       >
                         {u.active
-                          ? <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                          : <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          ? <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                          : <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         }
                       </button>
                     </div>
@@ -256,7 +256,7 @@ export default function Users({ path }) {
               </tr>
             ))}
             {users.length === 0 && !loadingMore && (
-              <tr><td colSpan={5} class="px-3 py-12 text-center text-base-content/30 text-sm">{t('noStaff')}</td></tr>
+              <tr><td colSpan={5} class="px-3 py-12 text-center text-base-content/50 text-sm">{t('noStaff')}</td></tr>
             )}
           </tbody>
         </table>
@@ -267,7 +267,7 @@ export default function Users({ path }) {
       <div ref={sentinelRef} class="h-4" />
       {loadingMore && (
         <div class="flex justify-center py-4">
-          <span class="loading loading-spinner loading-sm text-base-content/40" />
+          <span class="loading loading-spinner loading-sm text-base-content/70" />
         </div>
       )}
 

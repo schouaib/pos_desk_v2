@@ -40,6 +40,7 @@ var (
 	verifiedCache   = make(map[string]time.Time)
 	verifiedCacheMu sync.RWMutex
 	cacheTTL        = 10 * time.Minute
+	cacheMaxSize    = 200
 )
 
 func isVerifiedCached(machineID string) bool {
@@ -51,6 +52,15 @@ func isVerifiedCached(machineID string) bool {
 
 func cacheVerified(machineID string) {
 	verifiedCacheMu.Lock()
+	// Evict expired entries if cache is getting large
+	if len(verifiedCache) >= cacheMaxSize {
+		now := time.Now()
+		for k, t := range verifiedCache {
+			if now.Sub(t) >= cacheTTL {
+				delete(verifiedCache, k)
+			}
+		}
+	}
 	verifiedCache[machineID] = time.Now()
 	verifiedCacheMu.Unlock()
 }

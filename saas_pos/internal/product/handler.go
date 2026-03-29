@@ -21,11 +21,12 @@ import (
 // GET /api/tenant/products/generate-barcode
 func HandleGenerateBarcode(c *fiber.Ctx) error {
 	tenantID := middleware.GetClaims(c).TenantID
+	tid, _ := primitive.ObjectIDFromHex(tenantID)
 	ctx := c.UserContext()
 	for range 10 {
 		code := fmt.Sprintf("%012d", rand.Int63n(1_000_000_000_000))
 		count, _ := col().CountDocuments(ctx, bson.M{
-			"tenant_id": tenantID,
+			"tenant_id": tid,
 			"barcodes":  code,
 		})
 		if count == 0 {
@@ -56,8 +57,9 @@ func HandleList(c *fiber.Ctx) error {
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	limit, _ := strconv.Atoi(c.Query("limit", "10"))
 	catID := c.Query("category_id", "")
+	brandID := c.Query("brand_id", "")
 
-	result, err := List(tenantID, q, page, limit, catID)
+	result, err := List(tenantID, q, page, limit, catID, brandID)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, err.Error())
 	}

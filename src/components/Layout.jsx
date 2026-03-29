@@ -61,11 +61,11 @@ const NavLink = memo(({ href, label, icon, active, onNavigate, badge, kbdHint })
     class={`group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
       ${active
         ? 'bg-primary text-primary-content shadow-sm'
-        : 'text-base-content/65 hover:text-base-content hover:bg-base-200'}`}
+        : 'text-base-content/80 hover:text-base-content hover:bg-base-200'}`}
   >
     {icon && <Icon d={icon} />}
     <span class="flex-1">{label}</span>
-    {badge > 0 && <span class="badge badge-error badge-xs text-[10px] px-1.5">{badge}</span>}
+    {badge > 0 && <span class="badge badge-error badge-xs text-xs px-1.5">{badge}</span>}
     {kbdHint && <span class="kbd-hint hidden lg:group-hover:inline-flex ms-auto">{kbdHint}</span>}
   </a>
 ))
@@ -74,13 +74,13 @@ const GroupButton = memo(({ label, icon, isActive, isOpen, onClick }) => (
   <button
     onClick={onClick}
     class={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
-      ${isActive ? 'text-primary bg-primary/8' : 'text-base-content/65 hover:text-base-content hover:bg-base-200'}`}
+      ${isActive ? 'text-primary bg-primary/8' : 'text-base-content/80 hover:text-base-content hover:bg-base-200'}`}
   >
     <span class="flex items-center gap-2.5">
       <Icon d={icon} />
       {label}
     </span>
-    <Icon d={ICONS.chevron} className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+    <Icon d={ICONS.chevron} className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
   </button>
 ))
 
@@ -138,7 +138,7 @@ export function Layout({ children, currentPath }) {
             </div>
             <div class="min-w-0">
               <p class="font-bold text-sm leading-tight truncate">{t('storeAdmin')}</p>
-              <p class="text-xs text-base-content/50 capitalize">{authUser.value?.role?.replace('_', ' ')}</p>
+              <p class="text-xs text-base-content/70 capitalize">{authUser.value?.role?.replace('_', ' ')}</p>
             </div>
           </div>
           <button class="md:hidden btn btn-sm btn-ghost btn-square" onClick={() => setOpen(false)}>
@@ -287,7 +287,7 @@ export function Layout({ children, currentPath }) {
       <div class="px-3 pb-1">
         <button
           onClick={() => shortcutsOpen.value = true}
-          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-base-content/50 hover:text-base-content hover:bg-base-200 transition-all duration-150"
+          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-base-content/70 hover:text-base-content hover:bg-base-200 transition-all duration-150"
           title="Keyboard shortcuts"
         >
           <span class="w-5 h-5 rounded border border-base-300 flex items-center justify-center text-xs font-bold shrink-0">?</span>
@@ -302,7 +302,7 @@ export function Layout({ children, currentPath }) {
           <div class="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-bold shrink-0">
             {initial}
           </div>
-          <p class="text-xs text-base-content/60 truncate flex-1">{email}</p>
+          <p class="text-xs text-base-content/80 truncate flex-1">{email}</p>
         </div>
         <button
           onClick={logout}
@@ -316,7 +316,7 @@ export function Layout({ children, currentPath }) {
   )
 
   return (
-    <div class="min-h-screen flex flex-col md:flex-row bg-base-200">
+    <div class="h-screen flex flex-col md:flex-row bg-base-200 app-shell overflow-hidden">
 
       {/* Mobile top bar */}
       <header class="md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-base-100 border-b border-base-300 flex items-center px-4 gap-3 shadow-sm">
@@ -351,7 +351,7 @@ export function Layout({ children, currentPath }) {
       </aside>
 
       {/* Page content */}
-      <main class="flex-1 p-4 md:p-6 overflow-auto mt-14 md:mt-0 min-w-0">
+      <main class="flex-1 p-4 md:p-6 overflow-y-auto mt-14 md:mt-0 min-w-0">
         {!batchAlertDismissed && expiredBatches.length > 0 && (
           <div class="alert alert-warning mb-4 shadow-sm cursor-pointer" onClick={() => document.getElementById('expiry-alert-dialog')?.showModal()}>
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">

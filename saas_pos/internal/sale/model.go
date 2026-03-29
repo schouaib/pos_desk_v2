@@ -45,6 +45,7 @@ type Sale struct {
 	CashierID     string             `bson:"cashier_id"     json:"cashier_id"`
 	CashierEmail  string             `bson:"cashier_email"  json:"cashier_email"`
 	CaisseID      string             `bson:"caisse_id,omitempty" json:"caisse_id,omitempty"`
+	HasFacture    bool               `bson:"has_facture,omitempty" json:"has_facture,omitempty"`
 	CreatedAt     time.Time          `bson:"created_at"     json:"created_at"`
 }
 
@@ -65,6 +66,7 @@ type CreateInput struct {
 	ClientID      string          `json:"client_id"`
 	SaleType      string          `json:"sale_type"` // "cash" | "credit"
 	CaisseID      string          `json:"caisse_id"`
+	HasFacture    bool            `json:"has_facture"`
 }
 
 // ListResult holds a paginated list of sales.

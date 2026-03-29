@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --port 5180 --host",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "tauri dev --features devtools",
     "tauri:build": "tauri build",
     "build": "vite build"
   },

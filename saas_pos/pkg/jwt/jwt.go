@@ -30,6 +30,11 @@ type ModulePerms struct {
 	Archive      bool `json:"archive"       bson:"archive"`
 	PriceHistory bool `json:"price_history" bson:"price_history"`
 	Valuation    bool `json:"valuation"     bson:"valuation"`
+	ViewPrixAchat bool `json:"view_prix_achat" bson:"view_prix_achat"`
+	ViewQty       bool `json:"view_qty"        bson:"view_qty"`
+	ViewPV1       bool `json:"view_pv1"        bson:"view_pv1"`
+	ViewPV2       bool `json:"view_pv2"        bson:"view_pv2"`
+	ViewPV3       bool `json:"view_pv3"        bson:"view_pv3"`
 	BC           bool `json:"bc"            bson:"bc"`
 	Devis        bool `json:"devis"         bson:"devis"`
 	Avoir        bool `json:"avoir"         bson:"avoir"`

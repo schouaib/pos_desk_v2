@@ -925,7 +925,9 @@ func ListPayments(tenantID, purchaseID string, page, limit int) ([]PurchasePayme
 	defer cur.Close(ctx)
 
 	var items []PurchasePayment
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, 0, err
+	}
 	if items == nil {
 		items = []PurchasePayment{}
 	}
@@ -1264,7 +1266,9 @@ func LowStockProducts(tenantID string, limit int) ([]LowStockProduct, error) {
 		PrixVente1   float64            `bson:"prix_vente_1"`
 	}
 	var rows []row
-	cur.All(ctx, &rows)
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
 
 	result := make([]LowStockProduct, 0, len(rows))
 	for _, r := range rows {
@@ -1326,7 +1330,9 @@ func Stats(tenantID string, from, to time.Time) (*PurchaseStats, error) {
 		TotalExpenses float64 `bson:"total_expenses"`
 	}
 	var rows []statusRow
-	cur.All(ctx, &rows)
+	if err := cur.All(ctx, &rows); err != nil {
+		return &PurchaseStats{ByStatus: map[string]StatusStats{}}, nil
+	}
 
 	result := &PurchaseStats{
 		ByStatus: make(map[string]StatusStats),

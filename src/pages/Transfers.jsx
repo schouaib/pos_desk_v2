@@ -177,7 +177,7 @@ export default function Transfers({ path }) {
                   </tr>
                 ))}
                 {transfers.length === 0 && (
-                  <tr><td colSpan={6} class="text-center py-8 text-base-content/40">{t('noProducts')}</td></tr>
+                  <tr><td colSpan={6} class="text-center py-8 text-base-content/70">{t('noProducts')}</td></tr>
                 )}
               </tbody>
             </table>

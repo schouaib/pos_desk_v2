@@ -156,7 +156,9 @@ func ListByProduct(tenantID, parentProductID string) ([]ProductVariant, error) {
 	defer cur.Close(ctx)
 
 	var items []ProductVariant
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []ProductVariant{}
 	}

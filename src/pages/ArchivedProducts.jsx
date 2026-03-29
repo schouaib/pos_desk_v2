@@ -63,12 +63,12 @@ export default function ArchivedProducts({ path }) {
           <table class="table table-sm w-full">
             <thead class="bg-base-200/60">
               <tr>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('productName')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('ref')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('qtyAvailable')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('prixVente1')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('archiveDate')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 w-28">{t('actions')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('productName')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('ref')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('qtyAvailable')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('prixVente1')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('archiveDate')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 w-28">{t('actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -80,7 +80,7 @@ export default function ArchivedProducts({ path }) {
                   <td class="px-3 py-2.5">
                     <div class="font-medium">{p.name}</div>
                     {p.barcodes?.length > 0 && (
-                      <div class="text-xs text-base-content/50">{p.barcodes.slice(0, 2).join(', ')}</div>
+                      <div class="text-xs text-base-content/70">{p.barcodes.slice(0, 2).join(', ')}</div>
                     )}
                   </td>
                   <td class="px-3 py-2.5 text-sm">{p.ref || '—'}</td>
@@ -88,7 +88,7 @@ export default function ArchivedProducts({ path }) {
                     {p.is_service ? <span class="badge badge-outline badge-xs">{t('isService')}</span> : p.qty_available}
                   </td>
                   <td class="px-3 py-2.5 text-sm">{p.prix_vente_1}</td>
-                  <td class="px-3 py-2.5 text-xs text-base-content/50">
+                  <td class="px-3 py-2.5 text-xs text-base-content/70">
                     {p.archived_at ? new Date(p.archived_at).toLocaleDateString() : '—'}
                   </td>
                   <td class="px-3 py-2.5">
@@ -101,7 +101,7 @@ export default function ArchivedProducts({ path }) {
               {!loading && items.length === 0 && (
                 <tr>
                   <td colSpan={6} class="py-12 text-center">
-                    <div class="flex flex-col items-center gap-2 text-base-content/30">
+                    <div class="flex flex-col items-center gap-2 text-base-content/50">
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                       </svg>
@@ -117,7 +117,7 @@ export default function ArchivedProducts({ path }) {
 
       {total > 0 && (
         <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/60">{t('showing')} {start}–{end} {t('of')} {total}</span>
+          <span class="text-base-content/80">{t('showing')} {start}–{end} {t('of')} {total}</span>
           <div class="join">
             <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
             {(() => {

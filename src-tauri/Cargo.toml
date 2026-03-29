@@ -32,6 +32,10 @@ aes-gcm = "0.10"
 rand = "0.8"
 tauri-plugin-fs = "2.4.5"
 
+[features]
+default = []
+devtools = ["tauri/devtools"]
+
 [target.'cfg(not(windows))'.dependencies]
 libc = "0.2"
 
@@ -52,6 +56,6 @@ codegen-units = 16
 strip = true
 lto = "fat"
 panic = "abort"
-opt-level = "s"
+opt-level = 3
 codegen-units = 1
 overflow-checks = true

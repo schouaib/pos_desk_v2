@@ -10,6 +10,7 @@ import {
   connectPrinter, disconnectPrinter, printBytes,
   getConnection, tryAutoConnect,
 } from '../lib/webusbPrint'
+import { QuickAddProductModal } from '../components/QuickAddProductModal'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,8 +41,16 @@ function fmt(v) {
 // ─── Sound effects (Web Audio API — no files needed) ──────────────────────────
 let _audioCtx
 function getAudioCtx() {
-  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+  if (!_audioCtx || _audioCtx.state === 'closed') {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+  }
   return _audioCtx
+}
+function closeAudioCtx() {
+  if (_audioCtx && _audioCtx.state !== 'closed') {
+    _audioCtx.close().catch(() => {})
+    _audioCtx = null
+  }
 }
 function playBeep(freq = 800, duration = 0.1, volume = 0.15) {
   try {
@@ -103,20 +112,26 @@ function HelpModal({ onClose, t }) {
   return (
     <dialog class="modal modal-bottom sm:modal-middle" open>
       <div class="modal-box max-w-sm">
-        <h3 class="font-bold text-base mb-4">{t('keyboardShortcuts')}</h3>
-        <table class="table table-sm">
-          <tbody>
-            {shortcuts.map(({ key, desc }) => (
-              <tr key={key}>
-                <td class="w-24">
-                  <kbd class="kbd kbd-sm">{key}</kbd>
-                </td>
-                <td class="text-sm text-base-content/70">{desc}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div class="modal-action">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="font-bold text-base">{t('keyboardShortcuts')}</h3>
+            <p class="text-xs text-base-content/70">POS</p>
+          </div>
+        </div>
+        <div class="space-y-1.5">
+          {shortcuts.map(({ key, desc }) => (
+            <div key={key} class="flex items-center justify-between py-1.5 px-1">
+              <span class="text-sm text-base-content/80">{desc}</span>
+              <span class="pos-help-key">{key}</span>
+            </div>
+          ))}
+        </div>
+        <div class="modal-action mt-5">
           <button class="btn btn-sm btn-ghost" onClick={onClose}>{t('close')}</button>
         </div>
       </div>
@@ -154,7 +169,7 @@ function PriceEditor({ line, onApply, onClose, t }) {
     <dialog class="modal modal-bottom sm:modal-middle" open>
       <div class="modal-box max-w-sm">
         <h3 class="font-bold text-base mb-1">{t('editPrice')}</h3>
-        <p class="text-sm text-base-content/50 mb-4">{line.name}</p>
+        <p class="text-sm text-base-content/70 mb-4">{line.name}</p>
 
         {/* Quick PV buttons */}
         <div class="flex gap-2 mb-4 flex-wrap">
@@ -163,7 +178,7 @@ function PriceEditor({ line, onApply, onClose, t }) {
               style="height:2.75rem;border-radius:0.625rem;font-weight:700"
               onClick={() => quickSet(line.pv1)}>
               <span class="flex flex-col items-center leading-tight">
-                <span class="text-[10px] opacity-70 font-medium">{t('pv1')}</span>
+                <span class="text-xs opacity-70 font-medium">{t('pv1')}</span>
                 <span class="font-mono">{fmt(line.pv1)}</span>
               </span>
             </button>
@@ -173,7 +188,7 @@ function PriceEditor({ line, onApply, onClose, t }) {
               style="height:2.75rem;border-radius:0.625rem;font-weight:700"
               onClick={() => quickSet(line.pv2)}>
               <span class="flex flex-col items-center leading-tight">
-                <span class="text-[10px] opacity-70 font-medium">{t('pv2')}</span>
+                <span class="text-xs opacity-70 font-medium">{t('pv2')}</span>
                 <span class="font-mono">{fmt(line.pv2)}</span>
               </span>
             </button>
@@ -183,7 +198,7 @@ function PriceEditor({ line, onApply, onClose, t }) {
               style="height:2.75rem;border-radius:0.625rem;font-weight:700"
               onClick={() => quickSet(line.pv3)}>
               <span class="flex flex-col items-center leading-tight">
-                <span class="text-[10px] opacity-70 font-medium">{t('pv3')}</span>
+                <span class="text-xs opacity-70 font-medium">{t('pv3')}</span>
                 <span class="font-mono">{fmt(line.pv3)}</span>
               </span>
             </button>
@@ -215,7 +230,7 @@ function PriceEditor({ line, onApply, onClose, t }) {
         </div>
 
         {minPrice > 0 && (
-          <p class={`text-xs mb-3 ${belowMin ? 'text-error font-semibold' : 'text-base-content/45'}`}>
+          <p class={`text-xs mb-3 ${belowMin ? 'text-error font-semibold' : 'text-base-content/70'}`}>
             {t('pvMin')}: {fmt(minPrice)}
             {belowMin && ` — ${t('priceBelow')}`}
           </p>
@@ -262,7 +277,7 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t, store }) {
         <h3 class="font-bold text-lg mb-4">{t('payment')}</h3>
 
         {/* Payment method selector */}
-        <div class="flex gap-2 mb-4">
+        <div class="pos-pay-method mb-4">
           {['cash', 'cheque', 'virement'].map(m => (
             <button
               key={m}
@@ -275,7 +290,7 @@ function PaymentModal({ total, onConfirm, onClose, loading, error, t, store }) {
         </div>
 
         <div class="pos-pay-total mb-4">
-          <span class="text-sm font-semibold text-base-content/60">{store.use_vat ? t('totalTTC') : t('purchaseTotal')}</span>
+          <span class="text-sm font-semibold text-base-content/80">{store.use_vat ? t('totalTTC') : t('purchaseTotal')}</span>
           <span class={`text-2xl font-extrabold font-mono ${total < 0 ? 'text-error' : 'text-primary'}`}>{fmt(total)}</span>
         </div>
 
@@ -553,6 +568,8 @@ export default function Pos({ path }) {
   const focusTimerRef = useRef(null)
 
   // Product search dialog
+  const canAddProduct = hasPerm('products', 'add')
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQ, setSearchQ] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -788,6 +805,7 @@ export default function Pos({ path }) {
       clearTimeout(scanIdleRef.current)
       clearTimeout(catalogSearchTimer.current)
       disconnectPrinter()
+      closeAudioCtx()
       if (beepRef.current) {
         beepRef.current.close().catch(() => {})
         beepRef.current = null
@@ -1294,6 +1312,7 @@ export default function Pos({ path }) {
           client_id: selectedClient.id,
           sale_type: isCash ? 'cash' : 'credit',
           caisse_id: caisseSession?.id || '',
+          has_facture: true,
         })
         const sale = result.data ?? result
         // Create facture linked to the sale
@@ -1481,7 +1500,13 @@ export default function Pos({ path }) {
   // ─── render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div ref={posRef} class="page-enter h-screen bg-base-200 p-4 flex flex-col overflow-hidden">
+    <div ref={posRef} class="page-enter h-screen bg-base-200 p-4 flex flex-col overflow-hidden"
+      style={{
+        ...(localStorage.getItem('posBg') ? { backgroundColor: localStorage.getItem('posBg') } : {}),
+        ...(localStorage.getItem('posText') ? { color: localStorage.getItem('posText') } : {}),
+        ...(localStorage.getItem('posPrimary') ? { '--color-primary': localStorage.getItem('posPrimary'), '--color-primary-content': '#fff' } : {}),
+        ...(localStorage.getItem('posCheckout') ? { '--pos-checkout': localStorage.getItem('posCheckout') } : {}),
+      }}>
 
       {/* Caisse opening modal — blocks POS until session is opened */}
       {caisseSession === undefined && (
@@ -1499,7 +1524,7 @@ export default function Pos({ path }) {
               </div>
             </div>
             <h3 class="font-bold text-lg mb-1 text-center">{t('openCaisse')}</h3>
-            <p class="text-sm text-base-content/60 mb-5 text-center">{t('caisseRequired')}</p>
+            <p class="text-sm text-base-content/80 mb-5 text-center">{t('caisseRequired')}</p>
             <div class="form-control mb-3">
               <label class="label"><span class="label-text">{t('openingAmount')}</span></label>
               <input
@@ -1542,12 +1567,12 @@ export default function Pos({ path }) {
       {caisseSession && (
       <div class="flex flex-col flex-1 min-h-0">
       {/* ── Glass Header Toolbar ──────────────────────────────────────────────── */}
-      <div class="pos-header">
+      <div class="pos-header" style={localStorage.getItem('posHeader') ? { backgroundColor: localStorage.getItem('posHeader') } : undefined}>
         <div class="flex items-center gap-2">
           <button class="btn btn-sm btn-ghost btn-square" onClick={() => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); route('/dashboard') }} title={t('dashboard')}>
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
           </button>
-          <h2 class="text-lg font-bold tracking-tight">{t('posPage')}</h2>
+          <h2 class="text-2xl font-bold">{t('posPage')}</h2>
           <button class="btn btn-sm btn-ghost btn-square" onClick={toggleFullscreen} title="Fullscreen">
             {isFullscreen
               ? <svg xmlns="http://www.w3.org/2000/svg" class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" /></svg>
@@ -1568,8 +1593,8 @@ export default function Pos({ path }) {
               </button>
             </div>
           ) : (
-            <button class="btn btn-xs btn-ghost gap-1 text-base-content/50" onClick={handleConnectPrinter}>
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <button class="btn btn-xs btn-ghost gap-1 text-base-content/70" onClick={handleConnectPrinter}>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
               </svg>
               {t('connectPrinter')}
@@ -1598,12 +1623,12 @@ export default function Pos({ path }) {
             {t('closeCaisse')}
           </button>
           {/* Shortcuts hint */}
-          <div class="hidden lg:flex gap-1 items-center text-xs text-base-content/35">
-            <kbd class="kbd kbd-xs">F1</kbd> <span class="text-base-content/25">Help</span>
+          <div class="hidden lg:flex gap-1 items-center text-xs text-base-content/50">
+            <kbd class="kbd kbd-xs">F1</kbd> <span class="text-base-content/50">Help</span>
             <span class="mx-0.5 text-base-content/15">|</span>
-            <kbd class="kbd kbd-xs">F2</kbd> <span class="text-base-content/25">{t('searchProduct')}</span>
+            <kbd class="kbd kbd-xs">F2</kbd> <span class="text-base-content/50">{t('searchProduct')}</span>
             <span class="mx-0.5 text-base-content/15">|</span>
-            <kbd class="kbd kbd-xs">F10</kbd> <span class="text-base-content/25">{t('checkout')}</span>
+            <kbd class="kbd kbd-xs">F10</kbd> <span class="text-base-content/50">{t('checkout')}</span>
           </div>
         </div>
       </div>
@@ -1684,7 +1709,7 @@ export default function Pos({ path }) {
             <div class="flex items-center gap-1">
               {lines.length === 0 && lastSaleItemsRef.current && (
                 <button class="btn btn-xs btn-ghost text-accent gap-1" onClick={repeatLastSale} title={t('repeatLastSale')}>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
                   </svg>
                   {t('repeatLastSale')}
@@ -1692,7 +1717,7 @@ export default function Pos({ path }) {
               )}
               {lines.length > 0 && (
                 <button class="btn btn-xs btn-ghost text-info gap-1" onClick={parkCurrentTicket} title="F7">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
                   </svg>
                   {t('holdTicket')}
@@ -1701,7 +1726,7 @@ export default function Pos({ path }) {
               )}
               {parkedTickets.length > 0 && (
                 <button class="btn btn-xs btn-outline btn-warning gap-1" onClick={() => setParkedOpen(true)} title="F8">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                   </svg>
                   {t('parkedTickets')}
@@ -1710,14 +1735,14 @@ export default function Pos({ path }) {
               )}
               {lines.length > 0 && (
                 <button class="btn btn-xs btn-ghost text-error gap-1" onClick={() => setLines([])}>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                   {t('clearTicket')}
                 </button>
               )}
             </div>
           </div>
 
-          <div class="pos-ticket bg-base-100 overflow-x-auto flex-1">
+          <div class="pos-ticket bg-base-100 overflow-x-auto flex-1" style={localStorage.getItem('posTicket') ? { backgroundColor: localStorage.getItem('posTicket') } : undefined}>
             <table class="table table-sm">
               <thead>
                 <tr>
@@ -1739,8 +1764,8 @@ export default function Pos({ path }) {
                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
                           </svg>
                         </div>
-                        <p class="text-sm text-base-content/40 font-medium">{t('scanOrSearch')}</p>
-                        <p class="text-xs text-base-content/25"><kbd class="kbd kbd-xs">F1</kbd> {t('keyboardShortcuts')}</p>
+                        <p class="text-sm text-base-content/70 font-medium">{t('scanOrSearch')}</p>
+                        <p class="text-xs text-base-content/50"><kbd class="kbd kbd-xs">F1</kbd> {t('keyboardShortcuts')}</p>
                       </div>
                     </td>
                   </tr>
@@ -1780,7 +1805,7 @@ export default function Pos({ path }) {
                             </span>
                           )}
                         </div>
-                        {line.barcode && <div class="text-xs text-base-content/35 font-mono">{line.barcode}</div>}
+                        {line.barcode && <div class="text-xs text-base-content/50 font-mono">{line.barcode}</div>}
                       </td>
 
                       {/* Qty — click to open numpad */}
@@ -1824,7 +1849,7 @@ export default function Pos({ path }) {
 
                       {/* Delete */}
                       <td>
-                        <button class="btn btn-xs btn-ghost btn-square text-base-content/25 hover:text-error"
+                        <button class="btn btn-xs btn-ghost btn-square text-base-content/50 hover:text-error"
                           onClick={(e) => { e.stopPropagation(); removeLine(line._key) }}>
                           <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1841,7 +1866,7 @@ export default function Pos({ path }) {
 
         {/* ── Summary + Pay ─────────────────────────────────────────────────── */}
         <div class="lg:w-80 shrink-0 flex flex-col order-first lg:order-none">
-          <div class="pos-summary bg-base-100 p-5 space-y-3 flex-1 flex flex-col">
+          <div class="pos-summary bg-base-100 p-5 space-y-3 flex-1 flex flex-col" style={localStorage.getItem('posSummary') ? { backgroundColor: localStorage.getItem('posSummary') } : undefined}>
 
             {/* Client selector */}
             {canSelectClient && (
@@ -1850,15 +1875,15 @@ export default function Pos({ path }) {
                   <div class="pos-client-card">
                     <div class="min-w-0">
                       <p class="text-xs font-bold text-primary truncate">{selectedClient.name}</p>
-                      <p class="text-[11px] text-base-content/45 font-mono">{selectedClient.code}</p>
+                      <p class="text-xs text-base-content/70 font-mono">{selectedClient.code}</p>
                     </div>
-                    <button class="btn btn-xs btn-ghost btn-square text-base-content/30 shrink-0" onClick={clearClient}>
+                    <button class="btn btn-xs btn-ghost btn-square text-base-content/50 shrink-0" onClick={clearClient}>
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                   </div>
                 ) : (
                   <button
-                    class="btn btn-outline btn-sm w-full justify-start font-normal text-base-content/50 gap-1.5"
+                    class="btn btn-outline btn-sm w-full justify-start font-normal text-base-content/70 gap-1.5"
                     onClick={openClientDialog}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -1886,7 +1911,7 @@ export default function Pos({ path }) {
 
             {store.use_vat && (
             <div class="flex justify-between text-sm py-0.5">
-              <span class="text-base-content/50">{t('subtotalHT')}</span>
+              <span class="text-base-content/70">{t('subtotalHT')}</span>
               <span class="font-mono font-medium">{fmt(totalHT)}</span>
             </div>
             )}
@@ -1894,14 +1919,14 @@ export default function Pos({ path }) {
             {/* VAT breakdown */}
             {store.use_vat && Object.entries(vatBreakdown).map(([rate, amount]) => (
               <div key={rate} class="flex justify-between text-sm py-0.5">
-                <span class="text-base-content/50">{t('totalVAT')} {rate}%</span>
+                <span class="text-base-content/70">{t('totalVAT')} {rate}%</span>
                 <span class="font-mono text-warning font-medium">{fmt(amount)}</span>
               </div>
             ))}
             {store.use_vat && totalVAT === 0 && (
               <div class="flex justify-between text-sm py-0.5">
-                <span class="text-base-content/50">{t('totalVAT')}</span>
-                <span class="font-mono text-base-content/30">0.00</span>
+                <span class="text-base-content/70">{t('totalVAT')}</span>
+                <span class="font-mono text-base-content/50">0.00</span>
               </div>
             )}
 
@@ -1917,6 +1942,7 @@ export default function Pos({ path }) {
             <button
               class={`btn w-full pos-checkout-btn ${saleType === 'credit' ? 'btn-error' : 'btn-primary'}`}
               disabled={lines.length === 0 || payLoading}
+              style={localStorage.getItem('posCheckout') && saleType !== 'credit' ? { backgroundColor: localStorage.getItem('posCheckout'), borderColor: localStorage.getItem('posCheckout') } : undefined}
               onClick={() => {
                 if (saleType === 'credit' && selectedClient) {
                   handleConfirmSale(0)
@@ -2002,15 +2028,22 @@ export default function Pos({ path }) {
           <div class="modal-box !max-w-none w-[60vw] h-[70vh] max-h-[70vh] flex flex-col">
             <h3 class="font-bold text-base mb-3">{t('searchProduct')}</h3>
 
-            <input
-              ref={searchRef}
-              class="input input-bordered w-full mb-3"
-              placeholder={t('searchProducts')}
-              value={searchQ}
-              onInput={(e) => { setSearchQ(e.target.value); lastPosSearchRef.current = '' }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { clearTimeout(searchTimerRef.current); doProductSearch() } }}
-              autoComplete="off"
-            />
+            <div class="flex gap-2 mb-3">
+              <input
+                ref={searchRef}
+                class="input input-bordered flex-1"
+                placeholder={t('searchProducts')}
+                value={searchQ}
+                onInput={(e) => { setSearchQ(e.target.value); lastPosSearchRef.current = '' }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { clearTimeout(searchTimerRef.current); doProductSearch() } }}
+                autoComplete="off"
+              />
+              {canAddProduct && (
+                <button class="btn btn-accent btn-sm shrink-0" onClick={() => setQuickAddOpen(true)}>
+                  + {t('quickAddProduct')}
+                </button>
+              )}
+            </div>
 
             {searchLoading && (
               <div class="flex justify-center py-4">
@@ -2019,11 +2052,11 @@ export default function Pos({ path }) {
             )}
 
             {!searchLoading && searchResults.length === 0 && searchQ.trim() && (
-              <p class="text-center text-base-content/40 text-sm py-4">{t('productNotFound')}</p>
+              <p class="text-center text-base-content/70 text-sm py-4">{t('productNotFound')}</p>
             )}
 
             {!searchLoading && searchResults.length === 0 && !searchQ.trim() && (
-              <p class="text-center text-base-content/30 text-sm py-4">{t('scanOrSearch')}</p>
+              <p class="text-center text-base-content/50 text-sm py-4">{t('scanOrSearch')}</p>
             )}
 
             <div class="space-y-1 flex-1 min-h-0 overflow-y-auto">
@@ -2042,14 +2075,14 @@ export default function Pos({ path }) {
                         </span>
                       ) : null })()}
                     </p>
-                    <p class="text-xs text-base-content/50">
+                    <p class="text-xs text-base-content/70">
                       {[p.ref, p.barcodes?.[0]].filter(Boolean).join(' · ')}
                     </p>
                   </div>
                   <div class="text-end shrink-0 ms-3">
                     <p class="font-mono text-sm font-semibold">{fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}</p>
                     {!p.is_service && (
-                      <p class={`text-xs ${p.qty_available <= p.qty_min ? 'text-warning' : 'text-base-content/40'}`}>
+                      <p class={`text-xs ${p.qty_available <= p.qty_min ? 'text-warning' : 'text-base-content/70'}`}>
                         {t('qtyAvailable')}: {p.qty_available}
                       </p>
                     )}
@@ -2065,6 +2098,17 @@ export default function Pos({ path }) {
           <div class="modal-backdrop" onClick={() => { setSearchOpen(false); refocusScan() }} />
         </dialog>
       )}
+
+      {/* ── Quick add product modal ── */}
+      <QuickAddProductModal
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        onCreated={(p) => {
+          openVariantPicker(p)
+          setSearchOpen(false)
+          refocusScan()
+        }}
+      />
 
       {/* ── Price editor ─────────────────────────────────────────────────────── */}
       {editingLine && (
@@ -2107,12 +2151,12 @@ export default function Pos({ path }) {
             )}
 
             {!clientSearchLoading && clientResults.length === 0 && clientSearch.trim() && (
-              <p class="text-center text-base-content/40 text-sm py-4">{t('noClients')}</p>
+              <p class="text-center text-base-content/70 text-sm py-4">{t('noClients')}</p>
             )}
 
             {!clientSearchLoading && clientResults.length === 0 && !clientSearch.trim() && recentClientsRef.current.length > 0 && (
               <div>
-                <p class="text-xs font-semibold text-base-content/50 mb-1">{t('recentClients')}</p>
+                <p class="text-xs font-semibold text-base-content/70 mb-1">{t('recentClients')}</p>
                 <div class="space-y-1">
                   {recentClientsRef.current.map(c => (
                     <button
@@ -2122,9 +2166,9 @@ export default function Pos({ path }) {
                     >
                       <div class="min-w-0">
                         <p class="font-medium text-sm truncate">{c.name}</p>
-                        <p class="text-xs text-base-content/50">{c.phone || c.email || '—'}</p>
+                        <p class="text-xs text-base-content/70">{c.phone || c.email || '—'}</p>
                       </div>
-                      <p class="font-mono text-xs text-base-content/40 shrink-0 ms-3">{c.code}</p>
+                      <p class="font-mono text-xs text-base-content/70 shrink-0 ms-3">{c.code}</p>
                     </button>
                   ))}
                 </div>
@@ -2132,7 +2176,7 @@ export default function Pos({ path }) {
             )}
 
             {!clientSearchLoading && clientResults.length === 0 && !clientSearch.trim() && recentClientsRef.current.length === 0 && (
-              <p class="text-center text-base-content/30 text-sm py-4">{t('searchClients')}</p>
+              <p class="text-center text-base-content/50 text-sm py-4">{t('searchClients')}</p>
             )}
 
             <div class="space-y-1">
@@ -2144,10 +2188,10 @@ export default function Pos({ path }) {
                 >
                   <div class="min-w-0">
                     <p class="font-medium text-sm truncate">{c.name}</p>
-                    <p class="text-xs text-base-content/50">{c.phone || c.email || '—'}</p>
+                    <p class="text-xs text-base-content/70">{c.phone || c.email || '—'}</p>
                   </div>
                   <div class="text-end shrink-0 ms-3">
-                    <p class="font-mono text-xs text-base-content/40">{c.code}</p>
+                    <p class="font-mono text-xs text-base-content/70">{c.code}</p>
                     {c.balance > 0 && (
                       <p class="text-xs text-error font-mono">{fmt(c.balance)}</p>
                     )}
@@ -2231,7 +2275,7 @@ export default function Pos({ path }) {
           <div class="modal-box max-w-md">
             <h3 class="font-bold text-base mb-3">{t('parkedTickets')}</h3>
             {parkedTickets.length === 0 ? (
-              <p class="text-center text-base-content/40 text-sm py-4">{t('noParkedTickets')}</p>
+              <p class="text-center text-base-content/70 text-sm py-4">{t('noParkedTickets')}</p>
             ) : (
               <div class="space-y-2">
                 {parkedTickets.map(ticket => (
@@ -2240,7 +2284,7 @@ export default function Pos({ path }) {
                       <p class="text-sm font-medium">
                         {ticket.lines.length} {t('saleItems')} · <span class="font-mono font-bold">{fmt(ticket.total)}</span>
                       </p>
-                      <p class="text-xs text-base-content/50">
+                      <p class="text-xs text-base-content/70">
                         {ticket.client ? ticket.client.name + ' · ' : ''}
                         {new Date(ticket.parkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
@@ -2250,7 +2294,7 @@ export default function Pos({ path }) {
                         {t('restore')}
                       </button>
                       <button class="btn btn-xs btn-ghost text-error" onClick={() => deleteParkedTicket(ticket.id)}>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
@@ -2277,10 +2321,10 @@ export default function Pos({ path }) {
                 {hasFeature('favorites') && hasPerm('favorites', 'view') && (
                   <a
                     href="/favorites"
-                    class="btn btn-xs btn-ghost text-base-content/40 gap-1"
+                    class="btn btn-xs btn-ghost text-base-content/70 gap-1"
                     onClick={() => setCatalogOpen(false)}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
@@ -2315,14 +2359,14 @@ export default function Pos({ path }) {
                       onClick={() => { openVariantPicker(p); setCatalogOpen(false); setCatalogSearch('') }}
                     >
                       <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
-                      <span class="text-[11px] font-mono font-bold text-primary">
+                      <span class="text-xs font-mono font-bold text-primary">
                         {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                       </span>
                     </button>
                   ))}
                 </div>
               ) : (
-                <p class="text-center text-base-content/30 text-sm py-6">{t('noProducts')}</p>
+                <p class="text-center text-base-content/50 text-sm py-6">{t('noProducts')}</p>
               )
             ) : (
               <>
@@ -2370,7 +2414,7 @@ export default function Pos({ path }) {
                           onClick={() => { openVariantPicker(p); setCatalogOpen(false) }}
                         >
                           <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
-                          <span class={`text-[11px] font-mono font-bold ${fc ? 'text-white/80' : 'text-primary'}`}>
+                          <span class={`text-xs font-mono font-bold ${fc ? 'text-white/80' : 'text-primary'}`}>
                             {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                           </span>
                         </button>
@@ -2379,7 +2423,7 @@ export default function Pos({ path }) {
                   </div>
                 )}
                 {activeCat === null && favorites.length === 0 && (
-                  <p class="text-center text-base-content/30 text-sm py-6">{t('noFavorites')}</p>
+                  <p class="text-center text-base-content/50 text-sm py-6">{t('noFavorites')}</p>
                 )}
 
                 {/* Sub-favorite group grid */}
@@ -2400,7 +2444,7 @@ export default function Pos({ path }) {
                             onClick={() => { openVariantPicker(p); setCatalogOpen(false) }}
                           >
                             <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
-                            <span class={`text-[11px] font-mono font-bold ${pc ? 'text-white/80' : 'text-primary'}`}>
+                            <span class={`text-xs font-mono font-bold ${pc ? 'text-white/80' : 'text-primary'}`}>
                               {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                             </span>
                           </button>
@@ -2408,7 +2452,7 @@ export default function Pos({ path }) {
                       })}
                     </div>
                   ) : (
-                    <p class="text-center text-base-content/30 text-sm py-6">{t('noProducts')}</p>
+                    <p class="text-center text-base-content/50 text-sm py-6">{t('noProducts')}</p>
                   )
                 })()}
 
@@ -2427,14 +2471,14 @@ export default function Pos({ path }) {
                           onClick={() => { openVariantPicker(p); setCatalogOpen(false) }}
                         >
                           <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
-                          <span class="text-[11px] font-mono font-bold text-primary">
+                          <span class="text-xs font-mono font-bold text-primary">
                             {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                           </span>
                         </button>
                       ))}
                     </div>
                   ) : (
-                    <p class="text-center text-base-content/30 text-sm py-6">{t('noProducts')}</p>
+                    <p class="text-center text-base-content/50 text-sm py-6">{t('noProducts')}</p>
                   )
                 )}
               </>
@@ -2524,25 +2568,25 @@ export default function Pos({ path }) {
               return (<>
             <div class="bg-base-200 rounded-lg p-3 mb-4 space-y-1.5 text-sm">
               <div class="flex justify-between">
-                <span class="text-base-content/60">{t('caisseOpenedAt')}</span>
+                <span class="text-base-content/80">{t('caisseOpenedAt')}</span>
                 <span>{caisseSession?.opened_at ? new Date(caisseSession.opened_at).toLocaleTimeString() : '-'}</span>
               </div>
               <div class="divider my-1"></div>
               <div class="flex justify-between">
-                <span class="text-base-content/60">{t('openingAmount')}</span>
+                <span class="text-base-content/80">{t('openingAmount')}</span>
                 <span class="font-semibold">{fmt(opening)}</span>
               </div>
               {caisseStats ? (<>
               <div class="flex justify-between">
-                <span class="text-base-content/60">{t('summSalesTotal')}</span>
+                <span class="text-base-content/80">{t('summSalesTotal')}</span>
                 <span class="font-semibold text-success">+{fmt(sales)}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-base-content/60">{t('summReturnsTotal')}</span>
+                <span class="text-base-content/80">{t('summReturnsTotal')}</span>
                 <span class="font-semibold text-error">-{fmt(returns)}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-base-content/60">{t('summRetraitsTotal')}</span>
+                <span class="text-base-content/80">{t('summRetraitsTotal')}</span>
                 <span class="font-semibold text-warning">-{fmt(retraits)}</span>
               </div>
               <div class="divider my-1"></div>

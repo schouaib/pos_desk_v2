@@ -145,7 +145,7 @@ func Approve(requestID string) (*FolderRequest, error) {
 		return nil, errors.New("parent tenant not found")
 	}
 
-	// Create new tenant as a folder (child) — copies plan, settings, and store info
+	// Create new tenant as a folder (child) — copies plan, settings, store info, and config
 	now := time.Now()
 	child := tenant.Tenant{
 		ID:               primitive.NewObjectID(),
@@ -162,6 +162,17 @@ func Approve(requestID string) (*FolderRequest, error) {
 		NIS:              parent.NIS,
 		NART:             parent.NART,
 		CompteRIB:        parent.CompteRIB,
+		// Tenant config / settings
+		UseVAT:           parent.UseVAT,
+		PosExpiryWarning: parent.PosExpiryWarning,
+		MaxCashAmount:    parent.MaxCashAmount,
+		TapRate:          parent.TapRate,
+		IbsRate:            parent.IbsRate,
+		DefaultProductMode: parent.DefaultProductMode,
+		PosFavorites:     parent.PosFavorites,
+		PosFavGroups:     parent.PosFavGroups,
+		PosFavColors:     parent.PosFavColors,
+		// Folder hierarchy
 		ParentID:         req.TenantID,
 		FolderName:       req.FolderName,
 		PlanID:           parent.PlanID,
@@ -392,6 +403,7 @@ func GetFolders(tenantID string) ([]FolderInfo, error) {
 			Name:       t.Name,
 			FolderName: name,
 			Active:     t.Active,
+			CreatedAt:  t.CreatedAt,
 		}
 	}
 	return folders, nil

@@ -5,9 +5,13 @@ const toasts = signal([])
 
 let _id = 0
 
+const MAX_TOASTS = 5
+
 export function toast(message, type = 'success', duration = 3000) {
   const id = ++_id
-  toasts.value = [...toasts.value, { id, message, type, exiting: false }]
+  let items = [...toasts.value, { id, message, type, exiting: false }]
+  if (items.length > MAX_TOASTS) items = items.slice(-MAX_TOASTS)
+  toasts.value = items
   if (duration > 0) {
     setTimeout(() => dismissToast(id), duration)
   }

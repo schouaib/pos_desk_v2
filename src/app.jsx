@@ -60,7 +60,7 @@ function PlanExpiredScreen() {
             </svg>
           </div>
           <h2 class="text-xl font-bold text-error">{t('planExpiredTitle')}</h2>
-          <p class="text-base-content/60 text-sm mt-2">{t('planExpiredDesc')}</p>
+          <p class="text-base-content/80 text-sm mt-2">{t('planExpiredDesc')}</p>
           <button class="btn btn-outline btn-sm mt-6" onClick={() => { clearAuth(); window.location.reload() }}>{t('logout')}</button>
         </div>
       </div>
@@ -101,7 +101,7 @@ function ServerUnreachable() {
             </svg>
           </div>
           <h2 class="text-lg font-bold">{t('serverUnreachableTitle') || 'Server Unreachable'}</h2>
-          <p class="text-base-content/60 text-sm mt-1">{getServerUrl()}</p>
+          <p class="text-base-content/80 text-sm mt-1">{getServerUrl()}</p>
           <div class="flex gap-2 mt-4">
             <button class={`btn btn-primary btn-sm ${retrying ? 'loading' : ''}`} onClick={retry}>
               {t('retry') || 'Retry'}
@@ -123,7 +123,7 @@ function SessionReplacedScreen() {
       <div class="card bg-base-100 shadow max-w-sm w-full">
         <div class="card-body items-center text-center py-10">
           <h2 class="text-xl font-bold">{t('sessionReplacedTitle')}</h2>
-          <p class="text-base-content/60 text-sm mt-2">{t('sessionReplacedDesc')}</p>
+          <p class="text-base-content/80 text-sm mt-2">{t('sessionReplacedDesc')}</p>
           <a href="/login" class="btn btn-primary btn-sm mt-6">{t('login')}</a>
         </div>
       </div>
@@ -134,7 +134,7 @@ function SessionReplacedScreen() {
 function Guard({ component: Component, path, perm, feat, adminOnly, ...props }) {
   useEffect(() => {
     if (!isLoggedIn()) { route('/login', true); return }
-    if (adminOnly && !isTenantAdmin()) { route('/dashboard', true); return }
+    if (adminOnly && !isTenantAdmin()) { route('/pos', true); return }
     if (feat && !hasFeature(feat)) { route('/dashboard', true); return }
     if (perm && !hasPerm(perm[0], perm[1])) { route('/dashboard', true); return }
   }, [])
@@ -147,7 +147,8 @@ function Guard({ component: Component, path, perm, feat, adminOnly, ...props }) 
 
 function RedirectRoot() {
   useEffect(() => {
-    route(isLoggedIn() ? '/dashboard' : '/login', true)
+    if (!isLoggedIn()) { route('/login', true); return }
+    route(isTenantAdmin() ? '/dashboard' : '/pos', true)
   }, [])
   return null
 }
@@ -262,7 +263,7 @@ export function App() {
     <div class="min-h-screen flex items-center justify-center bg-base-200">
       <div class="flex flex-col items-center gap-3">
         <span class="loading loading-spinner loading-lg text-primary" />
-        {state === 'starting' && <p class="text-base-content/60 text-sm">{t('startingServer') || 'Starting server...'}</p>}
+        {state === 'starting' && <p class="text-base-content/80 text-sm">{t('startingServer') || 'Starting server...'}</p>}
       </div>
     </div>
   )
@@ -276,7 +277,7 @@ export function App() {
             </svg>
           </div>
           <h2 class="text-xl font-bold">Desktop Only</h2>
-          <p class="text-base-content/60 text-sm mt-2">This application requires the CiPOSdz desktop app. Browser access is not allowed.</p>
+          <p class="text-base-content/80 text-sm mt-2">This application requires the CiPOSdz desktop app. Browser access is not allowed.</p>
         </div>
       </div>
     </div>
@@ -296,7 +297,7 @@ export function App() {
             </svg>
           </div>
           <h2 class="text-xl font-bold">{t('firstTimeSetup')}</h2>
-          <p class="text-base-content/60 text-sm mt-2">{t('needsAdminSetup')}</p>
+          <p class="text-base-content/80 text-sm mt-2">{t('needsAdminSetup')}</p>
           <button class="btn btn-primary btn-sm mt-6" onClick={() => window.location.reload()}>{t('retry')}</button>
         </div>
       </div>
@@ -327,7 +328,7 @@ export function App() {
       <AdminPanel />
       <Router>
         <Login path="/login" />
-        <Guard component={Dashboard} path="/dashboard" />
+        <Guard component={Dashboard} path="/dashboard" adminOnly />
         <Guard component={Users} path="/users" adminOnly feat="access_management" />
         <Guard component={Products} path="/products" feat="products" perm={['products', 'view']} />
         <Guard component={ArchivedProducts} path="/archived-products" feat="products" perm={['products', 'archive']} />

@@ -82,8 +82,8 @@ export default function Units({ path }) {
           <table class="table table-sm w-full">
             <thead class="bg-base-200/60">
               <tr>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('unitName')}</th>
-                {canWrite && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 w-24">{t('actions')}</th>}
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('unitName')}</th>
+                {canWrite && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 w-24">{t('actions')}</th>}
               </tr>
             </thead>
             <tbody>
@@ -95,8 +95,8 @@ export default function Units({ path }) {
                       <div class="flex gap-1">
                         {canEdit && (
                           <div class="tooltip tooltip-left" data-tip={t('edit')}>
-                            <button class="btn btn-xs btn-ghost btn-square" onClick={() => openEdit(item)}>
-                              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <button class="btn btn-sm btn-ghost btn-square" onClick={() => openEdit(item)}>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
                               </svg>
                             </button>
@@ -104,8 +104,8 @@ export default function Units({ path }) {
                         )}
                         {canDelete && (
                           <div class="tooltip tooltip-left" data-tip={t('delete')}>
-                            <button class="btn btn-xs btn-ghost btn-square text-error" onClick={() => { setDeleteTarget(item); openModal('unit-delete-modal') }}>
-                              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <button class="btn btn-sm btn-ghost btn-square text-error" onClick={() => { setDeleteTarget(item); openModal('unit-delete-modal') }}>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                               </svg>
                             </button>
@@ -119,7 +119,7 @@ export default function Units({ path }) {
               {items.length === 0 && (
                 <tr>
                   <td colSpan={canWrite ? 2 : 1} class="px-3 py-12 text-center">
-                    <div class="flex flex-col items-center gap-2 text-base-content/30">
+                    <div class="flex flex-col items-center gap-2 text-base-content/50">
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z" />
                       </svg>
@@ -133,10 +133,10 @@ export default function Units({ path }) {
         </div>
         {pages > 1 && (
           <div class="flex items-center justify-between px-4 py-3 border-t border-base-200 bg-base-50">
-            <span class="text-xs text-base-content/50">{page} / {pages}</span>
+            <span class="text-xs text-base-content/70">{page} / {pages}</span>
             <div class="join">
-              <button class="join-item btn btn-xs btn-ghost border border-base-300" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
-              <button class="join-item btn btn-xs btn-ghost border border-base-300" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>›</button>
+              <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
+              <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>›</button>
             </div>
           </div>
         )}

@@ -81,7 +81,7 @@ export default function Tenants() {
             <thead class="bg-base-200/60">
               <tr>
                 {[t('store') || 'Store', t('email'), t('plan') || 'Plan', t('expires') || 'Expires', t('status'), t('actions')].map((h, i) => (
-                  <th key={i} class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap">{h}</th>
+                  <th key={i} class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -96,7 +96,7 @@ export default function Tenants() {
                         <span class="font-medium">{ten.name}</span>
                       </div>
                     </td>
-                    <td class="px-3 py-2.5 text-sm text-base-content/70">{ten.email}</td>
+                    <td class="px-3 py-2.5 text-sm text-base-content/80">{ten.email}</td>
                     <td class="px-3 py-2.5"><span class="badge badge-outline badge-sm">{plan?.name || '—'}</span></td>
                     <td class="px-3 py-2.5 text-sm tabular-nums">{ten.plan_expires_at ? new Date(ten.plan_expires_at).toLocaleDateString() : '—'}</td>
                     <td class="px-3 py-2.5">
@@ -117,7 +117,7 @@ export default function Tenants() {
                 )
               })}
               {tenants.length === 0 && (
-                <tr><td colSpan={6} class="px-3 py-12 text-center text-base-content/40">{t('noStores') || 'No stores yet'}</td></tr>
+                <tr><td colSpan={6} class="px-3 py-12 text-center text-base-content/70">{t('noStores') || 'No stores yet'}</td></tr>
               )}
             </tbody>
           </table>
@@ -175,7 +175,7 @@ export default function Tenants() {
             <thead class="bg-base-200/60">
               <tr>
                 {[t('name'), t('email'), t('role') || 'Role', t('status'), ''].map((h, i) => (
-                  <th key={i} class="px-3 py-2 text-xs font-semibold uppercase text-base-content/50">{h}</th>
+                  <th key={i} class="px-3 py-2 text-xs font-semibold uppercase text-base-content/70">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -186,7 +186,7 @@ export default function Tenants() {
                   <td class="px-3 py-2 text-xs">{u.email}</td>
                   <td class="px-3 py-2"><span class="badge badge-outline badge-xs">{u.role}</span></td>
                   <td class="px-3 py-2">
-                    <span class={`text-xs font-semibold px-2 py-0.5 rounded-full ${u.active ? 'bg-success/15 text-success' : 'bg-base-200 text-base-content/50'}`}>
+                    <span class={`text-xs font-semibold px-2 py-0.5 rounded-full ${u.active ? 'bg-success/15 text-success' : 'bg-base-200 text-base-content/70'}`}>
                       {u.active ? t('active') || 'Active' : t('off') || 'Off'}
                     </span>
                   </td>
@@ -198,7 +198,7 @@ export default function Tenants() {
                 </tr>
               ))}
               {tenantUsers.length === 0 && (
-                <tr><td colSpan={5} class="px-3 py-8 text-center text-base-content/40">{t('noUsers') || 'No users'}</td></tr>
+                <tr><td colSpan={5} class="px-3 py-8 text-center text-base-content/70">{t('noUsers') || 'No users'}</td></tr>
               )}
             </tbody>
           </table>

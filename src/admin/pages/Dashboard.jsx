@@ -50,7 +50,7 @@ export default function Dashboard() {
         {cards.map((c) => (
           <div key={c.label} class="card bg-base-100 shadow">
             <div class="card-body p-4">
-              <p class="text-sm text-base-content/60">{c.label}</p>
+              <p class="text-sm text-base-content/80">{c.label}</p>
               <p class={`text-4xl font-bold ${c.color}`}>{c.value ?? '—'}</p>
             </div>
           </div>
@@ -74,15 +74,15 @@ export default function Dashboard() {
               <table class="table table-sm">
                 <tbody>
                   <tr>
-                    <td class="font-medium text-base-content/70 w-40">Port</td>
+                    <td class="font-medium text-base-content/80 w-40">Port</td>
                     <td class="font-mono">{dbInfo.port}</td>
                   </tr>
                   <tr>
-                    <td class="font-medium text-base-content/70">Database</td>
+                    <td class="font-medium text-base-content/80">Database</td>
                     <td class="font-mono">{dbInfo.db_name}</td>
                   </tr>
                   <tr>
-                    <td class="font-medium text-base-content/70">Auth Enabled</td>
+                    <td class="font-medium text-base-content/80">Auth Enabled</td>
                     <td>
                       <span class={`badge badge-sm ${dbInfo.auth_enabled ? 'badge-success' : 'badge-warning'}`}>
                         {dbInfo.auth_enabled ? 'Yes' : 'No (restart app to enable)'}
@@ -90,23 +90,23 @@ export default function Dashboard() {
                     </td>
                   </tr>
                   <tr>
-                    <td class="font-medium text-base-content/70">Admin User</td>
+                    <td class="font-medium text-base-content/80">Admin User</td>
                     <td class="font-mono">{dbInfo.admin_user}</td>
                   </tr>
                   <tr>
-                    <td class="font-medium text-base-content/70">Admin Password</td>
+                    <td class="font-medium text-base-content/80">Admin Password</td>
                     <td class="font-mono select-all">{mask(dbInfo.admin_pass)}</td>
                   </tr>
                   <tr>
-                    <td class="font-medium text-base-content/70">App User</td>
+                    <td class="font-medium text-base-content/80">App User</td>
                     <td class="font-mono">{dbInfo.app_user}</td>
                   </tr>
                   <tr>
-                    <td class="font-medium text-base-content/70">App Password</td>
+                    <td class="font-medium text-base-content/80">App Password</td>
                     <td class="font-mono select-all">{mask(dbInfo.app_pass)}</td>
                   </tr>
                   <tr>
-                    <td class="font-medium text-base-content/70">Connection String</td>
+                    <td class="font-medium text-base-content/80">Connection String</td>
                     <td class="font-mono text-xs break-all select-all">
                       {dbInfo.auth_enabled
                         ? `mongodb://${dbInfo.admin_user}:${showPasswords ? dbInfo.admin_pass : '****'}@127.0.0.1:${dbInfo.port}`
@@ -117,7 +117,7 @@ export default function Dashboard() {
                 </tbody>
               </table>
             </div>
-            <p class="text-xs text-base-content/40 mt-2">
+            <p class="text-xs text-base-content/70 mt-2">
               Use the admin credentials to connect via MongoDB Compass or mongosh for maintenance.
             </p>
           </div>

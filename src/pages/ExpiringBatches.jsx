@@ -94,12 +94,12 @@ export default function ExpiringBatches({ path }) {
           <table class="table table-sm w-full">
             <thead class="bg-base-200/60">
               <tr>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('productName')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('batchNumber')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('expiryDate')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('qty')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('prixAchat')}</th>
-                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50"></th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('productName')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('batchNumber')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('expiryDate')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('qty')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('prixAchat')}</th>
+                <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70"></th>
                 {canDelete && <th class="px-3 py-2.5"></th>}
               </tr>
             </thead>
@@ -144,7 +144,7 @@ export default function ExpiringBatches({ path }) {
       {/* Pagination */}
       {total > 0 && (
         <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/60">{t('showing')} {start}–{end} {t('of')} {total}</span>
+          <span class="text-base-content/80">{t('showing')} {start}–{end} {t('of')} {total}</span>
           <div class="join">
             <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
             {(() => {

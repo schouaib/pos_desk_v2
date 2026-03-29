@@ -15,6 +15,7 @@ import AdminAdmins from './pages/Admins'
 import AdminApiMetrics from './pages/ApiMetrics'
 import AdminStorage from './pages/Storage'
 import AdminFolderRequests from './pages/FolderRequests'
+import AdminTestDashboard from './pages/TestDashboard'
 
 // Initialize activation headers from main app
 export function initSaHeaders(machineId, key) {
@@ -52,7 +53,7 @@ function AdminLogin({ onLogin }) {
             </svg>
             Super Admin
           </h2>
-          <p class="text-base-content/60 text-sm mb-4">{t('signInManage') || 'Sign in to manage the system'}</p>
+          <p class="text-base-content/80 text-sm mb-4">{t('signInManage') || 'Sign in to manage the system'}</p>
 
           {error && (
             <div class="alert alert-error text-sm py-2 mb-2">
@@ -62,12 +63,12 @@ function AdminLogin({ onLogin }) {
 
           <form onSubmit={handleSubmit} class="space-y-3">
             <label class="form-control">
-              <span class="label-text text-sm font-medium">{t('username') || 'Username'}</span>
+              <span class="label-text text-xs">{t('username') || 'Username'}</span>
               <input type="text" class="input input-bordered input-sm"
                 value={form.email} onInput={(e) => setForm({ ...form, email: e.target.value })} required autoFocus />
             </label>
             <label class="form-control">
-              <span class="label-text text-sm font-medium">{t('password')}</span>
+              <span class="label-text text-xs">{t('password')}</span>
               <input type="password" class="input input-bordered input-sm"
                 value={form.password} onInput={(e) => setForm({ ...form, password: e.target.value })} required />
             </label>
@@ -110,7 +111,7 @@ function PasswordChangeModal({ onDone }) {
           <h2 class="card-title text-lg font-bold text-warning">
             {t('changePassword') || 'Change Password Required'}
           </h2>
-          <p class="text-sm text-base-content/60 mb-2">
+          <p class="text-sm text-base-content/80 mb-2">
             You are using a default password. Please change it now for security.
           </p>
           {error && <div class="alert alert-error text-sm py-2 mb-2"><span>{error}</span></div>}
@@ -160,6 +161,7 @@ function AdminLayout({ onClose }) {
     { key: 'metrics', label: t('apiMetrics') || 'API Metrics' },
     { key: 'storage', label: t('storageUsage') || 'Storage' },
     { key: 'folders', label: t('folderRequests') || 'Folder Requests' },
+    { key: 'tests', label: 'Integration Tests' },
   ]
 
   return (
@@ -173,7 +175,7 @@ function AdminLayout({ onClose }) {
         <div class="p-4 border-b border-base-300 flex items-center justify-between">
           <div>
             <h1 class="text-base font-bold text-primary">Admin Panel</h1>
-            <p class="text-[10px] text-base-content/50">Super Admin</p>
+            <p class="text-xs text-base-content/70">Super Admin</p>
           </div>
           <button onClick={onClose} class="btn btn-ghost btn-xs btn-circle" title="Close (Ctrl+Shift+F12)">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -198,7 +200,7 @@ function AdminLayout({ onClose }) {
         </nav>
 
         <div class="p-3 border-t border-base-300 space-y-2">
-          <p class="text-xs text-base-content/60 truncate">{saUser.value?.email}</p>
+          <p class="text-xs text-base-content/80 truncate">{saUser.value?.email}</p>
           <button onClick={logout} class="btn btn-sm btn-error btn-outline w-full">
             {t('logout') || 'Logout'}
           </button>
@@ -214,6 +216,7 @@ function AdminLayout({ onClose }) {
         {page === 'metrics' && <AdminApiMetrics />}
         {page === 'storage' && <AdminStorage />}
         {page === 'folders' && <AdminFolderRequests />}
+        {page === 'tests' && <AdminTestDashboard />}
       </main>
     </div>
   )

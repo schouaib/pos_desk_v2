@@ -44,6 +44,7 @@ import (
 	"saas_pos/internal/user"
 	"saas_pos/internal/facturation"
 	"saas_pos/internal/scale"
+	"saas_pos/internal/testrunner"
 	"saas_pos/internal/variant"
 
 	"github.com/gofiber/fiber/v2"
@@ -100,7 +101,7 @@ func main() {
 		// Reduce memory: disable pre-fork, limit body size
 		Prefork:        false,
 		BodyLimit:      2 * 1024 * 1024, // 2 MB
-		ReadBufferSize: 8192,            // 8 KB — needed for enlarged JWT with permission fields
+		ReadBufferSize: 16384,           // 16 KB — needed for enlarged JWT with permission fields + activation headers
 		StrictRouting:  true,
 	})
 
@@ -238,6 +239,9 @@ func registerRoutes(app *fiber.App) {
 
 	// API metrics
 	saAuth.Get("/metrics", metrics.HandleGetStats)
+
+	// Integration test runner
+	saAuth.Post("/run-tests", testrunner.HandleRunTests)
 
 	// ─── Tenant Panel ─────────────────────────────────────────────────────────
 	tp := api.Group("/tenant",

@@ -230,9 +230,11 @@ func UpdateSettings(tenantID string, input SettingsInput) (*Tenant, error) {
 		"use_vat":              input.UseVAT,
 		"pos_expiry_warning":  input.PosExpiryWarning,
 		"max_cash_amount":     input.MaxCashAmount,
-		"tap_rate":            input.TapRate,
-		"ibs_rate":            input.IbsRate,
-		"updated_at":          time.Now(),
+		"tap_rate":              input.TapRate,
+		"ibs_rate":              input.IbsRate,
+		"default_product_mode":  input.DefaultProductMode,
+		"visible_prices":        input.VisiblePrices,
+		"updated_at":            time.Now(),
 	}
 
 	after := options.After
@@ -317,7 +319,7 @@ func ListLinked(tenantID string) ([]Tenant, error) {
 		bson.M{"parent_id": rootID},
 	}}
 
-	cursor, err := col().Find(ctx, filter, options.Find().SetSort(bson.M{"created_at": 1}))
+	cursor, err := col().Find(ctx, filter, options.Find().SetSort(bson.M{"created_at": -1}))
 	if err != nil {
 		return nil, err
 	}

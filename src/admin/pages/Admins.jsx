@@ -49,7 +49,7 @@ export default function Admins() {
             <thead class="bg-base-200/60">
               <tr>
                 {[t('name'), t('email'), t('status'), t('actions')].map((h, i) => (
-                  <th key={i} class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap">{h}</th>
+                  <th key={i} class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -57,7 +57,7 @@ export default function Admins() {
               {admins.map((a) => (
                 <tr key={a.id} class="border-b border-base-200">
                   <td class="px-3 py-2.5 font-medium">{a.name}</td>
-                  <td class="px-3 py-2.5 text-sm text-base-content/70">{a.email}</td>
+                  <td class="px-3 py-2.5 text-sm text-base-content/80">{a.email}</td>
                   <td class="px-3 py-2.5">
                     <span class={`text-xs font-semibold px-2 py-0.5 rounded-full ${a.active ? 'bg-success/15 text-success' : 'bg-error/15 text-error'}`}>
                       {a.active ? t('active') || 'Active' : t('disabled') || 'Disabled'}
@@ -71,7 +71,7 @@ export default function Admins() {
                 </tr>
               ))}
               {admins.length === 0 && (
-                <tr><td colSpan={4} class="px-3 py-12 text-center text-base-content/40">{t('noAdmins') || 'No admins yet'}</td></tr>
+                <tr><td colSpan={4} class="px-3 py-12 text-center text-base-content/70">{t('noAdmins') || 'No admins yet'}</td></tr>
               )}
             </tbody>
           </table>

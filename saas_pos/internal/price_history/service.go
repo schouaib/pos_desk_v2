@@ -68,7 +68,9 @@ func List(tenantID, productID string, page, limit int) (*ListResult, error) {
 	defer cur.Close(ctx)
 
 	var items []PriceRecord
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []PriceRecord{}
 	}

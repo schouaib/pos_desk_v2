@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: light --default
+  themes: light --default, dark
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -20,7 +20,7 @@
   font-weight: 500;
   color: var(--color-base-content);
   @supports (color: color-mix(in lab, red, red)) {
-    color: color-mix(in oklab, var(--color-base-content) 75%, transparent);
+    color: color-mix(in oklab, var(--color-base-content) 88%, transparent);
   }
 }
 .input-bordered,
@@ -34,6 +34,17 @@ html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── App background ───────────────────────────────────────── */
+/* Subtle warm tint instead of flat gray (light theme only) */
+[data-theme="light"] .bg-base-200 {
+  background-color: #f0f1f5;
+}
+@supports (background: linear-gradient(135deg, #f0f1f5, #eef0f4)) {
+  [data-theme="light"] .app-shell {
+    background: linear-gradient(160deg, #f2f3f7 0%, #eceef3 50%, #e9ebf1 100%);
+  }
 }
 
 /* ─── Scrollbar ─────────────────────────────────────────────── */
@@ -233,7 +244,7 @@ aside {
   background: var(--color-base-200);
   color: var(--color-base-content);
   @supports (color: color-mix(in lab, red, red)) {
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    color: color-mix(in oklab, var(--color-base-content) 75%, transparent);
   }
 }
 
@@ -248,14 +259,23 @@ aside {
   gap: 0.75rem;
 }
 .empty-state svg {
-  opacity: 0.25;
+  opacity: 0.4;
 }
 .empty-state p {
   color: var(--color-base-content);
   @supports (color: color-mix(in lab, red, red)) {
-    color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
   }
   font-size: 0.875rem;
+}
+
+/* ─── Text readability boost ───────────────────────────────── */
+/* Tailwind opacity modifiers like text-base-content/50 are too faint.
+   These overrides ensure all text stays readable. */
+@supports (color: color-mix(in oklab, red, blue)) {
+  .table thead th {
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  }
 }
 
 /* ─── Scan feedback ─────────────────────────────────────────── */
@@ -361,7 +381,7 @@ aside {
   transform: translateY(-50%);
   width: 1.375rem;
   height: 1.375rem;
-  opacity: 0.35;
+  opacity: 0.5;
   transition: color 0.2s, opacity 0.2s;
 }
 .pos-scan-wrap:focus-within .pos-scan-icon {
@@ -409,14 +429,14 @@ aside {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  opacity: 0.6;
+  opacity: 0.8;
   padding-top: 0.625rem;
   padding-bottom: 0.625rem;
 }
 @supports (background: color-mix(in oklab, red, blue)) {
   .pos-ticket .table thead th {
     background: color-mix(in oklab, var(--color-base-200) 60%, transparent);
-    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
     opacity: 1;
   }
 }
@@ -565,7 +585,7 @@ aside {
 .pos-empty-icon svg {
   width: 2rem;
   height: 2rem;
-  opacity: 0.3;
+  opacity: 0.45;
 }
 
 /* ─── POS Payment Modal ───────────────────────────────────── */
@@ -740,4 +760,271 @@ aside {
 @keyframes pos-status-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   POS PRO+ — Premium Polish & Micro-interactions
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Elevated Summary Panel ──────────────────────────────── */
+.pos-summary {
+  background: var(--color-base-100);
+}
+@supports (background: color-mix(in oklab, red, blue)) {
+  .pos-summary {
+    background: linear-gradient(180deg, var(--color-base-100) 0%, color-mix(in oklab, var(--color-base-200) 40%, var(--color-base-100)) 100%);
+  }
+}
+
+/* ─── Enhanced Total Banner ───────────────────────────────── */
+.pos-summary-total {
+  position: relative;
+  overflow: hidden;
+}
+.pos-summary-total::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+.pos-summary-total::after {
+  content: '';
+  position: absolute;
+  bottom: -40%;
+  left: -10%;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+}
+
+/* ─── Ticket Table Hover Glow ─────────────────────────────── */
+@supports (box-shadow: 0 0 0 color-mix(in oklab, red, blue)) {
+  .pos-ticket:focus-within {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 15%, transparent),
+                0 4px 16px -4px rgb(0 0 0 / 0.08);
+  }
+}
+
+/* ─── Scan Input Glow Effect ──────────────────────────────── */
+.pos-scan-wrap .input:focus {
+  border-color: var(--color-primary);
+}
+@supports (box-shadow: 0 0 0 color-mix(in oklab, red, blue)) {
+  .pos-scan-wrap .input:focus {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 15%, transparent),
+                0 0 20px -4px color-mix(in oklab, var(--color-primary) 12%, transparent);
+  }
+}
+
+/* ─── Checkout Button Gradient ────────────────────────────── */
+@supports (background: color-mix(in oklab, red, blue)) {
+  .pos-checkout-btn {
+    background: linear-gradient(135deg, var(--color-primary), color-mix(in oklab, var(--color-primary) 80%, var(--color-info)));
+    border: none;
+    color: #fff;
+  }
+  .pos-checkout-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, color-mix(in oklab, var(--color-primary) 90%, #000), color-mix(in oklab, var(--color-primary) 70%, var(--color-info)));
+  }
+}
+
+/* ─── Payment Method Pills ────────────────────────────────── */
+.pos-pay-method {
+  display: flex;
+  gap: 0.5rem;
+}
+.pos-pay-method .btn {
+  border-radius: 9999px;
+  padding: 0 1.25rem;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pos-pay-method .btn.btn-primary {
+  box-shadow: 0 2px 8px -2px var(--color-primary);
+}
+@supports (box-shadow: 0 0 0 color-mix(in oklab, red, blue)) {
+  .pos-pay-method .btn.btn-primary {
+    box-shadow: 0 2px 8px -2px color-mix(in oklab, var(--color-primary) 40%, transparent);
+  }
+}
+
+/* ─── Denomination Buttons Grid ───────────────────────────── */
+.pos-denom-btn {
+  position: relative;
+  overflow: hidden;
+}
+.pos-denom-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.pos-denom-btn:hover::after {
+  opacity: 1;
+}
+
+/* ─── Change Display Gradient ─────────────────────────────── */
+@supports (background: color-mix(in oklab, red, blue)) {
+  .pos-change-display.bg-success\/10 {
+    background: linear-gradient(135deg, color-mix(in oklab, var(--color-success) 10%, transparent), color-mix(in oklab, var(--color-success) 5%, transparent));
+    border: 1px solid color-mix(in oklab, var(--color-success) 15%, transparent);
+  }
+  .pos-change-display.bg-error\/10 {
+    background: linear-gradient(135deg, color-mix(in oklab, var(--color-error) 10%, transparent), color-mix(in oklab, var(--color-error) 5%, transparent));
+    border: 1px solid color-mix(in oklab, var(--color-error) 15%, transparent);
+  }
+}
+
+/* ─── Client Card Hover ───────────────────────────────────── */
+.pos-client-card:hover {
+  transform: translateY(-1px);
+}
+@supports (box-shadow: 0 0 0 color-mix(in oklab, red, blue)) {
+  .pos-client-card:hover {
+    box-shadow: 0 4px 12px -4px color-mix(in oklab, var(--color-primary) 20%, transparent);
+  }
+}
+
+/* ─── Numpad Enhanced ─────────────────────────────────────── */
+.pos-numpad .btn {
+  background: var(--color-base-100);
+  border: 1px solid var(--color-base-300);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+@supports (border-color: color-mix(in oklab, red, blue)) {
+  .pos-numpad .btn {
+    border-color: color-mix(in oklab, var(--color-base-content) 8%, transparent);
+  }
+  .pos-numpad .btn:hover {
+    background: color-mix(in oklab, var(--color-base-content) 4%, transparent);
+    border-color: color-mix(in oklab, var(--color-base-content) 14%, transparent);
+  }
+}
+
+/* ─── Help Modal Shortcuts (kbd-style) ───────────────────── */
+.pos-help-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: 0.375rem;
+  background: var(--color-base-200);
+  border: 1px solid var(--color-base-300);
+  box-shadow: 0 1px 0 var(--color-base-300);
+}
+@supports (background: color-mix(in oklab, red, blue)) {
+  .pos-help-key {
+    background: linear-gradient(180deg, var(--color-base-100), var(--color-base-200));
+    border-color: color-mix(in oklab, var(--color-base-content) 12%, transparent);
+    box-shadow: 0 1px 0 color-mix(in oklab, var(--color-base-content) 8%, transparent);
+  }
+}
+
+/* ─── Empty State Enhanced ────────────────────────────────── */
+.pos-empty-icon {
+  background: var(--color-base-200);
+  box-shadow: 0 4px 16px -4px rgb(0 0 0 / 0.08);
+}
+@supports (background: color-mix(in oklab, red, blue)) {
+  .pos-empty-icon {
+    background: linear-gradient(135deg, var(--color-base-200), color-mix(in oklab, var(--color-primary) 6%, var(--color-base-200)));
+  }
+}
+
+/* ─── Scan Toast Enhanced ─────────────────────────────────── */
+@supports (background: color-mix(in oklab, red, blue)) {
+  .pos-scan-toast {
+    background: linear-gradient(135deg, var(--color-success), color-mix(in oklab, var(--color-success) 85%, var(--color-info)));
+  }
+}
+
+/* ─── POS Header Subtle Gradient ──────────────────────────── */
+@supports (background: color-mix(in oklab, red, blue)) {
+  .pos-header {
+    background: linear-gradient(180deg, color-mix(in oklab, var(--color-base-100) 95%, transparent), color-mix(in oklab, var(--color-base-100) 80%, transparent));
+  }
+}
+
+/* ─── Selected Row Glow ───────────────────────────────────── */
+@supports (box-shadow: 0 0 0 color-mix(in oklab, red, blue)) {
+  .pos-ticket .pos-row-selected {
+    box-shadow: inset 3px 0 0 var(--color-primary),
+                0 1px 4px -1px color-mix(in oklab, var(--color-primary) 10%, transparent);
+    border-left: none;
+  }
+  .pos-ticket .pos-row-selected td:first-child {
+    padding-left: 1rem;
+  }
+}
+
+/* ─── Catalog Product Grid Buttons ────────────────────────── */
+.pos-catalog-btn {
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-base-300);
+  background: var(--color-base-100);
+  padding: 0.75rem 0.5rem;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 4.5rem;
+  cursor: pointer;
+  text-align: center;
+}
+@supports (border-color: color-mix(in oklab, red, blue)) {
+  .pos-catalog-btn {
+    border-color: color-mix(in oklab, var(--color-base-content) 8%, transparent);
+  }
+}
+.pos-catalog-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px -4px rgb(0 0 0 / 0.1);
+}
+@supports (border-color: color-mix(in oklab, red, blue)) {
+  .pos-catalog-btn:hover {
+    border-color: color-mix(in oklab, var(--color-primary) 30%, transparent);
+    box-shadow: 0 4px 16px -4px color-mix(in oklab, var(--color-primary) 15%, transparent);
+  }
+}
+.pos-catalog-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* ─── Payment Modal Success Gradient ──────────────────────── */
+@supports (background: color-mix(in oklab, red, blue)) {
+  .modal-box .btn-success {
+    background: linear-gradient(135deg, var(--color-success), color-mix(in oklab, var(--color-success) 80%, var(--color-info)));
+    border: none;
+  }
+  .modal-box .btn-success:hover:not(:disabled) {
+    background: linear-gradient(135deg, color-mix(in oklab, var(--color-success) 90%, #000), color-mix(in oklab, var(--color-success) 70%, var(--color-info)));
+  }
+}
+
+/* ─── Smooth Transitions for All POS Elements ─────────────── */
+.pos-summary,
+.pos-ticket,
+.pos-scan-wrap .input,
+.pos-client-card,
+.pos-checkout-btn,
+.pos-denom-btn,
+.pos-numpad .btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }

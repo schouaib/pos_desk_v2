@@ -85,7 +85,9 @@ func List(tenantID, q string, page, limit int) (*ListResult, error) {
 	defer cur.Close(ctx)
 
 	var items []Client
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []Client{}
 	}
@@ -195,7 +197,9 @@ func ListArchived(tenantID, q string, page, limit int) (*ListResult, error) {
 	}
 	defer cur.Close(ctx)
 	items := []Client{}
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	return &ListResult{Items: items, Total: total}, nil
 }
 
@@ -547,7 +551,9 @@ func PaymentsSum(tenantID string, from, to time.Time) (float64, error) {
 	}
 	defer cur.Close(ctx)
 	var agg []struct{ Total float64 `bson:"total"` }
-	cur.All(ctx, &agg)
+	if err := cur.All(ctx, &agg); err != nil {
+		return 0, err
+	}
 	if len(agg) > 0 {
 		return math.Round(agg[0].Total*100) / 100, nil
 	}
@@ -579,7 +585,9 @@ func ListPayments(tenantID, clientID string, page, limit int) (*PaymentListResul
 	defer cur.Close(ctx)
 
 	var items []Payment
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []Payment{}
 	}

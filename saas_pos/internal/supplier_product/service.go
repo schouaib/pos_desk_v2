@@ -28,14 +28,15 @@ func Create(tenantID string, input CreateInput) (*SupplierProduct, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	tid, _ := primitive.ObjectIDFromHex(tenantID)
+
 	// Get supplier name
 	var sup struct{ Name string `bson:"name"` }
-	if err := database.Col("suppliers").FindOne(ctx, bson.M{"_id": sid, "tenant_id": tenantID}).Decode(&sup); err != nil {
+	if err := database.Col("suppliers").FindOne(ctx, bson.M{"_id": sid, "tenant_id": tid}).Decode(&sup); err != nil {
 		return nil, errors.New("supplier not found")
 	}
 
 	// Get product name
-	tid, _ := primitive.ObjectIDFromHex(tenantID)
 	var prod struct{ Name string `bson:"name"` }
 	if err := database.Col("products").FindOne(ctx, bson.M{"_id": pid, "tenant_id": tid}).Decode(&prod); err != nil {
 		return nil, errors.New("product not found")
@@ -77,7 +78,9 @@ func Create(tenantID string, input CreateInput) (*SupplierProduct, error) {
 	col().UpdateOne(ctx, filter, update, opts)
 
 	// Return the current doc
-	col().FindOne(ctx, filter).Decode(&sp)
+	if err := col().FindOne(ctx, filter).Decode(&sp); err != nil {
+		return nil, err
+	}
 	return &sp, nil
 }
 
@@ -112,7 +115,9 @@ func ListBySupplier(tenantID, supplierID string, page, limit int) (*ListResult, 
 	defer cur.Close(ctx)
 
 	var items []SupplierProduct
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []SupplierProduct{}
 	}
@@ -135,7 +140,9 @@ func ListByProduct(tenantID, productID string) ([]SupplierProduct, error) {
 	defer cur.Close(ctx)
 
 	var items []SupplierProduct
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []SupplierProduct{}
 	}

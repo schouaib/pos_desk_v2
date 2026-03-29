@@ -32,21 +32,21 @@ export default function Storage() {
       <h2 class="text-2xl font-bold mb-6">{t('storageUsage') || 'Storage Usage'}</h2>
       <div class="grid grid-cols-3 gap-4 mb-6">
         <div class="card bg-base-100 shadow"><div class="card-body py-4">
-          <p class="text-xs text-base-content/60">{t('totalDbSize') || 'DB Size'}</p>
+          <p class="text-xs text-base-content/80">{t('totalDbSize') || 'DB Size'}</p>
           <p class="text-2xl font-bold text-primary">{fmt(data?.total_db_bytes || 0)}</p>
         </div></div>
         <div class="card bg-base-100 shadow"><div class="card-body py-4">
-          <p class="text-xs text-base-content/60">{t('totalDiskSize') || 'Disk Size'}</p>
+          <p class="text-xs text-base-content/80">{t('totalDiskSize') || 'Disk Size'}</p>
           <p class="text-2xl font-bold text-secondary">{fmt(data?.total_disk_bytes || 0)}</p>
         </div></div>
         <div class="card bg-base-100 shadow"><div class="card-body py-4">
-          <p class="text-xs text-base-content/60">{t('totalSize') || 'Total'}</p>
+          <p class="text-xs text-base-content/80">{t('totalSize') || 'Total'}</p>
           <p class="text-2xl font-bold">{fmt(data?.total_bytes || 0)}</p>
         </div></div>
       </div>
 
       {tenants.length === 0 ? (
-        <p class="text-base-content/60 text-center py-10">{t('noStores') || 'No stores'}</p>
+        <p class="text-base-content/80 text-center py-10">{t('noStores') || 'No stores'}</p>
       ) : (
         <div class="card bg-base-100 shadow overflow-hidden">
           <table class="table table-sm w-full">
@@ -78,7 +78,7 @@ export default function Storage() {
                       <div class="grid grid-cols-3 gap-2">
                         {Object.entries(tenant.doc_counts || {}).sort(([,a],[,b]) => b - a).map(([col, count]) => (
                           <div key={col} class="flex justify-between text-sm px-2 py-1 bg-base-100 rounded">
-                            <span class="text-base-content/70">{col}</span>
+                            <span class="text-base-content/80">{col}</span>
                             <span class="font-mono font-semibold">{count.toLocaleString()}</span>
                           </div>
                         ))}

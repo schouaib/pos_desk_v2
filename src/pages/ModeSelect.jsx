@@ -90,14 +90,14 @@ export default function ModeSelect({ onReady }) {
                 </div>
                 <div>
                   <h1 class="text-2xl font-bold">CiPOSdz</h1>
-                  <p class="text-xs text-base-content/40">v1.0.0</p>
+                  <p class="text-xs text-base-content/70">v1.0.0</p>
                 </div>
               </div>
             </div>
             <LangSwitcher />
           </div>
 
-          <p class="text-base-content/60 text-sm mb-4">
+          <p class="text-base-content/80 text-sm mb-4">
             {t('modeSelectDesc') || 'Choose how to use this POS terminal'}
           </p>
 
@@ -125,12 +125,12 @@ export default function ModeSelect({ onReady }) {
                   </div>
                   <div class="flex-1">
                     <h3 class="font-bold text-sm">{t('serverMode') || 'Server Mode'}</h3>
-                    <p class="text-xs text-base-content/60 mt-0.5">
+                    <p class="text-xs text-base-content/80 mt-0.5">
                       {t('serverModeDesc') || 'Run the database and POS on this machine. Other POS terminals on the network can connect to it.'}
                     </p>
                     {mode === 'server' && lanIp && (
                       <div class="mt-2 p-2 bg-base-200 rounded-lg">
-                        <p class="text-xs text-base-content/50">{t('otherCanConnect') || 'Other terminals can connect to:'}</p>
+                        <p class="text-xs text-base-content/70">{t('otherCanConnect') || 'Other terminals can connect to:'}</p>
                         <p class="font-mono text-sm font-bold text-primary">{lanIp}:3000</p>
                       </div>
                     )}
@@ -154,7 +154,7 @@ export default function ModeSelect({ onReady }) {
                   </div>
                   <div class="flex-1">
                     <h3 class="font-bold text-sm">{t('clientMode') || 'Client Mode'}</h3>
-                    <p class="text-xs text-base-content/60 mt-0.5">
+                    <p class="text-xs text-base-content/80 mt-0.5">
                       {t('clientModeDesc') || 'Connect to a server running on another machine on the local network.'}
                     </p>
                     {mode === 'client' && (
@@ -168,7 +168,7 @@ export default function ModeSelect({ onReady }) {
                           onKeyDown={e => e.key === 'Enter' && clientIp && connectClient()}
                           onClick={e => e.stopPropagation()}
                         />
-                        <p class="text-xs text-base-content/40 mt-1">
+                        <p class="text-xs text-base-content/70 mt-1">
                           {t('enterServerIp') || 'Enter the IP shown on the server machine'}
                         </p>
                       </div>

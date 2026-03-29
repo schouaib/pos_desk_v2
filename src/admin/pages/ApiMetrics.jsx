@@ -71,15 +71,15 @@ export default function ApiMetrics() {
       {data && (
         <div class="grid grid-cols-3 gap-4 mb-6">
           <div class="card bg-base-100 shadow"><div class="card-body py-4 px-5">
-            <p class="text-xs text-base-content/50">{t('totalRequests') || 'Total Requests'}</p>
+            <p class="text-xs text-base-content/70">{t('totalRequests') || 'Total Requests'}</p>
             <p class="text-3xl font-bold text-primary">{data.total_requests?.toLocaleString()}</p>
           </div></div>
           <div class="card bg-base-100 shadow"><div class="card-body py-4 px-5">
-            <p class="text-xs text-base-content/50">{t('overallSuccess') || 'Success Rate'}</p>
+            <p class="text-xs text-base-content/70">{t('overallSuccess') || 'Success Rate'}</p>
             <p class={`text-3xl font-bold ${data.success_rate >= 99 ? 'text-success' : 'text-warning'}`}>{data.success_rate}%</p>
           </div></div>
           <div class="card bg-base-100 shadow"><div class="card-body py-4 px-5">
-            <p class="text-xs text-base-content/50">{t('endpoint') || 'Endpoints'}</p>
+            <p class="text-xs text-base-content/70">{t('endpoint') || 'Endpoints'}</p>
             <p class="text-3xl font-bold">{sorted.length}</p>
           </div></div>
         </div>

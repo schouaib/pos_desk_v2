@@ -79,8 +79,8 @@ export default function Login() {
             <LangSwitcher />
           </div>
 
-          <h2 class="text-xl font-bold mb-0.5">{t('storeLogin')}</h2>
-          <p class="text-base-content/50 text-sm mb-5">{t('signInManage')}</p>
+          <h2 class="text-2xl font-bold mb-0.5">{t('storeLogin')}</h2>
+          <p class="text-base-content/70 text-sm mb-5">{t('signInManage')}</p>
 
           {error && (
             <div class={`alert text-sm py-2.5 px-3.5 mb-3 rounded-lg ${error.includes('disabled') ? 'alert-warning' : 'alert-error'}`}>
@@ -93,14 +93,14 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} class="space-y-4">
             <label class="form-control">
-              <span class="label-text">{t('username') || 'Username'}</span>
+              <span class="label-text text-xs">{t('username') || 'Username'}</span>
               <input ref={emailRef} type="text" class="input input-bordered w-full"
                 placeholder="admin"
                 value={form.email} onInput={(e) => setForm({ ...form, email: e.target.value })}
                 data-search required autocomplete="username" />
             </label>
             <label class="form-control">
-              <span class="label-text">{t('password')}</span>
+              <span class="label-text text-xs">{t('password')}</span>
               <input type="password" class="input input-bordered w-full"
                 placeholder="••••••••"
                 value={form.password} onInput={(e) => setForm({ ...form, password: e.target.value })}
@@ -121,8 +121,8 @@ export default function Login() {
           </form>
 
           <div class="text-center mt-3 pt-3 border-t border-base-200">
-            <a href="/terms" class="link link-hover text-xs text-base-content/40">
-              شروط وأحكام الاستخدام
+            <a href="/terms" class="link link-hover text-xs text-base-content/70">
+              {t('termsOfUse')}
             </a>
           </div>
         </div>

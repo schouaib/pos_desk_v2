@@ -123,18 +123,32 @@ export function PrintLabelModal({ product, storeName, currency = 'DA' }) {
   if (!product) return null
   const price = product[priceField] ?? 0
 
+  const modelLabel = (id) =>
+    id === 'standard' ? (t('labelStandard') || 'Standard') :
+    id === '45x35' ? '45×35' :
+    id === '40x20' ? '40×20' :
+    id === 'optic' ? (t('labelOptic') || 'Optic') :
+    (t('labelBijou') || 'Bijou')
+
   return (
     <Modal id={PRINT_MODAL_ID} title={t('printLabel')} size="lg">
-      <div class="space-y-4">
+      <div class="space-y-5">
 
         {error && <div class="alert alert-error text-sm py-2"><span>{error}</span></div>}
 
         {/* Printer selector */}
-        <div>
-          <p class="label-text text-xs font-medium mb-1">{t('selectPrinter') || 'Printer'}</p>
+        <label class="form-control w-full">
+          <div class="label py-1">
+            <span class="label-text text-sm font-semibold flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-base-content/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
+              </svg>
+              {t('selectPrinter') || 'Printer'}
+            </span>
+          </div>
           {printers.length > 0 ? (
             <select
-              class="select select-bordered select-sm w-full"
+              class="select select-bordered w-full"
               value={selectedPrinter}
               onChange={(e) => handlePrinterChange(e.target.value)}
             >
@@ -150,78 +164,84 @@ export function PrintLabelModal({ product, storeName, currency = 'DA' }) {
               <span>{t('connectPrinter') || 'No printers found'}</span>
             </div>
           )}
-        </div>
+        </label>
 
         {/* Label model selector */}
         <div>
-          <p class="label-text text-xs font-medium mb-1.5">{t('labelModel') || 'Label model'}</p>
-          <div class="grid grid-cols-3 gap-2">
+          <p class="label-text text-sm font-semibold mb-2">{t('labelModel') || 'Label model'}</p>
+          <div class="flex flex-wrap gap-2">
             {LABEL_MODELS.map(m => (
               <button
                 key={m.id}
-                class={`btn btn-sm gap-1 ${model === m.id ? 'btn-primary' : 'btn-outline'}`}
+                type="button"
+                class={`flex flex-col items-center gap-1 px-4 py-2.5 rounded-xl border-2 transition-all
+                  ${model === m.id
+                    ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                    : 'border-base-300 bg-base-100 text-base-content/75 hover:border-base-content/20 hover:bg-base-200/50'}`}
                 onClick={() => setModel(m.id)}
               >
-                <span>{m.icon}</span>
-                <span class="text-xs">{
-                  m.id === 'standard' ? (t('labelStandard') || 'Standard') :
-                  m.id === '45x35' ? '45×35' :
-                  m.id === '40x20' ? '40×20' :
-                  m.id === 'optic' ? (t('labelOptic') || 'Optic') :
-                  (t('labelBijou') || 'Bijou')
-                }</span>
+                <span class="text-lg">{m.icon}</span>
+                <span class="text-xs font-semibold">{modelLabel(m.id)}</span>
               </button>
             ))}
           </div>
+          {/* Model description */}
+          <p class="text-xs text-base-content/70 mt-2 px-1">
+            {model === 'standard' && (t('labelStandardDesc') || 'Full thermal label: store name, product, barcode, price')}
+            {model === '45x35' && (t('label45x35Desc') || '45×35mm sticker: product name, barcode, price')}
+            {model === '40x20' && (t('label40x20Desc') || '40×20mm sticker: compact name, barcode, price')}
+            {model === 'optic' && (t('labelOpticDesc') || 'Tiny label (12×7mm) for glasses: ref + price only')}
+            {model === 'bijou' && (t('labelBijouDesc') || 'Compact jewelry label: store, product, ref, price')}
+          </p>
         </div>
 
-        {/* Model description */}
-        <div class="text-xs text-base-content/50 bg-base-200/50 rounded-lg px-3 py-2">
-          {model === 'standard' && (t('labelStandardDesc') || 'Full thermal label: store name, product, barcode, price')}
-          {model === '45x35' && (t('label45x35Desc') || '45×35mm sticker: product name, barcode, price')}
-          {model === '40x20' && (t('label40x20Desc') || '40×20mm sticker: compact name, barcode, price')}
-          {model === 'optic' && (t('labelOpticDesc') || 'Tiny label (12×7mm) for glasses: ref + price only')}
-          {model === 'bijou' && (t('labelBijouDesc') || 'Compact jewelry label: store, product, ref, price')}
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <p class="label-text text-xs font-medium mb-1">{t('copies')}</p>
-            <input type="number" min="1" max="99" class="input input-bordered input-sm w-24"
-              value={copies}
-              onInput={(e) => setCopies(Math.max(1, Math.min(99, parseInt(e.target.value) || 1)))} />
-          </div>
-
-          <div>
-            <p class="label-text text-xs font-medium mb-1">{t('price')}</p>
-            <select class="select select-bordered select-sm w-full" value={priceField}
-              onChange={(e) => setPriceField(e.target.value)}>
-              <option value="prix_vente_1">{t('prixVente1')} ({product.prix_vente_1})</option>
-              <option value="prix_vente_2">{t('prixVente2')} ({product.prix_vente_2})</option>
-              <option value="prix_vente_3">{t('prixVente3')} ({product.prix_vente_3})</option>
-            </select>
-          </div>
-
-          {model === 'standard' && (product.barcodes?.length > 1) && (
-            <div>
-              <p class="label-text text-xs font-medium mb-1">{t('barcode')}</p>
-              <select class="select select-bordered select-sm w-full" value={barcodeVal}
-                onChange={(e) => setBarcodeVal(e.target.value)}>
-                {product.barcodes.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
+        {/* Settings row */}
+        <div class="bg-base-200/40 rounded-xl p-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <label class="form-control">
+              <div class="label py-0.5">
+                <span class="label-text text-sm font-semibold">{t('price')}</span>
+              </div>
+              <select class="select select-bordered w-full" value={priceField}
+                onChange={(e) => setPriceField(e.target.value)}>
+                <option value="prix_vente_1">{t('prixVente1')} ({product.prix_vente_1})</option>
+                <option value="prix_vente_2">{t('prixVente2')} ({product.prix_vente_2})</option>
+                <option value="prix_vente_3">{t('prixVente3')} ({product.prix_vente_3})</option>
               </select>
-            </div>
-          )}
+            </label>
+
+            <label class="form-control">
+              <div class="label py-0.5">
+                <span class="label-text text-sm font-semibold">{t('copies')}</span>
+              </div>
+              <input type="number" min="1" max="99" class="input input-bordered w-full"
+                value={copies}
+                onInput={(e) => setCopies(Math.max(1, Math.min(99, parseInt(e.target.value) || 1)))} />
+            </label>
+
+            {model === 'standard' && (product.barcodes?.length > 1) && (
+              <label class="form-control col-span-2 sm:col-span-1">
+                <div class="label py-0.5">
+                  <span class="label-text text-sm font-semibold">{t('barcode')}</span>
+                </div>
+                <select class="select select-bordered w-full" value={barcodeVal}
+                  onChange={(e) => setBarcodeVal(e.target.value)}>
+                  {product.barcodes.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
         </div>
 
         {/* Preview */}
-        <div class="border border-base-300 rounded-lg p-3 text-center bg-base-50">
-          <p class="text-xs text-base-content/40 mb-2">{t('preview')}</p>
+        <div class="border border-base-300 rounded-xl p-4 flex flex-col items-center bg-base-100">
+          <p class="text-xs font-semibold text-base-content/60 uppercase tracking-wider mb-3">{t('preview')}</p>
 
           {model === 'standard' && (
-            <div class="inline-flex flex-col items-center border-2 border-dashed border-base-300 rounded p-2 gap-0.5 w-44 min-h-24">
-              {storeName && <span class="text-[9px] text-base-content/50">{storeName}</span>}
+            <div class="inline-flex flex-col items-center border-2 border-dashed border-base-300 rounded-lg p-3 gap-1 w-48 min-h-28 bg-white">
+              {storeName && <span class="text-[9px] text-base-content/70">{storeName}</span>}
               <span class={`font-bold truncate max-w-full leading-tight ${product.name.length > 25 ? 'text-[9px]' : 'text-xs'}`}>{product.name}</span>
               {barcodeVal && <BarcodePreview value={barcodeVal} />}
               <span class="text-sm font-bold">{price}</span>
@@ -229,7 +249,7 @@ export function PrintLabelModal({ product, storeName, currency = 'DA' }) {
           )}
 
           {model === '45x35' && (
-            <div class="inline-flex flex-col items-center border-2 border-dashed border-base-300 rounded p-2 gap-0.5 w-44 min-h-24">
+            <div class="inline-flex flex-col items-center border-2 border-dashed border-base-300 rounded-lg p-3 gap-1 w-48 min-h-28 bg-white">
               <span class="text-[9px] font-bold truncate max-w-full">{product.name}</span>
               {barcodeVal && <BarcodePreview value={barcodeVal} />}
               <span class="text-sm font-bold">{price}</span>
@@ -237,7 +257,7 @@ export function PrintLabelModal({ product, storeName, currency = 'DA' }) {
           )}
 
           {model === '40x20' && (
-            <div class="inline-flex flex-col items-center border-2 border-dashed border-base-300 rounded p-1.5 gap-0 w-36 min-h-16">
+            <div class="inline-flex flex-col items-center border-2 border-dashed border-base-300 rounded-lg p-2 gap-0 w-40 min-h-20 bg-white">
               <span class="text-[7px] font-bold truncate max-w-full">{product.name}</span>
               {barcodeVal && <BarcodePreview value={barcodeVal} />}
               <span class="text-[10px] font-bold">{price}</span>
@@ -245,35 +265,36 @@ export function PrintLabelModal({ product, storeName, currency = 'DA' }) {
           )}
 
           {model === 'optic' && (
-            <div class="inline-flex flex-col items-center border-2 border-dashed border-base-300 rounded px-2 py-1 gap-0 w-24 min-h-10">
-              <span class="text-[8px] text-base-content/60 truncate max-w-full">{product.ref || barcodeVal}</span>
+            <div class="inline-flex flex-col items-center border-2 border-dashed border-base-300 rounded-lg px-3 py-1.5 gap-0 w-28 min-h-12 bg-white">
+              <span class="text-[8px] text-base-content/80 truncate max-w-full">{product.ref || barcodeVal}</span>
               <span class="text-xs font-bold">{price}</span>
             </div>
           )}
 
           {model === 'bijou' && (
-            <div class="inline-flex flex-col items-center border-2 border-dashed border-base-300 rounded px-2 py-1.5 gap-0.5 w-32 min-h-16">
-              {storeName && <span class="text-[7px] text-base-content/40">{storeName}</span>}
+            <div class="inline-flex flex-col items-center border-2 border-dashed border-base-300 rounded-lg px-3 py-2 gap-0.5 w-36 min-h-20 bg-white">
+              {storeName && <span class="text-[7px] text-base-content/70">{storeName}</span>}
               <span class={`font-bold truncate max-w-full leading-tight ${product.name.length > 20 ? 'text-[8px]' : 'text-[10px]'}`}>{product.name}</span>
-              {product.ref && <span class="text-[8px] text-base-content/50">{product.ref}</span>}
+              {product.ref && <span class="text-[8px] text-base-content/70">{product.ref}</span>}
               <span class="text-xs font-bold">{price}</span>
             </div>
           )}
 
-          <p class="text-xs text-base-content/40 mt-1">
+          <p class="text-xs text-base-content/60 mt-2">
             {model === '45x35' ? '45×35mm' : model === '40x20' ? '40×20mm' : model === 'optic' ? '12×7mm' : model === 'bijou' ? 'Compact' : '80mm'} · {copies} {t('copies')}
           </p>
         </div>
 
         <div class="modal-action">
+          <button type="button" class="btn btn-ghost" onClick={() => closeModal(PRINT_MODAL_ID)}>{t('cancel')}</button>
           <button
             type="button"
-            class={`btn btn-primary btn-sm gap-1.5 ${printing ? 'loading' : ''}`}
+            class={`btn btn-primary gap-2 ${printing ? 'loading' : ''}`}
             onClick={handlePrint}
             disabled={printing || !hasPrinter}
           >
             {!printing && (
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
               </svg>
             )}

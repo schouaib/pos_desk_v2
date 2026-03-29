@@ -57,10 +57,12 @@ func Create(tenantID string, input CreateInput) (*StockLoss, error) {
 		barcode = product.Barcodes[0]
 	}
 
-	productCol().UpdateOne(ctx,
+	if _, err := productCol().UpdateOne(ctx,
 		bson.M{"_id": pid, "tenant_id": tid},
 		bson.M{"$inc": bson.M{"qty_available": -input.Qty}},
-	)
+	); err != nil {
+		return nil, errors.New("failed to update stock")
+	}
 
 	loss := &StockLoss{
 		ID:          primitive.NewObjectID(),
@@ -108,10 +110,12 @@ func createVariantLoss(ctx context.Context, tenantID string, tid, pid primitive.
 	}
 
 	// Decrement variant qty
-	database.Col("product_variants").UpdateOne(ctx,
+	if _, err := database.Col("product_variants").UpdateOne(ctx,
 		bson.M{"_id": vid, "tenant_id": tid},
 		bson.M{"$inc": bson.M{"qty_available": -input.Qty}},
-	)
+	); err != nil {
+		return nil, errors.New("failed to update variant stock")
+	}
 
 	// Sync parent product qty
 	_ = variant.SyncParentStock(tenantID, pid)
@@ -168,7 +172,9 @@ func List(tenantID, search string, from, to time.Time, page, limit int) (*ListRe
 	defer cur.Close(ctx)
 
 	var items []StockLoss
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []StockLoss{}
 	}

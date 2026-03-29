@@ -47,4 +47,5 @@ type FolderInfo struct {
 	Name       string             `json:"name"`
 	FolderName string             `json:"folder_name"`
 	Active     bool               `json:"active"`
+	CreatedAt  time.Time          `json:"created_at"`
 }

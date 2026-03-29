@@ -87,8 +87,8 @@ export default function Chat() {
             </svg>
           </div>
           <div>
-            <h1 class="text-lg font-bold">{t('chatWithAdmin')}</h1>
-            <p class="text-xs text-base-content/50">{t('chatSubtitle')}</p>
+            <h1 class="text-2xl font-bold">{t('chatWithAdmin')}</h1>
+            <p class="text-xs text-base-content/70">{t('chatSubtitle')}</p>
           </div>
         </div>
 
@@ -101,7 +101,7 @@ export default function Chat() {
           )}
 
           {!loading && messages.length === 0 && (
-            <div class="text-center text-base-content/40 py-12">
+            <div class="text-center text-base-content/70 py-12">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
               </svg>
@@ -114,7 +114,7 @@ export default function Chat() {
             const isMine = msg.sender_role !== 'super_admin'
             return (
               <div key={msg.id} class={`chat ${isMine ? 'chat-end' : 'chat-start'}`}>
-                <div class="chat-header text-xs text-base-content/50 mb-0.5">
+                <div class="chat-header text-xs text-base-content/70 mb-0.5">
                   {isMine ? t('you') : t('adminLabel')}
                   <time class="ms-2 opacity-60">{formatTime(msg.created_at)}</time>
                 </div>
@@ -122,7 +122,7 @@ export default function Chat() {
                   {msg.content}
                 </div>
                 {isMine && (
-                  <div class="chat-footer text-[10px] opacity-50 mt-0.5">
+                  <div class="chat-footer text-xs opacity-50 mt-0.5">
                     {msg.read ? t('read') : t('sent')}
                   </div>
                 )}

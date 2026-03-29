@@ -318,7 +318,7 @@ export default function Facturation({ path }) {
   return (
     <Layout currentPath={path}>
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
-        <h1 class="text-xl font-bold">{t('facturationPage')}</h1>
+        <h1 class="text-2xl font-bold">{t('facturationPage')}</h1>
       </div>
 
       {/* Tabs */}
@@ -398,7 +398,7 @@ export default function Facturation({ path }) {
               </tr>
             ))}
             {items.length === 0 && !loading && (
-              <tr><td colSpan={7} class="text-center py-8 text-base-content/40">{t('noResults')}</td></tr>
+              <tr><td colSpan={7} class="text-center py-8 text-base-content/70">{t('noResults')}</td></tr>
             )}
           </tbody>
         </table>
@@ -429,7 +429,7 @@ export default function Facturation({ path }) {
                   <h2 class="text-xl font-bold font-mono">{detail.ref}</h2>
                   <span class={`badge ${STATUS_BADGE[detail.status]}`}>{statusLabel(detail.status)}</span>
                 </div>
-                <p class="text-sm text-base-content/50 mt-0.5">{docTypeLabel(detail.doc_type)} — {formatDate(detail.created_at)}</p>
+                <p class="text-sm text-base-content/70 mt-0.5">{docTypeLabel(detail.doc_type)} — {formatDate(detail.created_at)}</p>
               </div>
               <button class="btn btn-sm btn-circle btn-ghost" onClick={() => setDetail(null)}>
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -441,7 +441,7 @@ export default function Facturation({ path }) {
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                 {/* Client card */}
                 <div class="bg-base-200/50 rounded-xl p-4 border border-base-300/50">
-                  <p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40 mb-2">{t('clientName')}</p>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-base-content/70 mb-2">{t('clientName')}</p>
                   <p class="font-semibold text-sm">{detail.client_name}</p>
                   {detail.payment_method && (
                     <div class="mt-2 flex items-center gap-1.5">
@@ -454,12 +454,12 @@ export default function Facturation({ path }) {
 
                 {/* Status/links card */}
                 <div class="bg-base-200/50 rounded-xl p-4 border border-base-300/50 space-y-1.5 text-xs">
-                  {detail.due_date && <div class="flex justify-between"><span class="text-base-content/50">{t('dueDate')}</span><span class="font-medium">{formatDate(detail.due_date)}</span></div>}
-                  {detail.valid_until && <div class="flex justify-between"><span class="text-base-content/50">{t('validUntil')}</span><span class="font-medium">{formatDate(detail.valid_until)}</span></div>}
-                  {detail.payment_terms && <div class="flex justify-between"><span class="text-base-content/50">{t('paymentTerms')}</span><span class="font-medium">{detail.payment_terms}</span></div>}
-                  {detail.parent_ref && <div class="flex justify-between"><span class="text-base-content/50">{t('parentDoc')}</span><span class="font-mono font-medium">{detail.parent_ref}</span></div>}
-                  {detail.sale_ref && <div class="flex justify-between"><span class="text-base-content/50">{t('linkedSale')}</span><span class="font-mono font-medium">{detail.sale_ref}</span></div>}
-                  {detail.created_by_email && <div class="flex justify-between"><span class="text-base-content/50">{t('createdBy')}</span><span class="font-medium">{detail.created_by_email}</span></div>}
+                  {detail.due_date && <div class="flex justify-between"><span class="text-base-content/70">{t('dueDate')}</span><span class="font-medium">{formatDate(detail.due_date)}</span></div>}
+                  {detail.valid_until && <div class="flex justify-between"><span class="text-base-content/70">{t('validUntil')}</span><span class="font-medium">{formatDate(detail.valid_until)}</span></div>}
+                  {detail.payment_terms && <div class="flex justify-between"><span class="text-base-content/70">{t('paymentTerms')}</span><span class="font-medium">{detail.payment_terms}</span></div>}
+                  {detail.parent_ref && <div class="flex justify-between"><span class="text-base-content/70">{t('parentDoc')}</span><span class="font-mono font-medium">{detail.parent_ref}</span></div>}
+                  {detail.sale_ref && <div class="flex justify-between"><span class="text-base-content/70">{t('linkedSale')}</span><span class="font-mono font-medium">{detail.sale_ref}</span></div>}
+                  {detail.created_by_email && <div class="flex justify-between"><span class="text-base-content/70">{t('createdBy')}</span><span class="font-medium">{detail.created_by_email}</span></div>}
                 </div>
               </div>
 
@@ -467,8 +467,8 @@ export default function Facturation({ path }) {
               {detail.doc_type === 'facture' && (
                 <div class="mb-5 bg-base-200/50 rounded-xl p-4 border border-base-300/50">
                   <div class="flex justify-between text-xs mb-2">
-                    <span class="text-base-content/50">{t('paidAmount')}: <span class="font-semibold text-success">{formatDA(detail.paid_amount)}</span></span>
-                    <span class="text-base-content/50">{t('remaining')}: <span class="font-semibold text-error">{formatDA(detail.total - detail.paid_amount)}</span></span>
+                    <span class="text-base-content/70">{t('paidAmount')}: <span class="font-semibold text-success">{formatDA(detail.paid_amount)}</span></span>
+                    <span class="text-base-content/70">{t('remaining')}: <span class="font-semibold text-error">{formatDA(detail.total - detail.paid_amount)}</span></span>
                   </div>
                   <div class="w-full bg-base-300 rounded-full h-2.5">
                     <div class={`h-2.5 rounded-full transition-all ${detail.status === 'paid' ? 'bg-success' : 'bg-primary'}`}
@@ -487,23 +487,23 @@ export default function Facturation({ path }) {
                 <table class="table table-sm w-full">
                   <thead>
                     <tr class="bg-base-200/60">
-                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50">#</th>
-                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('product')}</th>
-                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-right">{t('qty')}</th>
-                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-right">{t('unitPrice')}</th>
-                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-right">{t('discount')}</th>
-                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-right">{t('vat')}</th>
-                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/50 text-right">{t('totalTTC')}</th>
+                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/70">#</th>
+                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('product')}</th>
+                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/70 text-right">{t('qty')}</th>
+                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/70 text-right">{t('unitPrice')}</th>
+                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/70 text-right">{t('discount')}</th>
+                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/70 text-right">{t('vat')}</th>
+                      <th class="text-xs font-semibold uppercase tracking-wide text-base-content/70 text-right">{t('totalTTC')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {detail.lines.map((l, i) => (
                       <tr key={i} class={i % 2 === 0 ? '' : 'bg-base-200/20'}>
-                        <td class="text-xs text-base-content/30">{i + 1}</td>
+                        <td class="text-xs text-base-content/50">{i + 1}</td>
                         <td class="font-medium text-sm">{l.product_name}</td>
                         <td class="text-right font-mono text-sm">{l.qty}</td>
                         <td class="text-right font-mono text-sm">{formatDA(l.unit_price)}</td>
-                        <td class="text-right font-mono text-sm text-error">{l.discount > 0 ? formatDA(l.discount) : <span class="text-base-content/20">—</span>}</td>
+                        <td class="text-right font-mono text-sm text-error">{l.discount > 0 ? formatDA(l.discount) : <span class="text-base-content/50">—</span>}</td>
                         <td class="text-right"><span class="badge badge-xs badge-outline">{l.vat}%</span></td>
                         <td class="text-right font-mono text-sm font-semibold">{formatDA(l.total_ttc)}</td>
                       </tr>
@@ -515,8 +515,8 @@ export default function Facturation({ path }) {
               {/* Totals */}
               <div class="flex justify-end mb-4">
                 <div class="bg-base-200/50 rounded-xl border border-base-300/50 p-4 min-w-[280px]">
-                  <div class="flex justify-between text-sm py-1"><span class="text-base-content/60">{t('totalHT')}</span><span class="font-mono">{formatDA(detail.total_ht)}</span></div>
-                  <div class="flex justify-between text-sm py-1"><span class="text-base-content/60">{t('tva')}</span><span class="font-mono">{formatDA(detail.total_vat)}</span></div>
+                  <div class="flex justify-between text-sm py-1"><span class="text-base-content/80">{t('totalHT')}</span><span class="font-mono">{formatDA(detail.total_ht)}</span></div>
+                  <div class="flex justify-between text-sm py-1"><span class="text-base-content/80">{t('tva')}</span><span class="font-mono">{formatDA(detail.total_vat)}</span></div>
                   <div class="divider my-1" />
                   {(detail.timbre ?? 0) > 0 && (
                     <div class="flex justify-between text-sm py-1"><span class="text-warning">{t('timbreFiscal')}</span><span class="font-mono text-warning">{formatDA(detail.timbre)}</span></div>
@@ -528,15 +528,15 @@ export default function Facturation({ path }) {
               {/* Payments history */}
               {detail.payments?.length > 0 && (
                 <div class="mb-4">
-                  <h4 class="text-xs font-bold uppercase tracking-widest text-base-content/40 mb-2">{t('paymentHistory')}</h4>
+                  <h4 class="text-xs font-bold uppercase tracking-widest text-base-content/70 mb-2">{t('paymentHistory')}</h4>
                   <div class="space-y-1.5">
                     {detail.payments.map((p, i) => (
                       <div key={i} class="flex items-center gap-2 text-xs bg-success/5 border border-success/15 rounded-lg px-3 py-2">
                         <span class="font-mono font-bold text-success text-sm">{formatDA(p.amount)}</span>
                         <span class={`badge badge-xs ${p.payment_method === 'cash' ? 'badge-warning' : 'badge-info'}`}>{t('payMethod_' + p.payment_method)}</span>
                         {p.timbre > 0 && <span class="badge badge-xs badge-warning badge-outline">{t('timbreFiscal')}: {formatDA(p.timbre)}</span>}
-                        <span class="text-base-content/40 ms-auto">{formatDate(p.created_at)}</span>
-                        {p.note && <span class="text-base-content/50 italic">{p.note}</span>}
+                        <span class="text-base-content/70 ms-auto">{formatDate(p.created_at)}</span>
+                        {p.note && <span class="text-base-content/70 italic">{p.note}</span>}
                         <button class="btn btn-xs btn-ghost border border-base-300" onClick={() => printPaymentReceipt(detail, p, i)}>
                           <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" /></svg>
                         </button>
@@ -549,8 +549,8 @@ export default function Facturation({ path }) {
               {/* Note */}
               {detail.note && (
                 <div class="bg-base-200/30 rounded-lg px-4 py-3 mb-4 border border-base-300/30">
-                  <p class="text-xs text-base-content/40 font-semibold uppercase tracking-wide mb-1">{t('note')}</p>
-                  <p class="text-sm text-base-content/70">{detail.note}</p>
+                  <p class="text-xs text-base-content/70 font-semibold uppercase tracking-wide mb-1">{t('note')}</p>
+                  <p class="text-sm text-base-content/80">{detail.note}</p>
                 </div>
               )}
 
@@ -582,11 +582,11 @@ export default function Facturation({ path }) {
       <Modal id="avoir-modal" title={`${t('newAvoir')} — ${avoirTarget?.ref || ''}`}>
         {avoirError && <div class="alert alert-error text-sm py-2 mb-3"><span>{avoirError}</span></div>}
         <form onSubmit={submitAvoir}>
-          <p class="text-sm text-base-content/60 mb-3">{t('selectProducts')}</p>
+          <p class="text-sm text-base-content/80 mb-3">{t('selectProducts')}</p>
           {avoirLines.map((l, i) => (
             <div key={i} class="flex items-center gap-2 mb-1">
               <span class="text-sm flex-1">{l.name}</span>
-              <span class="text-xs text-base-content/50">max: {l.max}</span>
+              <span class="text-xs text-base-content/70">max: {l.max}</span>
               <input type="number" class="input input-bordered input-xs w-20" min="0" max={l.max} step="any" value={l.qty}
                 onInput={(e) => {
                   const v = Math.min(parseFloat(e.target.value) || 0, l.max)
@@ -610,7 +610,7 @@ export default function Facturation({ path }) {
         {payTarget && (
           <form onSubmit={submitPay}>
             <div class="text-sm mb-3">
-              <span class="text-base-content/60">{t('remaining')}: </span>
+              <span class="text-base-content/80">{t('remaining')}: </span>
               <span class="font-semibold">{formatDA(payTarget.total - payTarget.paid_amount)}</span>
             </div>
             {/* Payment method (locked to facture's method) */}
@@ -649,7 +649,7 @@ export default function Facturation({ path }) {
 
       {/* Convert Modal — select payment method */}
       <Modal id="convert-modal" title={`${t('convertToFacture')} — ${convertTarget?.ref || ''}`}>
-        <p class="text-sm text-base-content/60 mb-4">{t('blPaymentMethod')}</p>
+        <p class="text-sm text-base-content/80 mb-4">{t('blPaymentMethod')}</p>
         <div class="flex flex-col gap-2 mb-4">
           {['cash', 'cheque', 'virement'].map((m) => (
             <button

@@ -285,7 +285,7 @@ export default function Plans() {
             <thead class="bg-base-200/60">
               <tr>
                 {[t('name'), t('priceDa'), t('maxUsers'), t('maxProducts'), t('planFeatures'), t('status'), t('actions')].map((h, i) => (
-                  <th key={i} class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/50 whitespace-nowrap">{h}</th>
+                  <th key={i} class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -294,7 +294,7 @@ export default function Plans() {
                 <tr key={p.id} class="border-b border-base-200">
                   <td class="px-3 py-2.5">
                     <div class="font-medium">{p.name}</div>
-                    <div class="text-xs text-base-content/50">{p.description}</div>
+                    <div class="text-xs text-base-content/70">{p.description}</div>
                   </td>
                   <td class="px-3 py-2.5 font-medium tabular-nums">{formatDA(p.price)}</td>
                   <td class="px-3 py-2.5 tabular-nums">{p.max_users === 0 ? '∞' : p.max_users}</td>
@@ -308,7 +308,7 @@ export default function Plans() {
                         </span>
                       ))}
                       {!ALL_FEATURES.some((f) => p.features?.[f.key]) && (
-                        <span class="text-xs text-base-content/30">—</span>
+                        <span class="text-xs text-base-content/50">—</span>
                       )}
                     </div>
                   </td>
@@ -329,7 +329,7 @@ export default function Plans() {
                 </tr>
               ))}
               {plans.length === 0 && (
-                <tr><td colSpan={7} class="px-3 py-12 text-center text-base-content/40">{t('noPlans')}</td></tr>
+                <tr><td colSpan={7} class="px-3 py-12 text-center text-base-content/70">{t('noPlans')}</td></tr>
               )}
             </tbody>
           </table>
@@ -381,7 +381,7 @@ export default function Plans() {
                         value={form.feature_prices[f.key]}
                         onInput={(e) => setFeaturePrice(f.key, e.target.value)}
                       />
-                      <span class="text-xs text-base-content/50">DA</span>
+                      <span class="text-xs text-base-content/70">DA</span>
                     </div>
                   )}
                 </div>

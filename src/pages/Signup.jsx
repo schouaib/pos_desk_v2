@@ -88,7 +88,7 @@ export default function Signup() {
             <span class="text-primary-content text-2xl font-bold">P</span>
           </div>
           <h1 class="text-3xl font-bold">{t('getStarted')}</h1>
-          <p class="text-base-content/60 mt-1">{t('choosePlanSub')}</p>
+          <p class="text-base-content/80 mt-1">{t('choosePlanSub')}</p>
         </div>
 
         {step < 3 && (
@@ -102,7 +102,7 @@ export default function Signup() {
         {step === 1 && (
           <div>
             {plans.length === 0 && (
-              <div class="text-center text-base-content/40 py-12">
+              <div class="text-center text-base-content/70 py-12">
                 <p>{t('loadingPlans')}</p>
               </div>
             )}
@@ -115,12 +115,12 @@ export default function Signup() {
                 >
                   <div class="card-body">
                     <h2 class="card-title">{plan.name}</h2>
-                    <p class="text-base-content/60 text-sm">{plan.description}</p>
+                    <p class="text-base-content/80 text-sm">{plan.description}</p>
                     <div class="mt-3">
                       <span class="text-3xl font-bold text-primary">${plan.price}</span>
-                      <span class="text-base-content/50 text-sm">{t('perMonth')}</span>
+                      <span class="text-base-content/70 text-sm">{t('perMonth')}</span>
                     </div>
-                    <ul class="mt-3 space-y-1 text-sm text-base-content/70">
+                    <ul class="mt-3 space-y-1 text-sm text-base-content/80">
                       <li>{plan.max_users === 0 ? `${t('unlimited')} ${t('users')}` : `${t('upTo')} ${plan.max_users} ${t('users')}`}</li>
                       <li>{plan.max_products === 0 ? `${t('unlimited')} ${t('products')}` : `${t('upTo')} ${plan.max_products} ${t('products')}`}</li>
                       <li>{(!plan.max_sales_month || plan.max_sales_month === 0) ? `${t('unlimited')} ${t('salesPerMonth')}` : `${t('upTo')} ${plan.max_sales_month} ${t('salesPerMonth')}`}</li>
@@ -139,7 +139,7 @@ export default function Signup() {
                 </div>
               ))}
             </div>
-            <p class="text-center text-sm text-base-content/50 mt-6">
+            <p class="text-center text-sm text-base-content/70 mt-6">
               {t('alreadyAccount')}{' '}
               <a href="/login" class="link link-primary">{t('signIn2')}</a>
             </p>
@@ -152,7 +152,7 @@ export default function Signup() {
             <div class="card-body">
               <div class="flex items-center justify-between mb-4">
                 <div>
-                  <p class="text-sm text-base-content/60">{t('selectedPlan')}</p>
+                  <p class="text-sm text-base-content/80">{t('selectedPlan')}</p>
                   <p class="font-bold text-primary">{selectedPlan?.name} — ${selectedPlan?.price}{t('perMonth')}</p>
                 </div>
                 <button class="btn btn-xs btn-ghost" onClick={() => setStep(1)}>{t('change')}</button>
@@ -208,7 +208,7 @@ export default function Signup() {
                     <input type="color" class="w-10 h-9 rounded border cursor-pointer"
                       value={form.brand_color}
                       onInput={(e) => setForm({ ...form, brand_color: e.target.value })} />
-                    <span class="text-sm font-mono text-base-content/60">{form.brand_color}</span>
+                    <span class="text-sm font-mono text-base-content/80">{form.brand_color}</span>
                   </div>
                 </label>
 
@@ -217,7 +217,7 @@ export default function Signup() {
                   {t('createMyStore')}
                 </button>
 
-                <p class="text-center text-sm text-base-content/50">
+                <p class="text-center text-sm text-base-content/70">
                   {t('alreadyAccount')}{' '}
                   <a href="/login" class="link link-primary">{t('signIn2')}</a>
                 </p>
@@ -237,15 +237,15 @@ export default function Signup() {
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h2 class="text-xl font-bold">{t('pendingTitle')}</h2>
-                <p class="text-base-content/60 mt-2 text-sm leading-relaxed">
+                <h2 class="text-2xl font-bold">{t('pendingTitle')}</h2>
+                <p class="text-base-content/80 mt-2 text-sm leading-relaxed">
                   {t('pendingDesc')}{' '}
                   <span class="font-semibold text-base-content">{form.store_name}</span>
                   <br /><br />
                   {t('pendingReview')}
                 </p>
                 <div class="divider" />
-                <p class="text-xs text-base-content/40">
+                <p class="text-xs text-base-content/70">
                   {t('registeredWith')} <span class="font-medium">{form.email}</span>
                 </p>
                 <a href="/login" class="btn btn-outline btn-sm mt-4">{t('backToLogin')}</a>

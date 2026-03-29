@@ -37,9 +37,9 @@ function StatCard({ icon, label, value, color = 'primary', sub }) {
         <Icon d={icon} className="w-5 h-5" />
       </div>
       <div class="min-w-0 flex-1">
-        <p class="text-xs text-base-content/50 truncate">{label}</p>
+        <p class="text-xs text-base-content/70 truncate">{label}</p>
         <p class={`text-lg font-bold tabular-nums mt-0.5 ${textColor[color]}`}>{value}</p>
-        {sub && <p class="text-[11px] text-base-content/40 mt-0.5">{sub}</p>}
+        {sub && <p class="text-xs text-base-content/70 mt-0.5">{sub}</p>}
       </div>
     </div>
   )
@@ -101,7 +101,7 @@ export default function UserSummary({ path }) {
       <div class="flex items-center justify-between mb-5">
         <div>
           <h2 class="text-2xl font-bold">{t('userSummaryPage')}</h2>
-          <p class="text-sm text-base-content/50 mt-0.5">
+          <p class="text-sm text-base-content/70 mt-0.5">
             {dateFrom === dateTo ? dateFrom : `${dateFrom} — ${dateTo}`}
             {hourFrom !== '' && hourTo !== '' && ` · ${String(hourFrom).padStart(2, '0')}:00 – ${String(hourTo).padStart(2, '0')}:59`}
           </p>
@@ -118,7 +118,7 @@ export default function UserSummary({ path }) {
       <div class="bg-base-100 rounded-xl shadow-sm border border-base-200 px-4 py-2.5 mb-5 flex items-center gap-2 overflow-x-auto">
         <input type="date" class="input input-bordered input-sm w-36 shrink-0"
           title={t('dateFrom')} value={dateFrom} onInput={(e) => setDateFrom(e.target.value)} />
-        <span class="text-base-content/30 shrink-0">–</span>
+        <span class="text-base-content/50 shrink-0">–</span>
         <input type="date" class="input input-bordered input-sm w-36 shrink-0"
           title={t('dateTo')} value={dateTo} onInput={(e) => setDateTo(e.target.value)} />
 
@@ -129,7 +129,7 @@ export default function UserSummary({ path }) {
           <option value="">{t('allDay')}</option>
           {hours.map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
         </select>
-        <span class="text-base-content/30 shrink-0">–</span>
+        <span class="text-base-content/50 shrink-0">–</span>
         <select class="select select-bordered select-sm w-24 shrink-0" title={t('hourTo')} value={hourTo}
           onChange={(e) => setHourTo(e.target.value)}>
           <option value="">{t('allDay')}</option>
@@ -190,19 +190,19 @@ export default function UserSummary({ path }) {
           <table class="table table-sm w-full">
             <thead>
               <tr class="bg-base-200/60 border-b border-base-300">
-                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('userEmail')}</th>
-                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-center">{t('summSalesCount')}</th>
-                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('summSalesTotal')}</th>
+                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('userEmail')}</th>
+                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-center">{t('summSalesCount')}</th>
+                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('summSalesTotal')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-success/70 text-end">{t('payMethod_cash')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-info/70 text-end">{t('payMethod_cheque')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-secondary/70 text-end">{t('payMethod_virement')}</th>
-                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-center">{t('summReturnsCount')}</th>
+                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-center">{t('summReturnsCount')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-error/70 text-end">{t('summReturnsTotal')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-warning/70 text-end">{t('summRetraitsTotal')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-warning/70 text-end">{t('timbreFiscal')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-info/70 text-end">{t('summOpeningAmount')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-info/70 text-end">{t('summClosingAmount')}</th>
-                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-end">{t('summEcart')}</th>
+                <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('summEcart')}</th>
                 <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-primary text-end">{t('summNet')}</th>
               </tr>
             </thead>
@@ -215,8 +215,8 @@ export default function UserSummary({ path }) {
               {!loading && (!data || data.users.length === 0) && (
                 <tr><td colSpan={14} class="py-16 text-center">
                   <div class="flex flex-col items-center gap-2">
-                    <Icon d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" className="w-8 h-8 text-base-content/20" />
-                    <span class="text-sm text-base-content/30">{t('noData')}</span>
+                    <Icon d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" className="w-8 h-8 text-base-content/50" />
+                    <span class="text-sm text-base-content/50">{t('noData')}</span>
                   </div>
                 </td></tr>
               )}

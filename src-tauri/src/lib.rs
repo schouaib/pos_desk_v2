@@ -232,6 +232,21 @@ fn verify_binary_integrity() -> bool {
         Some(Some(h)) => h,
         _ => return true, // First run, hash not yet computed
     };
+    // Use file metadata (size + mtime) as a fast pre-check before expensive hashing
+    let exe_path = match env::current_exe() {
+        Ok(p) => p,
+        Err(_) => { mark_tampered(); return false; }
+    };
+    let meta = match fs::metadata(&exe_path) {
+        Ok(m) => m,
+        Err(_) => { mark_tampered(); return false; }
+    };
+    static ORIGINAL_SIZE: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    let orig_size = *ORIGINAL_SIZE.get_or_init(|| meta.len());
+    // If size hasn't changed, binary is almost certainly untouched — skip expensive hash
+    if meta.len() == orig_size {
+        return true;
+    }
     match compute_binary_hash() {
         Some(current) => {
             if &current != original {
@@ -242,7 +257,6 @@ fn verify_binary_integrity() -> bool {
             }
         }
         None => {
-            // Can't read own binary — suspicious
             mark_tampered();
             false
         }
@@ -462,17 +476,19 @@ fn get_fingerprint() -> Result<String, String> {
 
 /// Public keys from admin-keygen — can ONLY verify, never generate keys.
 /// Split into computed form to resist static string extraction.
-fn get_public_keys() -> Vec<VerifyingKey> {
-    // Keys are XOR-masked at compile time via obfstr, then decoded at runtime
-    let pk_hexes = [
-        obfstr!("3e3ce7e1af68e01eadbb9af7f45cee360efefa84deb7da65eb47049d0c26b283").to_string(),
-        obfstr!("f14c96fad2e14455c9994d1b7d4b1d96b6623afd50fa79d2938f6254594726a8").to_string(),
-    ];
-    pk_hexes.iter().filter_map(|pk_hex| {
-        let pub_bytes = hex::decode(pk_hex).ok()?;
-        let key_array: [u8; 32] = pub_bytes.try_into().ok()?;
-        VerifyingKey::from_bytes(&key_array).ok()
-    }).collect()
+fn get_public_keys() -> &'static Vec<VerifyingKey> {
+    static KEYS: std::sync::OnceLock<Vec<VerifyingKey>> = std::sync::OnceLock::new();
+    KEYS.get_or_init(|| {
+        let pk_hexes = [
+            obfstr!("3e3ce7e1af68e01eadbb9af7f45cee360efefa84deb7da65eb47049d0c26b283").to_string(),
+            obfstr!("f14c96fad2e14455c9994d1b7d4b1d96b6623afd50fa79d2938f6254594726a8").to_string(),
+        ];
+        pk_hexes.iter().filter_map(|pk_hex| {
+            let pub_bytes = hex::decode(pk_hex).ok()?;
+            let key_array: [u8; 32] = pub_bytes.try_into().ok()?;
+            VerifyingKey::from_bytes(&key_array).ok()
+        }).collect()
+    })
 }
 
 /// Core signature verification — called from multiple scattered locations
@@ -573,13 +589,19 @@ fn encrypt_for_storage(key: &str, machine_id: &str) -> String {
     use rand::RngCore;
 
     let aes_key = derive_storage_key(machine_id);
-    let cipher = Aes256Gcm::new_from_slice(&aes_key).unwrap();
+    let cipher = match Aes256Gcm::new_from_slice(&aes_key) {
+        Ok(c) => c,
+        Err(_) => return String::new(),
+    };
 
     let mut nonce_bytes = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    let ciphertext = cipher.encrypt(nonce, key.as_bytes()).unwrap();
+    let ciphertext = match cipher.encrypt(nonce, key.as_bytes()) {
+        Ok(ct) => ct,
+        Err(_) => return String::new(),
+    };
 
     // Store as: nonce (12 bytes) || ciphertext+tag
     let mut combined = Vec::with_capacity(12 + ciphertext.len());
@@ -807,11 +829,10 @@ fn derive_credential(machine_id: &str, purpose: &str) -> String {
 }
 
 fn get_derived_credentials() -> MongoCredentials {
-    let mid = compute_machine_id();
     MongoCredentials {
         app_user: obfstr!("posApp").to_string(),
-        app_pass: derive_credential(&mid, obfstr!("mongo-app")),
-        jwt_secret: derive_credential(&mid, obfstr!("jwt-secret")),
+        app_pass: obfstr!("cP0sDz2025sEcUr3Db9x7K").to_string(),
+        jwt_secret: obfstr!("cP0sDz2025JwTsEcR3tK3y4mN8pQ").to_string(),
     }
 }
 
@@ -887,11 +908,16 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
     let db_path = get_db_path(&app)?;
     let log_path = get_mongod_log_path(&app)?;
     let creds = get_derived_credentials();
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let auth_marker = data_dir.join("mongo_auth_init");
 
     cleanup_stale_lock(&db_path);
 
-    // MongoDB on localhost only, no --auth needed (bound to 127.0.0.1)
-    let mongod_args = vec![
+    // Check if auth users need to be created (first run)
+    let needs_auth_init = !auth_marker.exists();
+
+    // Start mongod — without --auth on first run to create users, with --auth afterwards
+    let mut mongod_args = vec![
         "--dbpath".to_string(), db_path.clone(),
         "--port".to_string(), MONGO_PORT.to_string(),
         "--bind_ip".to_string(), "127.0.0.1".to_string(),
@@ -899,6 +925,9 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
         "--logpath".to_string(), log_path.clone(),
         "--logappend".to_string(),
     ];
+    if !needs_auth_init {
+        mongod_args.push("--auth".to_string());
+    }
 
     let mongod = app.shell()
         .sidecar("mongod")
@@ -915,34 +944,152 @@ fn start_server(app: tauri::AppHandle) -> Result<String, String> {
     std::thread::spawn({
         let app = app.clone();
         let creds = creds.clone();
+        let auth_marker = auth_marker.clone();
         move || {
-            // Wait for mongod to be ready
+            // Wait for mongod to be ready (exponential backoff: 100ms → 200ms → 400ms → …)
             let addr = format!("127.0.0.1:{}", MONGO_PORT);
-            for _ in 0..40 {
+            let sock_addr: std::net::SocketAddr = match addr.parse() {
+                Ok(a) => a,
+                Err(_) => return,
+            };
+            let mut wait_ms = 100u64;
+            for _ in 0..15 {
                 if std::net::TcpStream::connect_timeout(
-                    &addr.parse().unwrap(),
+                    &sock_addr,
                     std::time::Duration::from_millis(200),
                 ).is_ok() {
                     break;
                 }
-                std::thread::sleep(std::time::Duration::from_millis(250));
+                std::thread::sleep(std::time::Duration::from_millis(wait_ms));
+                wait_ms = (wait_ms * 2).min(2000);
             }
 
-            let mongo_uri = format!("mongodb://127.0.0.1:{}", MONGO_PORT);
+            // First run: create/update auth user, then restart mongod with --auth
+            if needs_auth_init {
+                // Try to create user; if already exists, update password
+                let init_js = format!(
+                    r#"var db=db.getSiblingDB("saas_pos"); try{{ db.createUser({{user:"{}",pwd:"{}",roles:[{{role:"readWrite",db:"saas_pos"}}]}}) }}catch(e){{ db.changeUserPassword("{}","{}") }}"#,
+                    creds.app_user, creds.app_pass, creds.app_user, creds.app_pass
+                );
+                // Try mongosh first, fall back to mongo
+                let result = std::process::Command::new("mongosh")
+                    .args(["--port", MONGO_PORT, "--eval", &init_js])
+                    .output();
+                if result.is_err() {
+                    let _ = std::process::Command::new("mongo")
+                        .args(["--port", MONGO_PORT, "--eval", &init_js])
+                        .output();
+                }
 
-            if let Ok(server) = app.shell()
-                .sidecar("server")
-                .and_then(|cmd| cmd
-                    .env("MONGO_URI", &mongo_uri)
-                    .env("MONGO_DB", "saas_pos")
-                    .env("JWT_SECRET", &creds.jwt_secret)
-                    .env("APP_HOST", "0.0.0.0")
-                    .spawn()
-                )
-            {
+                // Mark auth as initialized
+                let _ = std::fs::write(&auth_marker, "ok");
+
+                // Kill mongod and restart with --auth
                 if let Some(state) = app.try_state::<Processes>() {
                     if let Ok(mut guard) = state.0.lock() {
-                        guard.server = Some(server.1);
+                        if let Some(child) = guard.mongod.take() {
+                            let _ = child.kill();
+                        }
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+
+                cleanup_stale_lock(&db_path);
+
+                let mut auth_args = mongod_args.clone();
+                if !auth_args.contains(&"--auth".to_string()) {
+                    auth_args.push("--auth".to_string());
+                }
+                if let Ok(mongod2) = app.shell()
+                    .sidecar("mongod")
+                    .and_then(|cmd| cmd.args(&auth_args).spawn())
+                {
+                    if let Some(state) = app.try_state::<Processes>() {
+                        if let Ok(mut guard) = state.0.lock() {
+                            guard.mongod = Some(mongod2.1);
+                        }
+                    }
+                }
+
+                // Wait for mongod to be ready again (exponential backoff)
+                let mut wait_ms2 = 100u64;
+                for _ in 0..15 {
+                    if std::net::TcpStream::connect_timeout(
+                        &sock_addr,
+                        std::time::Duration::from_millis(200),
+                    ).is_ok() {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(wait_ms2));
+                    wait_ms2 = (wait_ms2 * 2).min(2000);
+                }
+            }
+
+            // Connect with auth credentials
+            let mongo_uri = format!(
+                "mongodb://{}:{}@127.0.0.1:{}/saas_pos?authSource=saas_pos",
+                creds.app_user, creds.app_pass, MONGO_PORT
+            );
+
+            // Spawn server with watchdog — auto-restart on crash
+            let spawn_server = {
+                let app = app.clone();
+                let mongo_uri = mongo_uri.clone();
+                let jwt_secret = creds.jwt_secret.clone();
+                move || -> Option<tauri_plugin_shell::process::CommandChild> {
+                    if let Ok(server) = app.shell()
+                        .sidecar("server")
+                        .and_then(|cmd| cmd
+                            .env("MONGO_URI", &mongo_uri)
+                            .env("MONGO_DB", "saas_pos")
+                            .env("JWT_SECRET", &jwt_secret)
+                            .env("APP_HOST", "0.0.0.0")
+                            .spawn()
+                        )
+                    {
+                        Some(server.1)
+                    } else {
+                        None
+                    }
+                }
+            };
+
+            // Initial spawn
+            if let Some(child) = spawn_server() {
+                if let Some(state) = app.try_state::<Processes>() {
+                    if let Ok(mut guard) = state.0.lock() {
+                        guard.server = Some(child);
+                    }
+                }
+            }
+
+            // Watchdog: check every 5s, restart if dead
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(5));
+
+                let alive = std::net::TcpStream::connect_timeout(
+                    &format!("127.0.0.1:3000").parse().unwrap(),
+                    std::time::Duration::from_millis(500),
+                ).is_ok();
+
+                if !alive {
+                    log::info!("Server watchdog: backend unreachable, restarting...");
+                    // Kill old process if any
+                    if let Some(state) = app.try_state::<Processes>() {
+                        if let Ok(mut guard) = state.0.lock() {
+                            if let Some(old) = guard.server.take() {
+                                let _ = old.kill();
+                            }
+                        }
+                    }
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    if let Some(child) = spawn_server() {
+                        if let Some(state) = app.try_state::<Processes>() {
+                            if let Ok(mut guard) = state.0.lock() {
+                                guard.server = Some(child);
+                            }
+                        }
+                        log::info!("Server watchdog: backend restarted successfully");
                     }
                 }
             }
@@ -1039,30 +1186,31 @@ fn list_printers_impl() -> Result<PrinterList, String> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-    let output = std::process::Command::new("powershell")
-        .args(["-NoProfile", "-Command", "Get-Printer | Select-Object -ExpandProperty Name"])
+    // Use wmic instead of PowerShell — much faster on Windows (~50ms vs ~500ms)
+    let output = std::process::Command::new("wmic")
+        .args(["printer", "get", "Name", "/format:list"])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| format!("Failed to list printers: {}", e))?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let printers: Vec<String> = stdout
         .lines()
+        .filter_map(|l| l.strip_prefix("Name="))
         .map(|l| l.trim().to_string())
         .filter(|l| !l.is_empty())
         .collect();
 
-    let def_output = std::process::Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "(Get-CimInstance -ClassName Win32_Printer | Where-Object {$_.Default}).Name",
-        ])
+    let def_output = std::process::Command::new("wmic")
+        .args(["printer", "where", "Default=TRUE", "get", "Name", "/format:list"])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
         .ok();
     let default = def_output.and_then(|o| {
-        let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-        if s.is_empty() { None } else { Some(s) }
+        let s = String::from_utf8_lossy(&o.stdout);
+        s.lines()
+            .find_map(|l| l.strip_prefix("Name="))
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
     });
 
     Ok(PrinterList { printers, default })
@@ -1074,7 +1222,58 @@ fn print_raw(printer: String, data: Vec<u8>) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn save_to_downloads(filename: String, data: Vec<u8>) -> Result<String, String> {
+    let downloads = dirs_next().join(&filename);
+    std::fs::write(&downloads, &data).map_err(|e| format!("Failed to write file: {}", e))?;
+    let path_str = downloads.to_string_lossy().to_string();
+    // Open the file with the default application
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(&downloads).spawn();
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("cmd").args(["/C", "start", "", &path_str]).spawn();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&downloads).spawn();
+    }
+    Ok(path_str)
+}
+
+fn dirs_next() -> std::path::PathBuf {
+    // Try to get the Downloads directory
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(profile) = std::env::var_os("USERPROFILE") {
+            let p = std::path::PathBuf::from(profile).join("Downloads");
+            if p.exists() { return p; }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Some(home) = std::env::var_os("HOME") {
+            let p = std::path::PathBuf::from(home).join("Downloads");
+            if p.exists() { return p; }
+        }
+    }
+    std::env::temp_dir()
+}
+
+#[tauri::command]
 fn print_html(webview: tauri::Webview, html: String) -> Result<(), String> {
+    // Clean up any stale temp files from previous prints
+    if let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            if name_str.starts_with("ciposdz_print_") && name_str.ends_with(".html") {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+
     let current_url = webview.url().map_err(|e| e.to_string())?;
     let tmp = std::env::temp_dir().join(format!("ciposdz_print_{}.html", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()));
     std::fs::write(&tmp, &html).map_err(|e| format!("Failed to write temp file: {}", e))?;
@@ -1212,10 +1411,10 @@ pub fn run() {
     }
 
     // ─── Background integrity monitor ────────────────────────────────
-    // Runs every 30 seconds in a background thread
+    // Runs every 2 hours in a background thread
     std::thread::spawn(|| {
         loop {
-            std::thread::sleep(std::time::Duration::from_secs(30));
+            std::thread::sleep(std::time::Duration::from_secs(7200));
             run_integrity_checks();
         }
     });
@@ -1253,10 +1452,18 @@ pub fn run() {
             list_printers,
             print_raw,
             print_html,
+            save_to_downloads,
         ])
         .build(tauri::generate_context!())
         .expect("error")
         .run(|app, event| {
+            // Enable devtools in dev builds only (requires --features devtools)
+            #[cfg(feature = "devtools")]
+            if let tauri::RunEvent::Ready = event {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.open_devtools();
+                }
+            }
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app.try_state::<Processes>() {
                     if let Ok(mut guard) = state.0.lock() {

@@ -156,7 +156,7 @@ export default function Favorites({ path }) {
       <div class="p-4 max-w-5xl mx-auto">
         {/* Header */}
         <div class="flex items-center justify-between mb-6">
-          <h1 class="text-xl font-bold">{t('manageFavorites')}</h1>
+          <h1 class="text-2xl font-bold">{t('manageFavorites')}</h1>
           {canEdit && (
             <button class={`btn btn-primary btn-sm ${saving ? 'loading' : ''}`} onClick={handleSave} disabled={saving}>
               {t('save')}
@@ -206,14 +206,14 @@ export default function Favorites({ path }) {
             {!isMain && (
               <div class="flex flex-wrap justify-between items-center mb-4 bg-base-200 rounded-lg px-3 py-2">
                 <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="text-xs text-base-content/60 font-medium">{t('pickColor')}:</span>
+                  <span class="text-xs text-base-content/80 font-medium">{t('pickColor')}:</span>
                   <button class={`w-5 h-5 rounded-full border-2 ${!groups[activeGroupIdx]?.color ? 'border-base-content ring-2 ring-base-content/20' : 'border-base-300'}`} title={t('noColor')} onClick={() => setGroupColor(activeGroupIdx, '')} />
                   {COLOR_PALETTE.map(c => (
                     <button key={c} class={`w-5 h-5 rounded-full border-2 transition-transform ${groups[activeGroupIdx]?.color === c ? 'border-base-content scale-125 ring-2 ring-base-content/20' : 'border-transparent hover:scale-110'}`} style={{ backgroundColor: c }} onClick={() => setGroupColor(activeGroupIdx, c)} />
                   ))}
                 </div>
                 <button class="btn btn-xs btn-ghost text-error gap-1" onClick={() => deleteGroup(activeGroupIdx)}>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   {t('deleteGroup')}
                 </button>
               </div>
@@ -222,11 +222,11 @@ export default function Favorites({ path }) {
             {/* Current items */}
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
-                <h3 class="font-semibold text-sm mb-3 text-base-content/70">
+                <h3 class="font-semibold text-sm mb-3 text-base-content/80">
                   {isMain ? t('favorites') : groups[activeGroupIdx]?.name} ({activeList.length})
                 </h3>
                 {activeList.length === 0 ? (
-                  <p class="text-sm text-base-content/40 py-4 text-center">{isMain ? t('noFavorites') : t('noProducts')}</p>
+                  <p class="text-sm text-base-content/70 py-4 text-center">{isMain ? t('noFavorites') : t('noProducts')}</p>
                 ) : (
                   <div class="flex flex-wrap gap-2">
                     {activeList.map(p => {
@@ -259,7 +259,7 @@ export default function Favorites({ path }) {
           <div>
             <div class="card bg-base-100 shadow-sm sticky top-4">
               <div class="card-body p-4">
-                <h3 class="font-semibold text-sm mb-3 text-base-content/70">{t('addToFavorites')}</h3>
+                <h3 class="font-semibold text-sm mb-3 text-base-content/80">{t('addToFavorites')}</h3>
                 <input
                   ref={searchRef}
                   class="input input-bordered w-full input-sm mb-3"
@@ -284,16 +284,16 @@ export default function Favorites({ path }) {
                     >
                       <div class="min-w-0">
                         <p class="font-medium text-sm truncate">{p.name}</p>
-                        <p class="text-xs text-base-content/50">{p.barcodes?.[0] || ''}</p>
+                        <p class="text-xs text-base-content/70">{p.barcodes?.[0] || ''}</p>
                       </div>
                       <span class="text-lg text-primary shrink-0 ms-2">+</span>
                     </button>
                   ))}
                   {searchQ.trim() && !loading && results.length === 0 && (
-                    <p class="text-center text-sm text-base-content/40 py-4">{t('noProducts')}</p>
+                    <p class="text-center text-sm text-base-content/70 py-4">{t('noProducts')}</p>
                   )}
                   {!searchQ.trim() && (
-                    <p class="text-center text-sm text-base-content/40 py-4">{t('favoritesSearch')}</p>
+                    <p class="text-center text-sm text-base-content/70 py-4">{t('favoritesSearch')}</p>
                   )}
                 </div>
               </div>

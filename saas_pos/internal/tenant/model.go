@@ -8,6 +8,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type VisiblePrices struct {
+	PV1 bool `bson:"pv1" json:"pv1"`
+	PV2 bool `bson:"pv2" json:"pv2"`
+	PV3 bool `bson:"pv3" json:"pv3"`
+}
+
 type PosFavGroup struct {
 	Name       string               `bson:"name"        json:"name"`
 	Color      string               `bson:"color"       json:"color"`
@@ -33,7 +39,9 @@ type Tenant struct {
 	PosExpiryWarning bool                 `bson:"pos_expiry_warning" json:"pos_expiry_warning"`
 	MaxCashAmount    float64              `bson:"max_cash_amount"    json:"max_cash_amount"`
 	TapRate          float64              `bson:"tap_rate"           json:"tap_rate"`
-	IbsRate          float64              `bson:"ibs_rate"           json:"ibs_rate"`
+	IbsRate              float64  `bson:"ibs_rate"               json:"ibs_rate"`
+	DefaultProductMode   string          `bson:"default_product_mode"   json:"default_product_mode"`
+	VisiblePrices        *VisiblePrices  `bson:"visible_prices,omitempty" json:"visible_prices"`
 	PosFavorites     []primitive.ObjectID  `bson:"pos_favorites"      json:"pos_favorites"`
 	PosFavGroups     []PosFavGroup         `bson:"pos_fav_groups"     json:"pos_fav_groups"`
 	PosFavColors     map[string]string     `bson:"pos_fav_colors"     json:"pos_fav_colors"`
@@ -67,8 +75,10 @@ type SettingsInput struct {
 	UseVAT           bool    `json:"use_vat"`
 	PosExpiryWarning bool    `json:"pos_expiry_warning"`
 	MaxCashAmount    float64 `json:"max_cash_amount"`
-	TapRate          float64 `json:"tap_rate"`
-	IbsRate          float64 `json:"ibs_rate"`
+	TapRate            float64 `json:"tap_rate"`
+	IbsRate            float64 `json:"ibs_rate"`
+	DefaultProductMode string          `json:"default_product_mode"`
+	VisiblePrices      *VisiblePrices  `json:"visible_prices"`
 }
 
 type ListResult struct {

@@ -7,9 +7,10 @@ import (
 	"math"
 	"time"
 
-	"saas_pos/internal/client"
+	"saas_pos/internal/caisse"
 	"saas_pos/internal/counter"
 	"saas_pos/internal/database"
+	salePkg "saas_pos/internal/sale"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -122,16 +123,7 @@ func Create(tenantID, cashierID, cashierEmail, saleID string, input CreateInput)
 			TotalTTC:    math.Round(lineTTC*100) / 100,
 			VAT:         sl.VAT,
 		})
-
-		// Restore stock for non-service products
-		pid := sl.ProductID
-		var p struct{ IsService bool `bson:"is_service"` }
-		if err := productCol().FindOne(ctx, bson.M{"_id": pid}).Decode(&p); err == nil && !p.IsService {
-			productCol().UpdateOne(ctx,
-				bson.M{"_id": pid},
-				bson.M{"$inc": bson.M{"qty_available": li.Qty}},
-			)
-		}
+		// Stock is restored by the negative sale created below
 	}
 
 	seq, _ := counter.Next(tenantID, "sale_return")
@@ -154,10 +146,32 @@ func Create(tenantID, cashierID, cashierEmail, saleID string, input CreateInput)
 		return nil, err
 	}
 
-	// If credit sale with client, reduce client balance
-	if sale.SaleType == "credit" && sale.ClientID != "" {
-		_ = client.AdjustBalance(tenantID, sale.ClientID, -math.Round(totalReturn*100)/100)
+	// Client balance and stock are handled by the negative sale below
+
+	// Create a negative sale so the return appears in statistics
+	// If caisse is open, link to session. If closed, just record in daily stats.
+	caisseID := ""
+	if sess, err := caisse.GetCurrent(tenantID, cashierID); err == nil && sess != nil {
+		caisseID = sess.ID.Hex()
 	}
+
+	var returnSaleLines []salePkg.SaleLineInput
+	for _, rl := range lines {
+		returnSaleLines = append(returnSaleLines, salePkg.SaleLineInput{
+			ProductID: rl.ProductID.Hex(),
+			Qty:       -rl.Qty,
+			UnitPrice: rl.UnitPrice,
+			Discount:  0,
+		})
+	}
+	_, _ = salePkg.Create(tenantID, cashierID, cashierEmail, salePkg.CreateInput{
+		Lines:         returnSaleLines,
+		PaymentMethod: "cash",
+		AmountPaid:    0,
+		ClientID:      sale.ClientID,
+		SaleType:      sale.SaleType,
+		CaisseID:      caisseID,
+	})
 
 	return ret, nil
 }
@@ -193,7 +207,9 @@ func List(tenantID string, from, to time.Time, page, limit int) (*ListResult, er
 	defer cur.Close(ctx)
 
 	var items []SaleReturn
-	cur.All(ctx, &items)
+	if err := cur.All(ctx, &items); err != nil {
+		return nil, err
+	}
 	if items == nil {
 		items = []SaleReturn{}
 	}
