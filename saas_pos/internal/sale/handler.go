@@ -3,6 +3,7 @@ package sale
 import (
 	"time"
 
+	"saas_pos/internal/dvr"
 	"saas_pos/internal/middleware"
 
 	"github.com/gofiber/fiber/v2"
@@ -22,6 +23,22 @@ func HandleCreate(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	// DVR: fire-and-forget clip extraction
+	if input.CameraChannel > 0 {
+		dvr.SaveEvent(dvr.ClipRequest{
+			TenantID:      claims.TenantID,
+			EventType:     dvr.EventSale,
+			EventRef:      sale.Ref,
+			EventID:       sale.ID.Hex(),
+			CameraChannel: input.CameraChannel,
+			EventTime:     sale.CreatedAt,
+			CashierID:     claims.ID,
+			CashierEmail:  claims.Email,
+			Amount:        sale.Total,
+		})
+	}
+
 	return c.Status(201).JSON(fiber.Map{"data": sale})
 }
 

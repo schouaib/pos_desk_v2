@@ -67,9 +67,9 @@ export default function ExpiringBatches({ path }) {
       </div>
 
       {/* Filter bar */}
-      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-2 flex-wrap items-end">
-        <label class="form-control">
-          <span class="label-text text-xs">{t('expiryAlertDays')}</span>
+      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-3 flex-wrap items-center">
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('expiryAlertDays')}</span>
           <div class="flex gap-1">
             <input type="number" min="0" step="1" class="input input-bordered input-sm w-20"
               value={daysInput}
@@ -77,7 +77,7 @@ export default function ExpiringBatches({ path }) {
               onKeyDown={(e) => e.key === 'Enter' && applyDays()} />
             <button class="btn btn-sm btn-primary btn-outline" onClick={applyDays}>{t('search')}</button>
           </div>
-        </label>
+        </div>
         <div class="flex gap-1">
           {[0, 7, 15, 30, 60, 90].map(d => (
             <button key={d} class={`btn btn-xs ${days === d ? 'btn-primary' : 'btn-ghost'}`}

@@ -30,6 +30,7 @@ const Expenses = lazy(() => import('./pages/Expenses'))
 const Retraits = lazy(() => import('./pages/Retraits'))
 const UserSummary = lazy(() => import('./pages/UserSummary'))
 const Settings = lazy(() => import('./pages/Settings'))
+const DVREvents = lazy(() => import('./pages/DVREvents'))
 const Clients = lazy(() => import('./pages/Clients'))
 const Folders = lazy(() => import('./pages/Folders'))
 const Chat = lazy(() => import('./pages/Chat'))
@@ -41,6 +42,7 @@ const ExpiringBatches = lazy(() => import('./pages/ExpiringBatches'))
 const TermsConditions = lazy(() => import('./pages/TermsConditions'))
 const Declarations = lazy(() => import('./pages/Declarations'))
 const Facturation = lazy(() => import('./pages/Facturation'))
+const ImportPurchase = lazy(() => import('./pages/ImportPurchase'))
 
 const Spinner = memo(() => (
   <div class="min-h-screen flex items-center justify-center bg-base-200">
@@ -340,6 +342,7 @@ export function App() {
         <Guard component={Units} path="/units" feat="products" perm={['units', 'view']} />
         <Guard component={Suppliers} path="/suppliers" feat="suppliers" perm={['suppliers', 'view']} />
         <Guard component={Purchases} path="/purchases" feat="purchases" perm={['purchases', 'view']} />
+        <Guard component={ImportPurchase} path="/import-purchase" feat="purchases" perm={['purchases', 'add']} />
         <Guard component={Losses} path="/losses" feat="losses" perm={['products', 'loss']} />
         <Guard component={Pos} path="/pos" feat="pos" perm={['sales', 'add']} />
         <Guard component={SalesHistory} path="/sales" feat="sales" perm={['sales', 'view']} />
@@ -355,6 +358,7 @@ export function App() {
         <Guard component={Chat} path="/chat" adminOnly />
         <Guard component={Facturation} path="/facturation" feat="facturation" perm={['facturation', 'view']} />
         <Guard component={Declarations} path="/declarations" adminOnly feat="stats" />
+        <Guard component={DVREvents} path="/dvr-events" adminOnly feat="dvr" />
         <TermsConditions path="/terms" />
         <RedirectRoot path="/" />
       </Router>

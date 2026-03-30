@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks'
 import { Layout } from '../components/Layout'
 import { api } from '../lib/api'
-import { hasPerm } from '../lib/auth'
+import { hasPerm, hasFeature, isTenantAdmin } from '../lib/auth'
 import { useI18n } from '../lib/i18n'
 import { buildReceipt } from '../lib/escpos'
 import { printBytes, getConnection } from '../lib/webusbPrint'
@@ -266,9 +266,9 @@ export default function Sales({ path }) {
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 whitespace-nowrap">{t('saleDate')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('saleCashier')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-center">{t('saleItems')}</th>
-              {store.use_vat && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('saleTotalHT')}</th>}
-              {store.use_vat && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('saleTotalVAT')}</th>}
-              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{store.use_vat ? t('saleTotalTTC') : t('purchaseTotal')}</th>
+              {store.use_vat_sale && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('saleTotalHT')}</th>}
+              {store.use_vat_sale && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('saleTotalVAT')}</th>}
+              <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{store.use_vat_sale ? t('saleTotalTTC') : t('purchaseTotal')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('saleAmountPaid')}</th>
               <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('saleChange')}</th>
               {showEarnings && <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-success text-end">{t('saleEarning')}</th>}
@@ -278,14 +278,14 @@ export default function Sales({ path }) {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={(showEarnings ? 10 : 9) - (store.use_vat ? 0 : 2)} class="py-10 text-center">
+                <td colSpan={(showEarnings ? 10 : 9) - (store.use_vat_sale ? 0 : 2)} class="py-10 text-center">
                   <span class="loading loading-spinner loading-md text-primary" />
                 </td>
               </tr>
             )}
             {!loading && items.length === 0 && (
               <tr>
-                <td colSpan={(showEarnings ? 10 : 9) - (store.use_vat ? 0 : 2)} class="py-12 text-center">
+                <td colSpan={(showEarnings ? 10 : 9) - (store.use_vat_sale ? 0 : 2)} class="py-12 text-center">
                   <div class="flex flex-col items-center gap-2 text-base-content/50">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
@@ -317,8 +317,8 @@ export default function Sales({ path }) {
                   <td class="px-3 py-2.5 text-center">
                     <span class="badge badge-sm badge-ghost">{s.lines?.length || 0}</span>
                   </td>
-                  {store.use_vat && <td class="px-3 py-2.5 text-end font-mono text-sm">{s.total_ht.toFixed(2)}</td>}
-                  {store.use_vat && <td class="px-3 py-2.5 text-end font-mono text-sm text-warning">{s.total_vat.toFixed(2)}</td>}
+                  {store.use_vat_sale && <td class="px-3 py-2.5 text-end font-mono text-sm">{s.total_ht.toFixed(2)}</td>}
+                  {store.use_vat_sale && <td class="px-3 py-2.5 text-end font-mono text-sm text-warning">{s.total_vat.toFixed(2)}</td>}
                   <td class="px-3 py-2.5 text-end font-mono text-sm font-semibold text-primary">{s.total.toFixed(2)}</td>
                   <td class="px-3 py-2.5 text-end font-mono text-sm">{s.amount_paid.toFixed(2)}</td>
                   <td class="px-3 py-2.5 text-end font-mono text-sm text-success">{s.change.toFixed(2)}</td>
@@ -376,6 +376,17 @@ export default function Sales({ path }) {
                               <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
                             </svg>
                           )}
+                        </button>
+                      )}
+                      {hasFeature('dvr') && isTenantAdmin() && (
+                        <button
+                          class="btn btn-sm btn-ghost btn-square"
+                          title={t('watchClip') || 'Watch Clip'}
+                          onClick={(e) => { e.stopPropagation(); window.open(`/dvr-events?ref=${s.ref}`, '_self') }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25z" />
+                          </svg>
                         </button>
                       )}
                     </div>
@@ -448,9 +459,9 @@ export default function Sales({ path }) {
               </div>
               <div class="divider my-2"></div>
               <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm font-mono">
-                {store.use_vat && <span>{t('saleTotalHT')}: <b>{detailSale.total_ht.toFixed(2)}</b></span>}
-                {store.use_vat && <span class="text-warning">{t('saleTotalVAT')}: <b>{detailSale.total_vat.toFixed(2)}</b></span>}
-                <span class="text-primary font-semibold">{store.use_vat ? t('saleTotalTTC') : t('purchaseTotal')}: {detailSale.total.toFixed(2)}</span>
+                {store.use_vat_sale && <span>{t('saleTotalHT')}: <b>{detailSale.total_ht.toFixed(2)}</b></span>}
+                {store.use_vat_sale && <span class="text-warning">{t('saleTotalVAT')}: <b>{detailSale.total_vat.toFixed(2)}</b></span>}
+                <span class="text-primary font-semibold">{store.use_vat_sale ? t('saleTotalTTC') : t('purchaseTotal')}: {detailSale.total.toFixed(2)}</span>
                 <span>{t('saleAmountPaid')}: {detailSale.amount_paid.toFixed(2)}</span>
                 <span class="text-success">{t('saleChange')}: {detailSale.change.toFixed(2)}</span>
                 {showEarnings && <span class="text-success font-semibold">{t('saleEarning')}: {(detailSale.total_earning ?? 0).toFixed(2)}</span>}

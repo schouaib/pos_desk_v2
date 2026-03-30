@@ -136,22 +136,22 @@ export default function Expenses({ path }) {
       </div>
 
       {/* Filters */}
-      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-2 flex-wrap items-end">
-        <label class="form-control flex-1 min-w-36">
-          <span class="label-text text-xs">{t('search')}</span>
+      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-3 flex-wrap items-center">
+        <div class="flex flex-col flex-1 min-w-36">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('search')}</span>
           <input type="text" class="input input-bordered input-sm" placeholder={t('expenseLabel')}
             value={search} onInput={(e) => { setSearch(e.target.value); setPage(1) }} />
-        </label>
-        <label class="form-control">
-          <span class="label-text text-xs">{t('dateFrom')}</span>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('dateFrom')}</span>
           <input type="date" class="input input-bordered input-sm"
             value={from} onInput={(e) => { setFrom(e.target.value); setPage(1) }} />
-        </label>
-        <label class="form-control">
-          <span class="label-text text-xs">{t('dateTo')}</span>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('dateTo')}</span>
           <input type="date" class="input input-bordered input-sm"
             value={to} onInput={(e) => { setTo(e.target.value); setPage(1) }} />
-        </label>
+        </div>
       </div>
 
       <div class="card bg-base-100 shadow overflow-hidden">

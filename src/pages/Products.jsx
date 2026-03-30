@@ -153,7 +153,7 @@ export default function Products({ path }) {
     api.listCategories().then(d => { if (!cancelled) setCategories(d) }).catch(() => {})
     api.listBrands().then(d => { if (!cancelled) setBrands(d) }).catch(() => {})
     api.listUnits().then(d => { if (!cancelled) setUnits(d) }).catch(() => {})
-    api.getStoreSettings().then(d => { if (!cancelled) { setStoreName(d?.name || ''); setStoreCurrency(d?.currency === 'EUR' ? '€' : d?.currency === 'USD' ? '$' : d?.currency === 'GBP' ? '£' : d?.currency === 'TND' ? 'DT' : d?.currency === 'SAR' ? 'SR' : d?.currency || 'DA'); setDefaultSalePrice(d?.default_sale_price || 1); setUseVAT(!!d?.use_vat); setQuickMode(d?.default_product_mode === 'quick' || !d?.default_product_mode); if (d?.visible_prices) setVisiblePrices(d.visible_prices) } }).catch(() => {})
+    api.getStoreSettings().then(d => { if (!cancelled) { setStoreName(d?.name || ''); setStoreCurrency(d?.currency === 'EUR' ? '€' : d?.currency === 'USD' ? '$' : d?.currency === 'GBP' ? '£' : d?.currency === 'TND' ? 'DT' : d?.currency === 'SAR' ? 'SR' : d?.currency || 'DA'); setDefaultSalePrice(d?.default_sale_price || 1); setUseVAT(!!(d?.use_vat_purchase || d?.use_vat_sale || d?.use_vat)); setQuickMode(d?.default_product_mode === 'quick' || !d?.default_product_mode); if (d?.visible_prices) setVisiblePrices(d.visible_prices) } }).catch(() => {})
     return () => { cancelled = true }
   }, [])
 
@@ -646,27 +646,36 @@ export default function Products({ path }) {
       </div>
 
       {/* Search + toolbar */}
-      <div class="flex items-center gap-2 mb-3 flex-wrap">
-        <div class="join flex-1 min-w-48">
-          <input class="input input-bordered input-sm join-item w-full"
-            placeholder={t('searchProducts')} value={qInput}
-            onInput={(e) => setQInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && doSearch()} />
-          <button class="btn btn-sm btn-primary join-item" onClick={doSearch}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607z" /></svg>
-          </button>
+      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-3 flex-wrap items-center">
+        <div class="flex flex-col flex-1 min-w-48">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('search')}</span>
+          <div class="join w-full">
+            <input class="input input-bordered input-sm join-item w-full"
+              placeholder={t('searchProducts')} value={qInput}
+              onInput={(e) => setQInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && doSearch()} />
+            <button class="btn btn-sm btn-primary join-item" onClick={doSearch}>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607z" /></svg>
+            </button>
+          </div>
         </div>
-        <select class="select select-bordered select-sm min-w-28" value={filterCat}
-          onChange={(e) => { setFilterCat(e.target.value); setPage(1) }}>
-          <option value="">{t('allCategories')}</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select class="select select-bordered select-sm min-w-28" value={filterBrand}
-          onChange={(e) => { setFilterBrand(e.target.value); setPage(1) }}>
-          <option value="">{t('allBrands')}</option>
-          {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-        <div class="flex gap-1.5">
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('category')}</span>
+          <select class="select select-bordered select-sm min-w-28" value={filterCat}
+            onChange={(e) => { setFilterCat(e.target.value); setPage(1) }}>
+            <option value="">{t('allCategories')}</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('brand')}</span>
+          <select class="select select-bordered select-sm min-w-28" value={filterBrand}
+            onChange={(e) => { setFilterBrand(e.target.value); setPage(1) }}>
+            <option value="">{t('allBrands')}</option>
+            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </div>
+        <div class="flex gap-1.5 self-end">
           {canAlert && (
             <button class="btn btn-sm btn-ghost gap-1 text-warning" onClick={() => route('/low-stock')}>
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>

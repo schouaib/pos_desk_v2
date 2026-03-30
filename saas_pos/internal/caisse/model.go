@@ -14,6 +14,7 @@ type Session struct {
 	OpeningAmount float64            `bson:"opening_amount" json:"opening_amount"`
 	ClosingAmount *float64           `bson:"closing_amount,omitempty" json:"closing_amount,omitempty"`
 	Notes         string             `bson:"notes"         json:"notes"`
+	CameraChannel int                `bson:"camera_channel,omitempty" json:"camera_channel,omitempty"`
 	Status        string             `bson:"status"        json:"status"` // "open" | "closed"
 	OpenedAt      time.Time          `bson:"opened_at"     json:"opened_at"`
 	ClosedAt      *time.Time         `bson:"closed_at,omitempty" json:"closed_at,omitempty"`
@@ -22,6 +23,7 @@ type Session struct {
 type OpenInput struct {
 	OpeningAmount float64 `json:"opening_amount"`
 	Notes         string  `json:"notes"`
+	CameraChannel int     `json:"camera_channel"`
 }
 
 type CloseInput struct {

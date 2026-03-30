@@ -29,11 +29,12 @@ const ALL_FEATURES = [
   { key: 'scale',              labelKey: 'featScale',             defaultPrice: 2500 },
   { key: 'facturation',        labelKey: 'featFacturation',       defaultPrice: 5000 },
   { key: 'remote_scanner',    labelKey: 'featRemoteScanner',     defaultPrice: 1000 },
+  { key: 'dvr',               labelKey: 'featDVR',               defaultPrice: 3000 },
 ]
 
 const DEFAULT_PRICES = Object.fromEntries(ALL_FEATURES.map((f) => [f.key, f.defaultPrice]))
 
-const emptyFeatures = { products: false, purchases: false, suppliers: false, sales: false, pos: false, losses: false, expenses: false, retraits: false, stats: false, multi_barcodes: false, product_history: false, clients: false, client_payments: false, user_summary: false, multi_folders: false, access_management: false, favorites: false, product_variants: false, stock_transfers: false, product_discounts: false, product_bundles: false, batch_tracking: false, scale: false, facturation: false, remote_scanner: false }
+const emptyFeatures = { products: false, purchases: false, suppliers: false, sales: false, pos: false, losses: false, expenses: false, retraits: false, stats: false, multi_barcodes: false, product_history: false, clients: false, client_payments: false, user_summary: false, multi_folders: false, access_management: false, favorites: false, product_variants: false, stock_transfers: false, product_discounts: false, product_bundles: false, batch_tracking: false, scale: false, facturation: false, remote_scanner: false, dvr: false }
 const emptyPrices = Object.fromEntries(ALL_FEATURES.map((f) => [f.key, 0]))
 const empty = { name: '', description: '', max_users: '0', max_products: '0', max_sales_month: '0', features: emptyFeatures, feature_prices: emptyPrices }
 

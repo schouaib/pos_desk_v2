@@ -67,6 +67,7 @@ type CreateInput struct {
 	SaleType      string          `json:"sale_type"` // "cash" | "credit"
 	CaisseID      string          `json:"caisse_id"`
 	HasFacture    bool            `json:"has_facture"`
+	CameraChannel int             `json:"camera_channel"`
 }
 
 // ListResult holds a paginated list of sales.

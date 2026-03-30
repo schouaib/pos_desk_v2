@@ -40,6 +40,7 @@ func Open(tenantID, userID, userEmail string, input OpenInput) (*Session, error)
 		UserEmail:     userEmail,
 		OpeningAmount: input.OpeningAmount,
 		Notes:         input.Notes,
+		CameraChannel: input.CameraChannel,
 		Status:        "open",
 		OpenedAt:      time.Now(),
 	}
@@ -208,6 +209,16 @@ func SumAmounts(tenantID string, from, to time.Time) (*CaisseTotals, error) {
 		cur.Decode(&result)
 	}
 	return &CaisseTotals{Opening: result.Opening, Closing: result.Closing}, nil
+}
+
+// GetCameraChannel returns the camera channel for the user's current open caisse session.
+// Returns 0 if no session or no camera assigned.
+func GetCameraChannel(tenantID, userID string) int {
+	session, err := GetCurrent(tenantID, userID)
+	if err != nil || session == nil {
+		return 0
+	}
+	return session.CameraChannel
 }
 
 func ListHistory(tenantID string, page, limit int) ([]Session, int64, error) {

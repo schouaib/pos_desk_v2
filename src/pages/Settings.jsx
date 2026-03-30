@@ -17,7 +17,7 @@ const CURRENCIES = [
   { code: 'AED', symbol: 'AED', name: 'UAE Dirham' },
 ]
 
-const TABS = ['generalInfo', 'legalInfo', 'currencySettings', 'printerSettings', 'appPreferences']
+const ALL_TABS = ['generalInfo', 'legalInfo', 'currencySettings', 'printerSettings', 'appPreferences', 'dvrSettings']
 
 export default function Settings({ path }) {
   const { t } = useI18n()
@@ -26,7 +26,9 @@ export default function Settings({ path }) {
     name: '', phone: '', address: '', logo_url: '',
     currency: 'DZD',
     default_sale_price: 1,
-    use_vat: false,
+    use_vat_purchase: false,
+    use_vat_sale: false,
+    vat_sale_facture_only: false,
     pos_expiry_warning: false,
     max_cash_amount: 0,
     tap_rate: 2,
@@ -47,6 +49,13 @@ export default function Settings({ path }) {
   const [darkMode, setDarkMode] = useState(() => (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) === 'dark')
   const [textSize, setTextSize] = useState(() => (typeof localStorage !== 'undefined' && localStorage.getItem('textSize')) || 'medium')
   const [visiblePrices, setVisiblePrices] = useState({ pv1: true, pv2: true, pv3: true })
+  const [dvrConfig, setDvrConfig] = useState({
+    enabled: false, ip: '', port: 37777, username: 'admin', password: '',
+    seconds_before: 10, seconds_after: 30, cameras: [],
+  })
+  const [dvrTesting, setDvrTesting] = useState(false)
+  const [dvrTestResult, setDvrTestResult] = useState(null)
+  const [deviceCamera, setDeviceCamera] = useState(0)
   const [posColors, setPosColors] = useState(() => {
     if (typeof localStorage === 'undefined') return {}
     const c = {}
@@ -66,6 +75,7 @@ export default function Settings({ path }) {
       const store = new LazyStore('printer.json')
       store.get('receipt_printer').then(v => { if (v) setReceiptPrinter(v) })
       store.get('label_printer').then(v => { if (v) setLabelPrinter(v) })
+      store.get('device_camera').then(v => { if (v) setDeviceCamera(v) })
     }).catch(() => {})
   }, [])
 
@@ -86,6 +96,18 @@ export default function Settings({ path }) {
         if (cancelled) return
         const vp = data.visible_prices || { pv1: true, pv2: true, pv3: true }
         setVisiblePrices(vp)
+        if (data.dvr) {
+          setDvrConfig({
+            enabled: !!data.dvr.enabled,
+            ip: data.dvr.ip || '',
+            port: data.dvr.port || 37777,
+            username: data.dvr.username || 'admin',
+            password: data.dvr.password || '',
+            seconds_before: data.dvr.seconds_before || 10,
+            seconds_after: data.dvr.seconds_after || 30,
+            cameras: data.dvr.cameras || [],
+          })
+        }
         setForm({
           name:       data.name       || '',
           phone:      data.phone      || '',
@@ -93,7 +115,9 @@ export default function Settings({ path }) {
           logo_url:   data.logo_url   || '',
           currency:           data.currency           || 'DZD',
           default_sale_price: data.default_sale_price || 1,
-          use_vat:            !!data.use_vat,
+          use_vat_purchase:       !!(data.use_vat_purchase ?? data.use_vat),
+          use_vat_sale:           !!(data.use_vat_sale ?? data.use_vat),
+          vat_sale_facture_only:  !!data.vat_sale_facture_only,
           pos_expiry_warning: !!data.pos_expiry_warning,
           max_cash_amount:    data.max_cash_amount || 0,
           tap_rate:           data.tap_rate || 2,
@@ -139,7 +163,9 @@ export default function Settings({ path }) {
     setSuccess(false)
     setSaving(true)
     try {
-      await api.updateStoreSettings({ ...form, visible_prices: visiblePrices })
+      const payload = { ...form, visible_prices: visiblePrices }
+      if (hasFeature('dvr')) payload.dvr = dvrConfig
+      await api.updateStoreSettings(payload)
       setSuccess(true)
       successTimer.current = setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
@@ -147,6 +173,32 @@ export default function Settings({ path }) {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleDVRTest() {
+    setDvrTesting(true)
+    setDvrTestResult(null)
+    try {
+      await api.testDVRConnection(dvrConfig)
+      setDvrTestResult({ ok: true, msg: 'Connection successful' })
+    } catch (err) {
+      setDvrTestResult({ ok: false, msg: err.message || 'Connection failed' })
+    } finally {
+      setDvrTesting(false)
+    }
+  }
+
+  function addCamera() {
+    setDvrConfig(c => ({ ...c, cameras: [...c.cameras, { name: '', channel: 1 }] }))
+  }
+  function removeCamera(i) {
+    setDvrConfig(c => ({ ...c, cameras: c.cameras.filter((_, j) => j !== i) }))
+  }
+  function updateCamera(i, field, value) {
+    setDvrConfig(c => ({
+      ...c,
+      cameras: c.cameras.map((cam, j) => j === i ? { ...cam, [field]: value } : cam),
+    }))
   }
 
   if (loading) {
@@ -161,7 +213,12 @@ export default function Settings({ path }) {
 
   const logoSrc = logoPreview || form.logo_url
   const hasPrinters = window.__TAURI_INTERNALS__
-  const visibleTabs = TABS.filter((_, i) => i !== 3 || hasPrinters)
+  const hasDVR = hasFeature('dvr')
+  const visibleTabs = ALL_TABS.filter(tab => {
+    if (tab === 'printerSettings') return hasPrinters
+    if (tab === 'dvrSettings') return hasDVR
+    return true
+  })
 
   return (
     <Layout currentPath={path}>
@@ -256,14 +313,37 @@ export default function Settings({ path }) {
         {settingsTab === 1 && (
           <div class="card bg-base-100 shadow">
             <div class="card-body p-5 space-y-4">
-              <div class="flex items-center justify-between bg-base-200 rounded-lg px-4 py-3">
-                <div>
-                  <p class="text-sm font-medium">{t('useVAT')}</p>
-                  <p class="text-xs text-base-content/70">{t('useVATDesc')}</p>
+              <div class="space-y-2">
+                <p class="text-sm font-semibold">{t('vatSettings')}</p>
+                <div class="flex items-center justify-between bg-base-200 rounded-lg px-4 py-3">
+                  <div>
+                    <p class="text-sm font-medium">{t('useVATPurchase')}</p>
+                    <p class="text-xs text-base-content/70">{t('useVATPurchaseDesc')}</p>
+                  </div>
+                  <input type="checkbox" class="toggle toggle-primary toggle-sm"
+                    checked={form.use_vat_purchase}
+                    onChange={(e) => setForm({ ...form, use_vat_purchase: e.target.checked })} />
                 </div>
-                <input type="checkbox" class="toggle toggle-primary toggle-sm"
-                  checked={form.use_vat}
-                  onChange={(e) => setForm({ ...form, use_vat: e.target.checked })} />
+                <div class="flex items-center justify-between bg-base-200 rounded-lg px-4 py-3">
+                  <div>
+                    <p class="text-sm font-medium">{t('useVATSale')}</p>
+                    <p class="text-xs text-base-content/70">{t('useVATSaleDesc')}</p>
+                  </div>
+                  <input type="checkbox" class="toggle toggle-primary toggle-sm"
+                    checked={form.use_vat_sale}
+                    onChange={(e) => setForm({ ...form, use_vat_sale: e.target.checked, ...(!e.target.checked && { vat_sale_facture_only: false }) })} />
+                </div>
+                {form.use_vat_sale && (
+                  <div class="flex items-center justify-between bg-base-200 rounded-lg px-4 py-3 ml-4">
+                    <div>
+                      <p class="text-sm font-medium">{t('vatSaleFactureOnly')}</p>
+                      <p class="text-xs text-base-content/70">{t('vatSaleFactureOnlyDesc')}</p>
+                    </div>
+                    <input type="checkbox" class="toggle toggle-warning toggle-sm"
+                      checked={form.vat_sale_facture_only}
+                      onChange={(e) => setForm({ ...form, vat_sale_facture_only: e.target.checked })} />
+                  </div>
+                )}
               </div>
 
               <label class="form-control">
@@ -546,6 +626,161 @@ export default function Settings({ path }) {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 5: DVR Surveillance Settings */}
+        {hasDVR && settingsTab === visibleTabs.indexOf('dvrSettings') && (
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-5 space-y-4">
+              <div class="flex items-center justify-between bg-base-200 rounded-lg px-4 py-3">
+                <div>
+                  <p class="text-sm font-medium">{t('dvrEnabled') || 'DVR Surveillance'}</p>
+                  <p class="text-xs text-base-content/70">{t('dvrEnabledDesc') || 'Record video clips for sales, refunds, and cash counts'}</p>
+                </div>
+                <input type="checkbox" class="toggle toggle-primary toggle-sm"
+                  checked={dvrConfig.enabled}
+                  onChange={(e) => setDvrConfig({ ...dvrConfig, enabled: e.target.checked })} />
+              </div>
+
+              {dvrConfig.enabled && (
+                <>
+                  <p class="text-sm font-semibold">{t('dvrConnection') || 'DVR Connection'}</p>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label class="form-control sm:col-span-2">
+                      <span class="label-text text-xs">{t('dvrIP') || 'DVR IP Address'}</span>
+                      <input class="input input-bordered input-sm font-mono" placeholder="192.168.1.100"
+                        value={dvrConfig.ip}
+                        onInput={(e) => setDvrConfig({ ...dvrConfig, ip: e.target.value })} />
+                    </label>
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('dvrPort') || 'HTTP Port'}</span>
+                      <input type="number" class="input input-bordered input-sm font-mono" placeholder="37777"
+                        value={dvrConfig.port}
+                        onInput={(e) => setDvrConfig({ ...dvrConfig, port: parseInt(e.target.value) || 37777 })} />
+                    </label>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('dvrUsername') || 'Username'}</span>
+                      <input class="input input-bordered input-sm" placeholder="admin"
+                        value={dvrConfig.username}
+                        onInput={(e) => setDvrConfig({ ...dvrConfig, username: e.target.value })} />
+                    </label>
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('dvrPassword') || 'Password'}</span>
+                      <input type="password" class="input input-bordered input-sm"
+                        value={dvrConfig.password}
+                        onInput={(e) => setDvrConfig({ ...dvrConfig, password: e.target.value })} />
+                    </label>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <button type="button" class={`btn btn-sm btn-outline ${dvrTesting ? 'loading' : ''}`}
+                      disabled={dvrTesting || !dvrConfig.ip}
+                      onClick={handleDVRTest}>
+                      {!dvrTesting && (
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z" />
+                        </svg>
+                      )}
+                      {t('testConnection') || 'Test Connection'}
+                    </button>
+                    {dvrTestResult && (
+                      <span class={`text-xs ${dvrTestResult.ok ? 'text-success' : 'text-error'}`}>
+                        {dvrTestResult.msg}
+                      </span>
+                    )}
+                  </div>
+
+                  <div class="divider my-1" />
+
+                  <p class="text-sm font-semibold">{t('dvrClipTiming') || 'Clip Timing'}</p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('dvrSecondsBefore') || 'Seconds before event'}</span>
+                      <input type="number" min="5" max="60" class="input input-bordered input-sm w-32"
+                        value={dvrConfig.seconds_before}
+                        onInput={(e) => setDvrConfig({ ...dvrConfig, seconds_before: parseInt(e.target.value) || 10 })} />
+                    </label>
+                    <label class="form-control">
+                      <span class="label-text text-xs">{t('dvrSecondsAfter') || 'Seconds after event'}</span>
+                      <input type="number" min="5" max="120" class="input input-bordered input-sm w-32"
+                        value={dvrConfig.seconds_after}
+                        onInput={(e) => setDvrConfig({ ...dvrConfig, seconds_after: parseInt(e.target.value) || 30 })} />
+                    </label>
+                  </div>
+                  <p class="text-xs text-base-content/60">
+                    {t('dvrTotalClip') || 'Total clip duration'}: {(dvrConfig.seconds_before || 10) + (dvrConfig.seconds_after || 30)}s
+                  </p>
+
+                  <div class="divider my-1" />
+
+                  <div class="flex items-center justify-between">
+                    <p class="text-sm font-semibold">{t('dvrCameras') || 'Camera Mapping'}</p>
+                    <button type="button" class="btn btn-xs btn-primary btn-outline" onClick={addCamera}>
+                      + {t('addCamera') || 'Add Camera'}
+                    </button>
+                  </div>
+                  <p class="text-xs text-base-content/60">
+                    {t('dvrCamerasDesc') || 'Map each POS station to a DVR camera channel. Cashiers select their station when opening the caisse.'}
+                  </p>
+
+                  {dvrConfig.cameras.length === 0 ? (
+                    <p class="text-sm text-base-content/50 text-center py-4">
+                      {t('noCameras') || 'No cameras configured. Click "Add Camera" to start.'}
+                    </p>
+                  ) : (
+                    <div class="space-y-2">
+                      {dvrConfig.cameras.map((cam, i) => (
+                        <div key={i} class="flex items-end gap-2 bg-base-200 rounded-lg px-3 py-2">
+                          <label class="form-control flex-1">
+                            <span class="label-text text-xs">{t('cameraName') || 'Station Name'}</span>
+                            <input class="input input-bordered input-sm" placeholder={`Caisse ${i + 1}`}
+                              value={cam.name}
+                              onInput={(e) => updateCamera(i, 'name', e.target.value)} />
+                          </label>
+                          <label class="form-control w-28">
+                            <span class="label-text text-xs">{t('cameraChannel') || 'Channel'}</span>
+                            <input type="number" min="1" max="64" class="input input-bordered input-sm font-mono"
+                              value={cam.channel}
+                              onInput={(e) => updateCamera(i, 'channel', parseInt(e.target.value) || 1)} />
+                          </label>
+                          <button type="button" class="btn btn-sm btn-ghost text-error mb-0.5" onClick={() => removeCamera(i)}>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {dvrConfig.cameras.length > 0 && window.__TAURI_INTERNALS__ && (
+                    <>
+                      <div class="divider my-1" />
+                      <p class="text-sm font-semibold">{t('deviceCamera') || 'This Computer\'s Camera'}</p>
+                      <p class="text-xs text-base-content/60">
+                        {t('deviceCameraDesc') || 'Select which camera channel is assigned to this computer. This is saved locally and applies to all users on this machine.'}
+                      </p>
+                      <select class="select select-bordered select-sm w-full max-w-xs"
+                        value={deviceCamera}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0
+                          setDeviceCamera(val)
+                          savePrinterPref('device_camera', val)
+                        }}>
+                        <option value={0}>{t('noCamera') || '-- No camera --'}</option>
+                        {dvrConfig.cameras.map((cam, i) => (
+                          <option key={i} value={cam.channel}>
+                            {cam.name || `Camera ${cam.channel}`} (CH {cam.channel})
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}

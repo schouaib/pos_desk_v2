@@ -22,7 +22,7 @@ export function QuickAddProductModal({ open, onClose, onCreated }) {
     api.getStoreSettings().then(d => {
       if (d) {
         setDefaultSalePrice(d.default_sale_price || 1)
-        setUseVAT(!!d.use_vat)
+        setUseVAT(!!(d.use_vat_purchase || d.use_vat_sale || d.use_vat))
       }
     }).catch(() => {})
   }, [])

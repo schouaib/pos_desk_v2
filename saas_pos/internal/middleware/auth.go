@@ -14,11 +14,17 @@ const LocalsClaims = "claims"
 // Auth validates the JWT.
 func Auth() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		token := ""
 		header := c.Get("Authorization")
-		if !strings.HasPrefix(header, "Bearer ") {
+		if strings.HasPrefix(header, "Bearer ") {
+			token = strings.TrimPrefix(header, "Bearer ")
+		} else if q := c.Query("token"); q != "" {
+			token = q // fallback for video/file streaming
+		}
+		if token == "" {
 			return response.Unauthorized(c)
 		}
-		claims, err := jwt.Parse(strings.TrimPrefix(header, "Bearer "))
+		claims, err := jwt.Parse(token)
 		if err != nil {
 			return response.Unauthorized(c)
 		}
@@ -124,6 +130,8 @@ func hasFeature(claims *jwt.Claims, feature string) bool {
 		return f.Facturation
 	case "remote_scanner":
 		return f.RemoteScanner
+	case "dvr":
+		return f.DVR
 	}
 	return false
 }

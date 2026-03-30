@@ -80,6 +80,16 @@ func Create(tenantID, cashierID, cashierEmail string, input CreateInput) (*Sale,
 		}
 	}
 
+	// Check tenant VAT settings for sales
+	var tenantVATSettings struct {
+		UseVATSale         bool `bson:"use_vat_sale"`
+		VATSaleFactureOnly bool `bson:"vat_sale_facture_only"`
+	}
+	if tid, err := primitive.ObjectIDFromHex(tenantID); err == nil {
+		database.Col("tenants").FindOne(ctx, bson.M{"_id": tid}).Decode(&tenantVATSettings)
+	}
+	applyVAT := tenantVATSettings.UseVATSale && (!tenantVATSettings.VATSaleFactureOnly || input.HasFacture)
+
 	var lines []SaleLine
 	var totalHT, totalVAT, totalEarning float64
 
@@ -156,7 +166,11 @@ func Create(tenantID, cashierID, cashierEmail string, input CreateInput) (*Sale,
 
 		// qty can be negative (return). Negative qty → negative lineHT/TTC.
 		lineHT := li.Qty*li.UnitPrice - discount
-		vatAmt := lineHT * float64(p.VAT) / 100
+		vatRate := p.VAT
+		if !applyVAT {
+			vatRate = 0
+		}
+		vatAmt := lineHT * float64(vatRate) / 100
 		lineTTC := lineHT + vatAmt
 		lineEarning := lineHT - li.Qty*prixAchat
 

@@ -23,6 +23,7 @@ import (
 	"saas_pos/internal/client"
 	"saas_pos/internal/discount"
 	"saas_pos/internal/docimport"
+	"saas_pos/internal/dvr"
 	"saas_pos/internal/expense"
 	"saas_pos/internal/folder"
 	"saas_pos/internal/location"
@@ -503,4 +504,12 @@ func registerRoutes(app *fiber.App) {
 	tpFact.Patch("/:id/status", middleware.RequirePermission("facturation", "edit"), facturation.HandleUpdateStatus)
 	tpFact.Post("/:id/avoir", middleware.RequirePermission("facturation", "avoir"), facturation.HandleCreateAvoir)
 	tpFact.Post("/:id/pay", middleware.RequirePermission("facturation", "edit"), facturation.HandlePay)
+
+	// DVR surveillance (plan-gated, tenant_admin only)
+	tpDVR := tp.Group("/dvr", middleware.RequireFeature("dvr"), middleware.RequireRole("tenant_admin"))
+	tpDVR.Get("/events", dvr.HandleList)
+	tpDVR.Get("/events/:id", dvr.HandleGetByID)
+	tpDVR.Post("/events/:id/fetch", dvr.HandleFetchClip)
+	tpDVR.Get("/events/:id/clip", dvr.HandleStreamClip)
+	tpDVR.Post("/test", dvr.HandleTestConnection)
 }

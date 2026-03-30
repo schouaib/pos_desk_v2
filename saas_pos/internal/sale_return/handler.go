@@ -3,6 +3,8 @@ package sale_return
 import (
 	"time"
 
+	"saas_pos/internal/caisse"
+	"saas_pos/internal/dvr"
 	"saas_pos/internal/middleware"
 	"saas_pos/pkg/response"
 
@@ -21,6 +23,22 @@ func HandleCreate(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, err.Error())
 	}
+
+	// DVR: fire-and-forget clip extraction for return
+	if ch := caisse.GetCameraChannel(claims.TenantID, claims.ID); ch > 0 {
+		dvr.SaveEvent(dvr.ClipRequest{
+			TenantID:      claims.TenantID,
+			EventType:     dvr.EventReturn,
+			EventRef:      ret.Ref,
+			EventID:       ret.ID.Hex(),
+			CameraChannel: ch,
+			EventTime:     ret.CreatedAt,
+			CashierID:     claims.ID,
+			CashierEmail:  claims.Email,
+			Amount:        ret.Total,
+		})
+	}
+
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"data": ret})
 }
 

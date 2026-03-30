@@ -114,37 +114,43 @@ export default function UserSummary({ path }) {
         )}
       </div>
 
-      {/* Filters — single row */}
-      <div class="bg-base-100 rounded-xl shadow-sm border border-base-200 px-4 py-2.5 mb-5 flex items-center gap-2 overflow-x-auto">
-        <input type="date" class="input input-bordered input-sm w-36 shrink-0"
-          title={t('dateFrom')} value={dateFrom} onInput={(e) => setDateFrom(e.target.value)} />
-        <span class="text-base-content/50 shrink-0">–</span>
-        <input type="date" class="input input-bordered input-sm w-36 shrink-0"
-          title={t('dateTo')} value={dateTo} onInput={(e) => setDateTo(e.target.value)} />
-
-        <div class="w-px h-7 bg-base-300 shrink-0" />
-
-        <select class="select select-bordered select-sm w-24 shrink-0" title={t('hourFrom')} value={hourFrom}
-          onChange={(e) => setHourFrom(e.target.value)}>
-          <option value="">{t('allDay')}</option>
-          {hours.map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
-        </select>
-        <span class="text-base-content/50 shrink-0">–</span>
-        <select class="select select-bordered select-sm w-24 shrink-0" title={t('hourTo')} value={hourTo}
-          onChange={(e) => setHourTo(e.target.value)}>
-          <option value="">{t('allDay')}</option>
-          {hours.map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:59</option>)}
-        </select>
-
+      {/* Filters */}
+      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-3 flex-wrap items-center">
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('dateFrom')}</span>
+          <input type="date" class="input input-bordered input-sm"
+            value={dateFrom} onInput={(e) => setDateFrom(e.target.value)} />
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('dateTo')}</span>
+          <input type="date" class="input input-bordered input-sm"
+            value={dateTo} onInput={(e) => setDateTo(e.target.value)} />
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('hourFrom')}</span>
+          <select class="select select-bordered select-sm" value={hourFrom}
+            onChange={(e) => setHourFrom(e.target.value)}>
+            <option value="">{t('allDay')}</option>
+            {hours.map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+          </select>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('hourTo')}</span>
+          <select class="select select-bordered select-sm" value={hourTo}
+            onChange={(e) => setHourTo(e.target.value)}>
+            <option value="">{t('allDay')}</option>
+            {hours.map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:59</option>)}
+          </select>
+        </div>
         {users.length > 0 && (
-          <>
-            <div class="w-px h-7 bg-base-300 shrink-0" />
-            <select class="select select-bordered select-sm shrink-0 min-w-[140px]" title={t('filterByUser')} value={userId}
+          <div class="flex flex-col">
+            <span class="text-xs text-base-content/70 mb-0.5">{t('filterByUser')}</span>
+            <select class="select select-bordered select-sm min-w-[140px]" value={userId}
               onChange={(e) => setUserId(e.target.value)}>
               <option value="">{t('allUsers')}</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
             </select>
-          </>
+          </div>
         )}
       </div>
 

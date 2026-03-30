@@ -8,11 +8,11 @@ import { shortcutsOpen } from '../components/ShortcutsOverlay'
 
 const inventoryPaths = ['/products', '/categories', '/brands', '/units', '/favorites']
 const stockPaths = ['/losses', '/low-stock', '/expiring-batches', '/archived-products', '/transfers']
-const purchasePaths = ['/purchases', '/suppliers']
+const purchasePaths = ['/purchases', '/suppliers', '/import-purchase']
 const salesPaths = ['/pos', '/sales', '/sale-returns', '/facturation']
 const financePaths = ['/sales-stats', '/expenses', '/retraits', '/user-summary', '/declarations']
 const peoplePaths = ['/clients', '/users']
-const systemPaths = ['/settings', '/folders', '/chat']
+const systemPaths = ['/settings', '/folders', '/chat', '/dvr-events']
 
 const Icon = memo(({ d, className = 'w-4 h-4 shrink-0' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" class={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -50,6 +50,7 @@ const ICONS = {
   systemGear: 'M11.42 15.17l-5.1 3.03a.75.75 0 01-1.14-.76l1.28-5.63a.75.75 0 00-.24-.7L1.53 7.11a.75.75 0 01.43-1.32l5.79-.49a.75.75 0 00.63-.43L10.97.74a.75.75 0 011.37 0l2.59 5.13a.75.75 0 00.63.43l5.79.49a.75.75 0 01.43 1.32l-4.28 3.7a.75.75 0 00-.24.7l1.28 5.63a.75.75 0 01-1.14.76l-5.1-3.03a.75.75 0 00-.74 0z',
   facturation: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.888L15.721 18.75M13.481 16.638a.75.75 0 11-1.06-1.06.75.75 0 011.06 1.06zm0 0L11.228 18.89a1.5 1.5 0 01-2.121 0l-1.5-1.5a1.5 1.5 0 010-2.121l6.364-6.364a.75.75 0 011.06 0l1.5 1.5a.75.75 0 010 1.06l-6.364 6.364zM10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
   declarations: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
+  dvr:        'm15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25z',
   menu:       'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5',
   close:      'M6 18L18 6M6 6l12 12',
 }
@@ -279,6 +280,7 @@ export function Layout({ children, currentPath }) {
             <NavLink href="/settings" label={t('storeSettings')} icon={ICONS.settings} active={currentPath === '/settings'} onNavigate={closeMenu} />
             {hasFeature('multi_folders') && (isTenantAdmin() || hasPerm('folders', 'view')) && <NavLink href="/folders" label={t('folders')} icon={ICONS.folders} active={currentPath === '/folders'} onNavigate={closeMenu} />}
             <NavLink href="/chat" label={t('chat')} icon={ICONS.chat} active={currentPath === '/chat'} onNavigate={closeMenu} badge={chatUnread} />
+            {hasFeature('dvr') && <NavLink href="/dvr-events" label={t('dvrEvents') || 'DVR'} icon={ICONS.dvr} active={currentPath === '/dvr-events'} onNavigate={closeMenu} />}
           </div>
         )}
       </nav>

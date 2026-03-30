@@ -44,12 +44,14 @@ export default function LowStock({ path }) {
         {total > 0 && <span class="badge badge-error">{total} {t('productsPage')}</span>}
       </div>
 
-      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-2 flex-wrap">
-        <input class="input input-bordered input-sm flex-1 min-w-40"
-          placeholder={t('searchProducts')} value={qInput}
-          onInput={(e) => setQInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && doSearch()} />
-        <button class="btn btn-sm btn-primary btn-outline" onClick={doSearch}>{t('search')}</button>
+      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-3 flex-wrap items-center">
+        <div class="flex flex-col flex-1 min-w-40">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('search')}</span>
+          <input class="input input-bordered input-sm" placeholder={t('searchProducts')} value={qInput}
+            onInput={(e) => setQInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && doSearch()} />
+        </div>
+        <button class="btn btn-sm btn-primary btn-outline self-end" onClick={doSearch}>{t('search')}</button>
       </div>
 
       <div class="card bg-base-100 shadow overflow-hidden">

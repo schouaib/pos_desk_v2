@@ -337,9 +337,9 @@ export const api = {
   getLowStock: (params) => request('GET', `/tenant/purchases/low-stock?${new URLSearchParams(params)}`),
   getPurchaseStats: (params) => request('GET', `/tenant/purchases/stats?${new URLSearchParams(params)}`),
 
-  // Purchase Document Import — fully local via PaddleOCR (localhost:5050)
+  // Purchase Document Import — fully local via PaddleOCR (localhost:5051)
   parsePurchaseDocument: async (file) => {
-    const OCR_URL = 'http://localhost:5050'
+    const OCR_URL = 'http://localhost:5051'
 
     const ocrForm = new FormData()
     ocrForm.append('image', file, file.name)
@@ -349,7 +349,7 @@ export const api = {
       if (!ocrRes.ok) throw new Error('OCR failed')
       ocrData = await ocrRes.json()
     } catch (err) {
-      throw new Error('PaddleOCR server unreachable — make sure it is running on port 5050')
+      throw new Error('PaddleOCR server unreachable — make sure it is running on port 5051')
     }
 
     const meta = ocrData.metadata || {}
@@ -464,5 +464,21 @@ export const api = {
   requestFolder: (body) => request('POST', '/tenant/folders', body),
   switchFolder: (body) => request('POST', '/tenant/folders/switch', body),
   copyFolderData: (body) => request('POST', '/tenant/folders/copy', body),
+
+  // DVR Surveillance
+  listDVREvents: (params = {}) => {
+    const q = new URLSearchParams()
+    if (params.from) q.set('from', params.from)
+    if (params.to) q.set('to', params.to)
+    if (params.type) q.set('type', params.type)
+    if (params.ref) q.set('ref', params.ref)
+    if (params.page) q.set('page', params.page)
+    if (params.limit) q.set('limit', params.limit)
+    return request('GET', `/tenant/dvr/events?${q}`)
+  },
+  getDVREvent: (id) => request('GET', `/tenant/dvr/events/${encodeURIComponent(id)}`),
+  fetchDVRClip: (id) => request('POST', `/tenant/dvr/events/${encodeURIComponent(id)}/fetch`),
+  getDVRClipURL: (id) => `${getBase()}/tenant/dvr/events/${encodeURIComponent(id)}/clip`,
+  testDVRConnection: (config) => request('POST', '/tenant/dvr/test', config),
 
 }

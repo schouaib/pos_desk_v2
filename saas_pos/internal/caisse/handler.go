@@ -1,9 +1,11 @@
 package caisse
 
 import (
+	"log"
 	"strconv"
 	"time"
 
+	"saas_pos/internal/dvr"
 	"saas_pos/internal/middleware"
 	"saas_pos/pkg/response"
 
@@ -17,10 +19,12 @@ func HandleOpen(c *fiber.Ctx) error {
 	if err := c.BodyParser(&input); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "invalid body")
 	}
+	log.Printf("[DVR] Caisse open: camera_channel=%d from input", input.CameraChannel)
 	session, err := Open(claims.TenantID, claims.ID, claims.Email, input)
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, err.Error())
 	}
+	log.Printf("[DVR] Caisse opened: session=%s, camera_channel=%d", session.ID.Hex(), session.CameraChannel)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"data": session})
 }
 
@@ -35,6 +39,22 @@ func HandleClose(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, err.Error())
 	}
+
+	// DVR: fire-and-forget clip extraction for caisse close (end of day cash count)
+	if session.CameraChannel > 0 {
+		dvr.SaveEvent(dvr.ClipRequest{
+			TenantID:      claims.TenantID,
+			EventType:     dvr.EventCaisseClose,
+			EventRef:      "CAISSE-" + session.ID.Hex()[:8],
+			EventID:       session.ID.Hex(),
+			CameraChannel: session.CameraChannel,
+			EventTime:     time.Now(),
+			CashierID:     claims.ID,
+			CashierEmail:  claims.Email,
+			Amount:        input.ClosingAmount,
+		})
+	}
+
 	return c.JSON(fiber.Map{"data": session})
 }
 

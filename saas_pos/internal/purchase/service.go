@@ -107,7 +107,7 @@ func computeExpensesTotal(expenses []PurchaseExpense) float64 {
 	return math.Round(total*100) / 100
 }
 
-func buildLines(tenantID primitive.ObjectID, inputs []LineInput) ([]PurchaseLine, error) {
+func buildLines(tenantID primitive.ObjectID, inputs []LineInput, applyVAT bool) ([]PurchaseLine, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -140,7 +140,11 @@ func buildLines(tenantID primitive.ObjectID, inputs []LineInput) ([]PurchaseLine
 		}
 
 		lineHT := math.Round(li.Qty*li.PrixAchat*(1-remise/100)*100) / 100
-		lineVAT := math.Round(lineHT*float64(p.VAT)/100*100) / 100
+		vatRate := p.VAT
+		if !applyVAT {
+			vatRate = 0
+		}
+		lineVAT := math.Round(lineHT*float64(vatRate)/100*100) / 100
 		lineTTC := math.Round((lineHT+lineVAT)*100) / 100
 
 		pl := PurchaseLine{
@@ -220,7 +224,13 @@ func Create(tenantID, userID, userEmail string, input CreateInput) (*Purchase, e
 		return nil, errors.New("supplier not found")
 	}
 
-	lines, err := buildLines(tid, input.Lines)
+	// Check tenant VAT settings for purchases
+	var tenantSettings struct {
+		UseVATPurchase bool `bson:"use_vat_purchase"`
+	}
+	database.Col("tenants").FindOne(ctx, bson.M{"_id": tid}).Decode(&tenantSettings)
+
+	lines, err := buildLines(tid, input.Lines, tenantSettings.UseVATPurchase)
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +421,13 @@ func Update(tenantID, id string, input UpdateInput) (*Purchase, error) {
 		return nil, errors.New("supplier not found")
 	}
 
-	lines, err := buildLines(tid, input.Lines)
+	// Check tenant VAT settings for purchases
+	var tenantSettings struct {
+		UseVATPurchase bool `bson:"use_vat_purchase"`
+	}
+	database.Col("tenants").FindOne(ctx, bson.M{"_id": tid}).Decode(&tenantSettings)
+
+	lines, err := buildLines(tid, input.Lines, tenantSettings.UseVATPurchase)
 	if err != nil {
 		return nil, err
 	}

@@ -227,7 +227,9 @@ func UpdateSettings(tenantID string, input SettingsInput) (*Tenant, error) {
 		"nis":                input.NIS,
 		"nart":               input.NART,
 		"compte_rib":         input.CompteRIB,
-		"use_vat":              input.UseVAT,
+		"use_vat_purchase":       input.UseVATPurchase,
+		"use_vat_sale":           input.UseVATSale,
+		"vat_sale_facture_only":  input.VATSaleFactureOnly,
 		"pos_expiry_warning":  input.PosExpiryWarning,
 		"max_cash_amount":     input.MaxCashAmount,
 		"tap_rate":              input.TapRate,
@@ -235,6 +237,22 @@ func UpdateSettings(tenantID string, input SettingsInput) (*Tenant, error) {
 		"default_product_mode":  input.DefaultProductMode,
 		"visible_prices":        input.VisiblePrices,
 		"updated_at":            time.Now(),
+	}
+
+	if input.DVR != nil {
+		if input.DVR.SecondsBefore <= 0 {
+			input.DVR.SecondsBefore = 10
+		}
+		if input.DVR.SecondsAfter <= 0 {
+			input.DVR.SecondsAfter = 30
+		}
+		if input.DVR.Port <= 0 {
+			input.DVR.Port = 37777
+		}
+		if input.DVR.Cameras == nil {
+			input.DVR.Cameras = []DVRCameraMapping{}
+		}
+		set["dvr"] = input.DVR
 	}
 
 	after := options.After

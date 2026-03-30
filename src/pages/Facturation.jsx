@@ -330,14 +330,26 @@ export default function Facturation({ path }) {
       </div>
 
       {/* Filters */}
-      <div class="flex flex-wrap gap-2 mb-3 items-end">
-        <input type="text" class="input input-bordered input-sm w-48" placeholder={t('search')} value={q} onInput={(e) => { setQ(e.target.value); setPage(1) }} />
-        <select class="select select-bordered select-sm" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}>
-          <option value="">{t('allStatuses')}</option>
-          {STATUSES.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
-        </select>
-        <input type="date" class="input input-bordered input-sm" value={from} onInput={(e) => { setFrom(e.target.value); setPage(1) }} />
-        <input type="date" class="input input-bordered input-sm" value={to} onInput={(e) => { setTo(e.target.value); setPage(1) }} />
+      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex gap-3 flex-wrap items-center">
+        <div class="flex flex-col flex-1 min-w-40">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('search')}</span>
+          <input type="text" class="input input-bordered input-sm" placeholder={t('search')} value={q} onInput={(e) => { setQ(e.target.value); setPage(1) }} />
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('status')}</span>
+          <select class="select select-bordered select-sm" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}>
+            <option value="">{t('allStatuses')}</option>
+            {STATUSES.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
+          </select>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('dateFrom')}</span>
+          <input type="date" class="input input-bordered input-sm" value={from} onInput={(e) => { setFrom(e.target.value); setPage(1) }} />
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('dateTo')}</span>
+          <input type="date" class="input input-bordered input-sm" value={to} onInput={(e) => { setTo(e.target.value); setPage(1) }} />
+        </div>
       </div>
 
       {/* Table */}

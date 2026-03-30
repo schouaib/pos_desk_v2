@@ -1274,35 +1274,39 @@ export default function Purchases({ path }) {
       </div>
 
       {/* Filters */}
-      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex flex-wrap gap-2">
-        <input
-          class="input input-bordered input-sm flex-1 min-w-40"
-          placeholder={`${t('purchaseSupplier')} / ${t('purchaseRef')} / ${t('supplierInvoice')}`}
-          value={filterQ}
-          onInput={(e) => setFilterQ(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && doSearch()}
-        />
-        <select class="select select-bordered select-sm"
-          value={filterStatus}
-          onChange={(e) => { setFilterStatus(e.target.value); setPage(1) }}>
+      <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex flex-wrap gap-3 items-center">
+        <div class="flex flex-col flex-1 min-w-40">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('search')}</span>
+          <input class="input input-bordered input-sm"
+            placeholder={`${t('purchaseSupplier')} / ${t('purchaseRef')} / ${t('supplierInvoice')}`}
+            value={filterQ}
+            onInput={(e) => setFilterQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && doSearch()} />
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('status')}</span>
+          <select class="select select-bordered select-sm"
+            value={filterStatus}
+            onChange={(e) => { setFilterStatus(e.target.value); setPage(1) }}>
           <option value="">{t('allStatuses')}</option>
           <option value="draft">{t('purchaseDraft')}</option>
           <option value="partially_validated">{t('purchasePartially_validated')}</option>
           <option value="validated">{t('purchaseValidated')}</option>
           <option value="paid">{t('purchasePaid')}</option>
-        </select>
-        <label class="flex items-center gap-1 text-sm">
-          <span class="text-base-content/80">{t('dateFrom')}</span>
+          </select>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('dateFrom')}</span>
           <input type="date" class="input input-bordered input-sm"
             value={filterDateFrom}
             onInput={(e) => { setFilterDateFrom(e.target.value); setPage(1) }} />
-        </label>
-        <label class="flex items-center gap-1 text-sm">
-          <span class="text-base-content/80">{t('dateTo')}</span>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('dateTo')}</span>
           <input type="date" class="input input-bordered input-sm"
             value={filterDateTo}
             onInput={(e) => { setFilterDateTo(e.target.value); setPage(1) }} />
-        </label>
+        </div>
         <button class="btn btn-sm btn-primary btn-outline" onClick={doSearch}>{t('search')}</button>
       </div>
 

@@ -28,4 +28,5 @@ type PlanFeatures struct {
 	Scale            bool `bson:"scale"             json:"scale"`
 	Facturation      bool `bson:"facturation"       json:"facturation"`
 	RemoteScanner    bool `bson:"remote_scanner"    json:"remote_scanner"`
+	DVR              bool `bson:"dvr"               json:"dvr"`
 }

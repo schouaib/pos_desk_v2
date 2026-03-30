@@ -2,7 +2,10 @@ package facturation
 
 import (
 	"strconv"
+	"time"
 
+	"saas_pos/internal/caisse"
+	"saas_pos/internal/dvr"
 	"saas_pos/internal/middleware"
 	"saas_pos/pkg/response"
 
@@ -114,6 +117,22 @@ func HandleCreateAvoir(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, err.Error())
 	}
+
+	// DVR: fire-and-forget clip extraction for avoir/refund
+	if ch := caisse.GetCameraChannel(claims.TenantID, claims.ID); ch > 0 {
+		dvr.SaveEvent(dvr.ClipRequest{
+			TenantID:      claims.TenantID,
+			EventType:     dvr.EventAvoir,
+			EventRef:      doc.Ref,
+			EventID:       doc.ID.Hex(),
+			CameraChannel: ch,
+			EventTime:     time.Now(),
+			CashierID:     claims.ID,
+			CashierEmail:  claims.Email,
+			Amount:        doc.Total,
+		})
+	}
+
 	return response.Created(c, doc)
 }
 

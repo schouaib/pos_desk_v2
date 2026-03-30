@@ -14,6 +14,22 @@ type VisiblePrices struct {
 	PV3 bool `bson:"pv3" json:"pv3"`
 }
 
+type DVRCameraMapping struct {
+	Name    string `bson:"name"    json:"name"`    // e.g. "Caisse 1"
+	Channel int    `bson:"channel" json:"channel"` // DVR camera channel number
+}
+
+type DVRConfig struct {
+	Enabled       bool               `bson:"enabled"        json:"enabled"`
+	IP            string             `bson:"ip"             json:"ip"`
+	Port          int                `bson:"port"           json:"port"`
+	Username      string             `bson:"username"       json:"username"`
+	Password      string             `bson:"password"       json:"password"`
+	SecondsBefore int                `bson:"seconds_before" json:"seconds_before"` // default 10
+	SecondsAfter  int                `bson:"seconds_after"  json:"seconds_after"`  // default 30
+	Cameras       []DVRCameraMapping `bson:"cameras"        json:"cameras"`
+}
+
 type PosFavGroup struct {
 	Name       string               `bson:"name"        json:"name"`
 	Color      string               `bson:"color"       json:"color"`
@@ -35,7 +51,9 @@ type Tenant struct {
 	NIS              string                `bson:"nis"                json:"nis"`
 	NART             string                `bson:"nart"               json:"nart"`
 	CompteRIB        string                `bson:"compte_rib"         json:"compte_rib"`
-	UseVAT           bool                  `bson:"use_vat"            json:"use_vat"`
+	UseVATPurchase      bool `bson:"use_vat_purchase"       json:"use_vat_purchase"`
+	UseVATSale          bool `bson:"use_vat_sale"           json:"use_vat_sale"`
+	VATSaleFactureOnly  bool `bson:"vat_sale_facture_only"  json:"vat_sale_facture_only"`
 	PosExpiryWarning bool                 `bson:"pos_expiry_warning" json:"pos_expiry_warning"`
 	MaxCashAmount    float64              `bson:"max_cash_amount"    json:"max_cash_amount"`
 	TapRate          float64              `bson:"tap_rate"           json:"tap_rate"`
@@ -45,6 +63,7 @@ type Tenant struct {
 	PosFavorites     []primitive.ObjectID  `bson:"pos_favorites"      json:"pos_favorites"`
 	PosFavGroups     []PosFavGroup         `bson:"pos_fav_groups"     json:"pos_fav_groups"`
 	PosFavColors     map[string]string     `bson:"pos_fav_colors"     json:"pos_fav_colors"`
+	DVR              *DVRConfig            `bson:"dvr,omitempty"      json:"dvr,omitempty"`
 	PlanID           primitive.ObjectID    `bson:"plan_id"            json:"plan_id"`
 	Features         features.PlanFeatures `bson:"features"           json:"features"`
 	MaxUsers         int                   `bson:"max_users"          json:"max_users"`
@@ -72,13 +91,16 @@ type SettingsInput struct {
 	NIS       string `json:"nis"`
 	NART      string `json:"nart"`
 	CompteRIB string `json:"compte_rib"`
-	UseVAT           bool    `json:"use_vat"`
+	UseVATPurchase      bool `json:"use_vat_purchase"`
+	UseVATSale          bool `json:"use_vat_sale"`
+	VATSaleFactureOnly  bool `json:"vat_sale_facture_only"`
 	PosExpiryWarning bool    `json:"pos_expiry_warning"`
 	MaxCashAmount    float64 `json:"max_cash_amount"`
 	TapRate            float64 `json:"tap_rate"`
 	IbsRate            float64 `json:"ibs_rate"`
 	DefaultProductMode string          `json:"default_product_mode"`
 	VisiblePrices      *VisiblePrices  `json:"visible_prices"`
+	DVR                *DVRConfig      `json:"dvr"`
 }
 
 type ListResult struct {

@@ -163,7 +163,9 @@ func Approve(requestID string) (*FolderRequest, error) {
 		NART:             parent.NART,
 		CompteRIB:        parent.CompteRIB,
 		// Tenant config / settings
-		UseVAT:           parent.UseVAT,
+		UseVATPurchase:     parent.UseVATPurchase,
+		UseVATSale:         parent.UseVATSale,
+		VATSaleFactureOnly: parent.VATSaleFactureOnly,
 		PosExpiryWarning: parent.PosExpiryWarning,
 		MaxCashAmount:    parent.MaxCashAmount,
 		TapRate:          parent.TapRate,

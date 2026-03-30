@@ -47,7 +47,7 @@ func round2(v float64) float64 {
 }
 
 // buildLines resolves product info and computes line totals.
-func buildLines(tenantID string, inputs []LineInput) ([]DocLine, error) {
+func buildLines(tenantID string, inputs []LineInput, applyVAT bool) ([]DocLine, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -81,7 +81,11 @@ func buildLines(tenantID string, inputs []LineInput) ([]DocLine, error) {
 		}
 
 		totalHT := round2(li.Qty*li.UnitPrice - li.Discount)
-		vatAmount := round2(totalHT * float64(p.VAT) / 100)
+		vatRate := p.VAT
+		if !applyVAT {
+			vatRate = 0
+		}
+		vatAmount := round2(totalHT * float64(vatRate) / 100)
 		totalTTC := round2(totalHT + vatAmount)
 
 		line := DocLine{
@@ -163,7 +167,17 @@ func Create(tenantID, userID, userEmail string, input CreateInput) (*Document, e
 		return nil, errors.New("client not found")
 	}
 
-	lines, err := buildLines(tenantID, input.Lines)
+	// Check tenant VAT settings — factures always get VAT when use_vat_sale is on
+	applyVAT := false
+	if tid, terr := primitive.ObjectIDFromHex(tenantID); terr == nil {
+		var ts struct {
+			UseVATSale bool `bson:"use_vat_sale"`
+		}
+		database.Col("tenants").FindOne(ctx, bson.M{"_id": tid}).Decode(&ts)
+		applyVAT = ts.UseVATSale
+	}
+
+	lines, err := buildLines(tenantID, input.Lines, applyVAT)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +306,17 @@ func Update(tenantID, id string, input UpdateInput) (*Document, error) {
 		return nil, errors.New("factures and avoirs cannot be edited")
 	}
 
-	lines, err := buildLines(tenantID, input.Lines)
+	// Check tenant VAT settings
+	applyVAT := false
+	if tid, terr := primitive.ObjectIDFromHex(tenantID); terr == nil {
+		var ts struct {
+			UseVATSale bool `bson:"use_vat_sale"`
+		}
+		database.Col("tenants").FindOne(ctx, bson.M{"_id": tid}).Decode(&ts)
+		applyVAT = ts.UseVATSale
+	}
+
+	lines, err := buildLines(tenantID, input.Lines, applyVAT)
 	if err != nil {
 		return nil, err
 	}
