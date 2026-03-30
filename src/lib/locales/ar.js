@@ -304,6 +304,7 @@ export default {
   movementReturn: 'مرتجع',
   movementAdjust: 'تعديل',
   movementTransfer: 'تحويل',
+  realQty: 'الكمية الحقيقية',
   noMovements: 'لا توجد حركات',
   results: 'نتيجة',
   vat: 'ض.ق.م %',

@@ -12,6 +12,7 @@ import (
 	"saas_pos/internal/client"
 	"saas_pos/internal/counter"
 	"saas_pos/internal/database"
+	"saas_pos/internal/expense"
 	"saas_pos/internal/retrait"
 	"saas_pos/internal/variant"
 
@@ -663,16 +664,25 @@ func UserSummary(tenantID string, from, to time.Time, userID, caisseID string) (
 		}
 	}
 
+	// Fetch total expenses for the period (expenses are per-tenant, not per-user)
+	expensesTotal, _ := expense.SumForPeriod(tenantID, from, to)
+
 	// Compute net, ecart and grand totals
 	var users []UserSummaryLine
 	var grandSales, grandReturns, grandRetraits, grandOpening, grandClosing, grandEcart float64
+	numUsers := len(userMap)
+	expensePerUser := 0.0
+	if numUsers > 0 {
+		expensePerUser = math.Round(expensesTotal/float64(numUsers)*100) / 100
+	}
 	for _, u := range userMap {
+		u.ExpensesTotal = expensePerUser
 		u.Net = math.Round((u.SalesTotal-u.ReturnsTotal-u.RetraitsTotal)*100) / 100
 		// ecart = closing_amount - expected
-		// Expected cash in drawer = opening + cash_sales + timbre - returns - retraits
+		// Expected cash in drawer = opening + cash_sales + timbre - returns - retraits - expenses
 		// Only cash sales go into the caisse; cheque/virement don't affect the drawer
 		// Timbre is collected as cash, so it adds to the expected drawer amount
-		expected := u.OpeningAmount + u.CashSalesTotal + u.TimbreTotal - u.ReturnsTotal - u.RetraitsTotal
+		expected := u.OpeningAmount + u.CashSalesTotal + u.TimbreTotal - u.ReturnsTotal - u.RetraitsTotal - expensePerUser
 		u.Ecart = math.Round((u.ClosingAmount-expected)*100) / 100
 		grandSales += u.SalesTotal
 		grandReturns += u.ReturnsTotal
@@ -691,6 +701,7 @@ func UserSummary(tenantID string, from, to time.Time, userID, caisseID string) (
 		GrandSales:    math.Round(grandSales*100) / 100,
 		GrandReturns:  math.Round(grandReturns*100) / 100,
 		GrandRetraits: math.Round(grandRetraits*100) / 100,
+		GrandExpenses: math.Round(expensesTotal*100) / 100,
 		GrandOpening:  math.Round(grandOpening*100) / 100,
 		GrandClosing:  math.Round(grandClosing*100) / 100,
 		GrandEcart:    math.Round(grandEcart*100) / 100,

@@ -314,6 +314,7 @@ export default {
   movementReturn: 'Return',
   movementAdjust: 'Adjustment',
   movementTransfer: 'Transfer',
+  realQty: 'Real Qty',
   noMovements: 'No movements yet',
   results: 'results',
   vat: 'VAT %',

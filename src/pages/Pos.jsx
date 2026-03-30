@@ -958,7 +958,7 @@ export default function Pos({ path }) {
         qty,
         unitPrice,
         discount: 0,
-        vat: product.vat || 0,
+        vat: store.vat_sale_facture_only ? 0 : (product.vat || 0),
         pv1: vp1 || 0,
         pv2: vp2 || 0,
         pv3: vp3 || 0,
@@ -1689,6 +1689,7 @@ export default function Pos({ path }) {
                   sales: u?.cash_sales_total || 0,
                   returns: u?.returns_total || 0,
                   retraits: u?.retraits_total || 0,
+                  expenses: u?.expenses_total || 0,
                   timbre: u?.timbre_total || 0,
                 })
               }).catch(() => {})
@@ -2644,8 +2645,9 @@ export default function Pos({ path }) {
               const sales = caisseStats?.sales || 0       // cash sales only (not credit/cheque/virement)
               const returns = caisseStats?.returns || 0  // absolute value (positive)
               const retraits = caisseStats?.retraits || 0
+              const expenses = caisseStats?.expenses || 0
               const timbre = caisseStats?.timbre || 0
-              const expected = round2(opening + sales - returns + timbre - retraits)
+              const expected = round2(opening + sales - returns + timbre - retraits - expenses)
               const closing = parseFloat(caisseCloseAmount) || 0
               const ecart = round2(closing - expected)
               return (<>
@@ -2671,6 +2673,10 @@ export default function Pos({ path }) {
               <div class="flex justify-between">
                 <span class="text-base-content/80">{t('summRetraitsTotal')}</span>
                 <span class="font-semibold text-warning">-{fmt(retraits)}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/80">{t('expenses')}</span>
+                <span class="font-semibold text-warning">-{fmt(expenses)}</span>
               </div>
               <div class="divider my-1"></div>
               <div class="flex justify-between font-bold">

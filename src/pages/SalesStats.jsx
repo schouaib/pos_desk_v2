@@ -47,7 +47,7 @@ export default function SalesStats({ path }) {
   const isDirty = `${draftFrom}T${draftFromTime}` !== filter.from || `${draftTo}T${draftToTime}` !== filter.to
   const marginPct = data?.revenue_ht > 0 ? ((data.gross_earning / data.revenue_ht) * 100).toFixed(1) : '0.0'
   const finalEarning = (data?.net_earning ?? 0) - expenseSum
-  const cashInRegister = caisseOpening + (data?.cash_payment_ttc ?? 0) + (data?.total_timbre ?? 0) + paymentsCollected - retraitSum
+  const cashInRegister = caisseOpening + (data?.cash_payment_ttc ?? 0) + (data?.total_timbre ?? 0) + paymentsCollected - retraitSum - expenseSum
   const ecart = caisseClosing != null ? caisseClosing - cashInRegister : 0
 
   const Loader = () => <div class="h-5 w-16 bg-base-200 rounded animate-pulse" />
@@ -176,6 +176,10 @@ export default function SalesStats({ path }) {
           <div class="flex items-center justify-between px-4 py-2.5">
             <span class="text-sm text-base-content/80">{t('paymentsCollected')}</span>
             <span class="text-sm font-bold tabular-nums text-success">{loading ? <Loader /> : `+${fmt(paymentsCollected)}`}</span>
+          </div>
+          <div class="flex items-center justify-between px-4 py-2.5">
+            <span class="text-sm text-base-content/80">{t('expenses')}</span>
+            <span class="text-sm font-bold tabular-nums text-error">{loading ? <Loader /> : `-${fmt(expenseSum)}`}</span>
           </div>
           <div class="flex items-center justify-between px-4 py-2.5">
             <span class="text-sm text-base-content/80">{t('retraitCost')}</span>

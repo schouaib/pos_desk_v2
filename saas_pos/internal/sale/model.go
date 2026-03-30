@@ -95,6 +95,7 @@ type UserSummaryLine struct {
 	ReturnsCount      int64   `json:"returns_count"`
 	ReturnsTotal      float64 `json:"returns_total"`       // sum of negative sales (TTC), stored as positive
 	RetraitsTotal     float64 `json:"retraits_total"`      // sum of cash withdrawals
+	ExpensesTotal     float64 `json:"expenses_total"`      // sum of expenses (cash out of drawer)
 	TimbreTotal       float64 `json:"timbre_total"`        // sum of timbre (stamp duty) collected
 	OpeningAmount     float64 `json:"opening_amount"`      // caisse opening amount
 	ClosingAmount     float64 `json:"closing_amount"`      // caisse closing amount (actual counted)
@@ -108,6 +109,7 @@ type UserSummaryResult struct {
 	GrandSales     float64           `json:"grand_sales"`
 	GrandReturns   float64           `json:"grand_returns"`
 	GrandRetraits  float64           `json:"grand_retraits"`
+	GrandExpenses  float64           `json:"grand_expenses"`
 	GrandOpening   float64           `json:"grand_opening"`
 	GrandClosing   float64           `json:"grand_closing"`
 	GrandEcart     float64           `json:"grand_ecart"`

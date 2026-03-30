@@ -153,6 +153,7 @@ func Create(tenantID string, input CreateInput) (*Product, error) {
 			"product_name":     p.Name,
 			"qty_before":       0,
 			"qty_after":        p.QtyAvailable,
+			"prix_achat":       p.PrixAchat,
 			"reason":           "stock initial",
 			"created_by":       "",
 			"created_by_email": "",
@@ -695,9 +696,21 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 	})
 
 	total := int64(len(allItems))
-	var sumQty float64
+	var sumQty, sumPurchase, sumSale, sumLoss, sumReturn float64
 	for _, m := range allItems {
 		sumQty += m.Qty
+		switch m.Type {
+		case "purchase":
+			sumPurchase += m.Qty
+		case "sale":
+			sumSale += m.Qty
+		case "loss":
+			sumLoss += m.Qty
+		case "sale_return":
+			sumReturn += m.Qty
+		case "adjustment":
+			// adjustments (including stock initial) are part of sumQty but no dedicated sum
+		}
 	}
 
 	start := (page - 1) * limit
@@ -713,7 +726,18 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 	if pages == 0 {
 		pages = 1
 	}
-	return &MovementsResult{Items: allItems[start:end], Total: total, SumQty: sumQty, Page: page, Limit: limit, Pages: pages}, nil
+	return &MovementsResult{
+		Items:       allItems[start:end],
+		Total:       total,
+		SumQty:      sumQty,
+		SumPurchase: sumPurchase,
+		SumSale:     sumSale,
+		SumLoss:     sumLoss,
+		SumReturn:   sumReturn,
+		Page:        page,
+		Limit:       limit,
+		Pages:       pages,
+	}, nil
 }
 
 // LowStockResult holds paginated low-stock products.

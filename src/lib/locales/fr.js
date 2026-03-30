@@ -304,6 +304,7 @@ export default {
   movementReturn: 'Retour',
   movementAdjust: 'Ajustement',
   movementTransfer: 'Transfert',
+  realQty: 'Qté réelle',
   noMovements: 'Aucun mouvement',
   results: 'résultats',
   vat: 'TVA %',

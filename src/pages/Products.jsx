@@ -96,6 +96,7 @@ export default function Products({ path }) {
   // Stock movements
   const [movTarget, setMovTarget] = useState(null)
   const [movAllItems, setMovAllItems] = useState([])
+  const [movSums, setMovSums] = useState({ sum_qty: 0, sum_purchase: 0, sum_sale: 0, sum_loss: 0, sum_return: 0 })
   const [movPage, setMovPage] = useState(1)
   const MOV_PER_PAGE = 10
   const movPages = Math.max(1, Math.ceil(movAllItems.length / MOV_PER_PAGE))
@@ -352,6 +353,7 @@ export default function Products({ path }) {
     try {
       const data = await api.listProductMovements(p.id, { limit: 10000, date_from: df, date_to: dt })
       setMovAllItems(data.items || [])
+      setMovSums({ sum_qty: data.sum_qty || 0, sum_purchase: data.sum_purchase || 0, sum_sale: data.sum_sale || 0, sum_loss: data.sum_loss || 0, sum_return: data.sum_return || 0 })
     } catch {} finally { setMovLoading(false) }
   }
 
@@ -364,6 +366,7 @@ export default function Products({ path }) {
       if (movDateTo) params.date_to = movDateTo
       const data = await api.listProductMovements(movTarget.id, params)
       setMovAllItems(data.items || [])
+      setMovSums({ sum_qty: data.sum_qty || 0, sum_purchase: data.sum_purchase || 0, sum_sale: data.sum_sale || 0, sum_loss: data.sum_loss || 0, sum_return: data.sum_return || 0 })
     } catch {} finally { setMovLoading(false) }
   }
 
@@ -2085,6 +2088,32 @@ export default function Products({ path }) {
               </button>
             </div>
           </div>
+
+          {/* Summary stats */}
+          {!movLoading && movAllItems.length > 0 && (
+            <div class="grid grid-cols-5 gap-2 px-6 pt-4 pb-2 shrink-0">
+              <div class="bg-info/10 rounded-lg px-3 py-2 text-center">
+                <div class="text-xs text-info font-medium">{t('movementPurchase')}</div>
+                <div class="text-lg font-bold text-info">+{movSums.sum_purchase}</div>
+              </div>
+              <div class="bg-success/10 rounded-lg px-3 py-2 text-center">
+                <div class="text-xs text-success font-medium">{t('movementSale')}</div>
+                <div class="text-lg font-bold text-success">{movSums.sum_sale}</div>
+              </div>
+              <div class="bg-error/10 rounded-lg px-3 py-2 text-center">
+                <div class="text-xs text-error font-medium">{t('loss')}</div>
+                <div class="text-lg font-bold text-error">{movSums.sum_loss}</div>
+              </div>
+              <div class="bg-warning/10 rounded-lg px-3 py-2 text-center">
+                <div class="text-xs text-warning font-medium">{t('movementReturn')}</div>
+                <div class="text-lg font-bold text-warning">+{movSums.sum_return}</div>
+              </div>
+              <div class="bg-primary/10 rounded-lg px-3 py-2 text-center">
+                <div class="text-xs text-primary font-medium">{t('realQty')}</div>
+                <div class="text-lg font-bold text-primary">{movSums.sum_qty}</div>
+              </div>
+            </div>
+          )}
 
           {/* Body */}
           <div class="flex-1 overflow-y-auto px-6 py-4">
