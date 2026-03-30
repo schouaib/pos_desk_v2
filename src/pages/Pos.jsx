@@ -544,6 +544,7 @@ export default function Pos({ path }) {
   const [caisseOpenAmount, setCaisseOpenAmount] = useState('')
   const [caisseOpenNotes, setCaisseOpenNotes] = useState('')
   const [caisseOpenLoading, setCaisseOpenLoading] = useState(false)
+  const [deviceCamera, setDeviceCamera] = useState(0)
   const [caisseCloseOpen, setCaisseCloseOpen] = useState(false)
   const [caisseCloseAmount, setCaisseCloseAmount] = useState('')
   const [caisseCloseNotes, setCaisseCloseNotes] = useState('')
@@ -717,9 +718,11 @@ export default function Pos({ path }) {
   async function handleOpenCaisse() {
     setCaisseOpenLoading(true)
     try {
+      console.log('[DVR] Opening caisse with camera_channel:', deviceCamera)
       const session = await api.openCaisse({
         opening_amount: parseFloat(caisseOpenAmount) || 0,
         notes: caisseOpenNotes,
+        camera_channel: deviceCamera,
       })
       setCaisseSession(session)
       setCaisseOpenAmount('')
@@ -800,6 +803,16 @@ export default function Pos({ path }) {
     // Load categories for quick-access tabs
     api.listCategories().then((cats) => { if (!cancelled) setCategories(cats) }).catch(() => {})
     tryAutoConnect().then((conn) => { if (!cancelled && conn) setPrinterConnected(true) }).catch(() => {})
+    // Load device camera channel from local store
+    if (window.__TAURI_INTERNALS__) {
+      import('@tauri-apps/plugin-store').then(({ LazyStore }) => {
+        const s = new LazyStore('printer.json')
+        s.get('device_camera').then(v => {
+          console.log('[DVR] device_camera from store:', v)
+          if (!cancelled && v != null && v > 0) setDeviceCamera(v)
+        })
+      }).catch(() => {})
+    }
     return () => {
       cancelled = true
       clearTimeout(focusTimerRef.current)
@@ -1310,6 +1323,7 @@ export default function Pos({ path }) {
         client_id: selectedClient?.id ?? '',
         sale_type: saleType,
         caisse_id: caisseSession?.id || '',
+        camera_channel: deviceCamera,
       })
       // Save lines for repeat-last-sale
       lastSaleItemsRef.current = [...lines]
@@ -1373,6 +1387,7 @@ export default function Pos({ path }) {
           sale_type: isCash ? 'cash' : 'credit',
           caisse_id: caisseSession?.id || '',
           has_facture: true,
+          camera_channel: deviceCamera,
         })
         const sale = result.data ?? result
         // Create facture linked to the sale
@@ -1598,7 +1613,7 @@ export default function Pos({ path }) {
                 autoFocus
               />
             </div>
-            <div class="form-control mb-4">
+            <div class="form-control mb-3">
               <label class="label"><span class="label-text">{t('caisseNotes')}</span></label>
               <input
                 type="text"
@@ -2419,15 +2434,15 @@ export default function Pos({ path }) {
                   <span class="loading loading-spinner loading-sm text-primary" />
                 </div>
               ) : catalogResults.length > 0 ? (
-                <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2 flex-1 min-h-0 overflow-y-auto">
+                <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2 overflow-y-auto auto-rows-min content-start">
                   {catalogResults.map(p => (
                     <button
                       key={p.id}
-                      class="btn btn-sm btn-outline h-auto py-2.5 flex flex-col items-center gap-0.5 min-h-0"
+                      class="btn btn-sm btn-outline h-auto min-h-[4.5rem] py-3 flex flex-col items-center justify-center gap-1 rounded-xl shadow-sm transition-all duration-150 hover:scale-[1.03] hover:shadow-md active:scale-[0.98]"
                       onClick={() => { openVariantPicker(p); setCatalogOpen(false); setCatalogSearch('') }}
                     >
-                      <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
-                      <span class="text-xs font-mono font-bold text-primary">
+                      <span class="text-xs font-medium leading-tight w-full text-center line-clamp-2">{p.name}</span>
+                      <span class="text-[11px] font-mono font-bold text-primary">
                         {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                       </span>
                     </button>
@@ -2471,18 +2486,18 @@ export default function Pos({ path }) {
 
                 {/* Favorites grid */}
                 {activeCat === null && favorites.length > 0 && (
-                  <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2 flex-1 min-h-0 overflow-y-auto">
+                  <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2 overflow-y-auto auto-rows-min content-start">
                     {favorites.map(p => {
                       const fc = favColors[p.id]
                       return (
                         <button
                           key={p.id}
-                          class={`btn btn-sm h-auto py-2.5 flex flex-col items-center gap-0.5 min-h-0 ${fc ? '' : 'btn-outline'}`}
+                          class={`btn btn-sm h-auto min-h-[4.5rem] py-3 flex flex-col items-center justify-center gap-1 rounded-xl shadow-sm transition-all duration-150 hover:scale-[1.03] hover:shadow-md active:scale-[0.98] ${fc ? 'border-0' : 'btn-outline'}`}
                           style={fc ? { backgroundColor: fc, borderColor: fc, color: '#fff' } : {}}
                           onClick={() => { openVariantPicker(p); setCatalogOpen(false) }}
                         >
-                          <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
-                          <span class={`text-xs font-mono font-bold ${fc ? 'text-white/80' : 'text-primary'}`}>
+                          <span class="text-xs font-medium leading-tight w-full text-center line-clamp-2">{p.name}</span>
+                          <span class={`text-[11px] font-mono font-bold ${fc ? 'text-white/80' : 'text-primary'}`}>
                             {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                           </span>
                         </button>
@@ -2501,18 +2516,18 @@ export default function Pos({ path }) {
                   if (!group) return null
                   const gc = group.color
                   return group.products.length > 0 ? (
-                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2 flex-1 min-h-0 overflow-y-auto">
+                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2 overflow-y-auto auto-rows-min content-start">
                       {group.products.map(p => {
                         const pc = favColors[p.id] || gc
                         return (
                           <button
                             key={p.id}
-                            class={`btn btn-sm h-auto py-2.5 flex flex-col items-center gap-0.5 min-h-0 ${pc ? '' : 'btn-outline'}`}
+                            class={`btn btn-sm h-auto min-h-[4.5rem] py-3 flex flex-col items-center justify-center gap-1 rounded-xl shadow-sm transition-all duration-150 hover:scale-[1.03] hover:shadow-md active:scale-[0.98] ${pc ? 'border-0' : 'btn-outline'}`}
                             style={pc ? { backgroundColor: pc, borderColor: pc, color: '#fff' } : {}}
                             onClick={() => { openVariantPicker(p); setCatalogOpen(false) }}
                           >
-                            <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
-                            <span class={`text-xs font-mono font-bold ${pc ? 'text-white/80' : 'text-primary'}`}>
+                            <span class="text-xs font-medium leading-tight w-full text-center line-clamp-2">{p.name}</span>
+                            <span class={`text-[11px] font-mono font-bold ${pc ? 'text-white/80' : 'text-primary'}`}>
                               {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                             </span>
                           </button>
@@ -2531,15 +2546,15 @@ export default function Pos({ path }) {
                       <span class="loading loading-spinner loading-sm text-primary" />
                     </div>
                   ) : catProducts.length > 0 ? (
-                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2 flex-1 min-h-0 overflow-y-auto">
+                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2 overflow-y-auto auto-rows-min content-start">
                       {catProducts.map(p => (
                         <button
                           key={p.id}
-                          class="btn btn-sm btn-outline h-auto py-2.5 flex flex-col items-center gap-0.5 min-h-0"
+                          class="btn btn-sm btn-outline h-auto min-h-[4.5rem] py-3 flex flex-col items-center justify-center gap-1 rounded-xl shadow-sm transition-all duration-150 hover:scale-[1.03] hover:shadow-md active:scale-[0.98]"
                           onClick={() => { openVariantPicker(p); setCatalogOpen(false) }}
                         >
-                          <span class="text-xs font-medium leading-tight w-full text-center line-clamp-3">{p.name}</span>
-                          <span class="text-xs font-mono font-bold text-primary">
+                          <span class="text-xs font-medium leading-tight w-full text-center line-clamp-2">{p.name}</span>
+                          <span class="text-[11px] font-mono font-bold text-primary">
                             {fmt((store.default_sale_price === 2 ? p.prix_vente_2 : store.default_sale_price === 3 ? p.prix_vente_3 : p.prix_vente_1) || 0)}
                           </span>
                         </button>
