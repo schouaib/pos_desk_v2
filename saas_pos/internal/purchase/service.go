@@ -1341,14 +1341,16 @@ func Stats(tenantID string, from, to time.Time) (*PurchaseStats, error) {
 		return nil, errors.New("invalid tenant_id")
 	}
 
-	filter := bson.M{
-		"tenant_id":  tid,
-		"created_at": bson.M{"$gte": from, "$lte": to},
-	}
+	dateFilter := bson.M{"$gte": from, "$lte": to}
 
-	// Aggregate by status
+	// Aggregate by status (exclude returns)
+	purchaseFilter := bson.M{
+		"tenant_id":  tid,
+		"created_at": dateFilter,
+		"ref":        bson.M{"$not": bson.M{"$regex": "^RET-"}},
+	}
 	pipeline := mongo.Pipeline{
-		{{Key: "$match", Value: filter}},
+		{{Key: "$match", Value: purchaseFilter}},
 		{{Key: "$group", Value: bson.M{
 			"_id":            "$status",
 			"count":          bson.M{"$sum": 1},
@@ -1426,9 +1428,9 @@ func Stats(tenantID string, from, to time.Time) (*PurchaseStats, error) {
 		}
 	}
 
-	// Top suppliers
+	// Top suppliers (exclude returns)
 	topPipeline := mongo.Pipeline{
-		{{Key: "$match", Value: filter}},
+		{{Key: "$match", Value: purchaseFilter}},
 		{{Key: "$group", Value: bson.M{
 			"_id":           "$supplier_id",
 			"supplier_name": bson.M{"$first": "$supplier_name"},
