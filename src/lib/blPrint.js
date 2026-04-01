@@ -31,10 +31,8 @@ function esc(s) {
 }
 
 function fmt(n, lang) {
-  if (lang === 'ar') {
-    return Number(n ?? 0).toLocaleString('ar-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-  return Number(n ?? 0).toFixed(2)
+  const locale = lang === 'ar' ? 'ar-DZ' : 'fr-DZ'
+  return Number(n ?? 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 

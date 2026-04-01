@@ -4,14 +4,15 @@ import { Modal, openModal, closeModal } from '../components/Modal'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 import { hasPerm, authUser } from '../lib/auth'
+import { Pagination } from '../components/Pagination'
 
-const emptyForm = { name: '', phone: '', address: '', balance: 0 }
+const emptyForm = { name: '', phone: '', email: '', address: '', rc: '', nif: '', nis: '', nart: '', compte_rib: '', balance: 0 }
 const PAGE_SIZE = 10
 
 function today() { return new Date().toISOString().slice(0, 10) }
 
 export default function Suppliers({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const canAdd    = hasPerm('suppliers', 'add')
   const canEdit   = hasPerm('suppliers', 'edit')
   const canDelete = hasPerm('suppliers', 'delete')
@@ -53,6 +54,7 @@ export default function Suppliers({ path }) {
   const [payNote, setPayNote]             = useState('')
   const [payError, setPayError]           = useState('')
   const [payLoading, setPayLoading]       = useState(false)
+  const [reverseTarget, setReverseTarget] = useState(null)
 
   // Archived
   const [archivedItems, setArchivedItems] = useState([])
@@ -64,6 +66,40 @@ export default function Suppliers({ path }) {
   const [balanceError, setBalanceError]   = useState('')
 
   const [deleteTarget, setDeleteTarget] = useState(null)
+
+  const MODAL_IDS = ['supplier-modal', 'purchases-modal', 'stmt-modal', 'balance-modal', 'delete-modal']
+
+  function closeAllDialogs() {
+    MODAL_IDS.forEach(id => closeModal(id))
+    setEditing(null)
+    setPurTarget(null)
+    setStmtTarget(null)
+    setBalanceTarget(null)
+    setDeleteTarget(null)
+    setError('')
+    setBalanceError('')
+    setPayError('')
+  }
+
+  // Clear target state when a dialog is closed via Escape
+  useEffect(() => {
+    function handleClose(e) {
+      const id = e.target?.id
+      if (id === 'supplier-modal')   setEditing(null)
+      if (id === 'purchases-modal')  setPurTarget(null)
+      if (id === 'stmt-modal')       setStmtTarget(null)
+      if (id === 'balance-modal')    setBalanceTarget(null)
+      if (id === 'delete-modal')     setDeleteTarget(null)
+    }
+    MODAL_IDS.forEach(id => {
+      document.getElementById(id)?.addEventListener('close', handleClose)
+    })
+    return () => {
+      MODAL_IDS.forEach(id => {
+        document.getElementById(id)?.removeEventListener('close', handleClose)
+      })
+    }
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -83,13 +119,15 @@ export default function Suppliers({ path }) {
   function doSearch() { setPage(1); setSearchQ(filterQ) }
 
   function openCreate() {
+    closeAllDialogs()
     setEditing(null); setForm(emptyForm); setError('')
     openModal('supplier-modal')
   }
 
   function openEdit(s) {
+    closeAllDialogs()
     setEditing(s)
-    setForm({ name: s.name, phone: s.phone || '', address: s.address || '', balance: s.balance })
+    setForm({ name: s.name, phone: s.phone || '', email: s.email || '', address: s.address || '', rc: s.rc || '', nif: s.nif || '', nis: s.nis || '', nart: s.nart || '', compte_rib: s.compte_rib || '', balance: s.balance })
     setError('')
     openModal('supplier-modal')
   }
@@ -106,6 +144,7 @@ export default function Suppliers({ path }) {
   }
 
   async function openPurchases(s) {
+    closeAllDialogs()
     const t0 = today()
     setPurTarget(s); setPurPage(1); setExpandedPur(null); setPurLines({})
     setPurDraftFrom(t0); setPurDraftTo(t0); setPurFrom(t0); setPurTo(t0)
@@ -167,6 +206,7 @@ export default function Suppliers({ path }) {
   }
 
   async function openStatement(s) {
+    closeAllDialogs()
     setStmtTarget(s); setStmtPage(1)
     setStmtDraftFrom(''); setStmtDraftTo(''); setStmtFrom(''); setStmtTo('')
     setPayAmount(''); setPayNote(''); setPayError('')
@@ -193,17 +233,18 @@ export default function Suppliers({ path }) {
   }
 
   function openBalance(s) {
+    closeAllDialogs()
     setBalanceTarget(s); setBalanceAmount(0); setBalanceError('')
     openModal('balance-modal')
   }
 
-  function openDelete(s) { setDeleteTarget(s); openModal('delete-modal') }
+  function openDelete(s) { closeAllDialogs(); setDeleteTarget(s); openModal('delete-modal') }
 
   async function handleSave() {
     setError('')
     try {
       if (editing) {
-        await api.updateSupplier(editing.id, { name: form.name, phone: form.phone, address: form.address })
+        await api.updateSupplier(editing.id, { name: form.name, phone: form.phone, email: form.email, address: form.address, rc: form.rc, nif: form.nif, nis: form.nis, nart: form.nart, compte_rib: form.compte_rib })
       } else {
         await api.createSupplier(form)
       }
@@ -224,6 +265,22 @@ export default function Suppliers({ path }) {
       await loadPayments(stmtTarget.id, stmtFrom, stmtTo, 1)
       load()
     } catch (e) { setPayError(e.message) } finally { setPayLoading(false) }
+  }
+
+  function handleReverse(payment) {
+    setReverseTarget(payment)
+    openModal('reverse-confirm-modal')
+  }
+
+  async function confirmReverse() {
+    if (!reverseTarget) return
+    try {
+      const updated = await api.reverseSupplierPayment(stmtTarget.id, reverseTarget.id)
+      setStmtTarget(updated)
+      await loadPayments(stmtTarget.id, stmtFrom, stmtTo, stmtPage)
+      load()
+    } catch (e) { setPayError(e.message) }
+    finally { setReverseTarget(null); closeModal('reverse-confirm-modal') }
   }
 
   async function handleBalance() {
@@ -310,8 +367,8 @@ export default function Suppliers({ path }) {
         <td class="mono ref">${p.ref || '—'}</td>
         <td>${date}</td>
         <td><span class="badge ${statusBadge}">${statusLabel}</span></td>
-        <td class="mono amt">${p.total.toFixed(2)}</td>
-        <td class="mono amt green">${p.paid_amount.toFixed(2)}</td>
+        <td class="mono amt">${fmt(p.total)}</td>
+        <td class="mono amt green">${fmt(p.paid_amount)}</td>
         <td class="mono amt ${p.status !== 'paid' ? 'red' : ''}">${remaining}</td>
       </tr>`
       if (!linesForPrint.has(p.id)) return mainRow
@@ -320,9 +377,9 @@ export default function Suppliers({ path }) {
       const lineRows = lines.map(l => `<tr class="lines-row">
         <td class="lines-indent" colspan="2"><span class="lines-product">${l.product_name || ''}</span></td>
         <td></td>
-        <td class="mono amt lines-dim">${l.qty} × ${(l.prix_achat || 0).toFixed(2)}</td>
+        <td class="mono amt lines-dim">${l.qty} × ${fmt((l.prix_achat || 0))}</td>
         <td></td>
-        <td class="mono amt lines-dim">${(l.qty * (l.prix_achat || 0)).toFixed(2)}</td>
+        <td class="mono amt lines-dim">${fmt((l.qty * (l.prix_achat || 0)))}</td>
       </tr>`).join('')
       return mainRow + lineRows
     }).join('')
@@ -398,13 +455,13 @@ export default function Suppliers({ path }) {
     </div>
     <div class="info-card">
       <h3>${t('supplierBalance')}</h3>
-      <div class="info-row"><span class="info-label">${t('supplierBalance')}</span><span class="info-value mono" style="color:${supplier.balance > 0 ? '#dc2626' : '#16a34a'}">${supplier.balance.toFixed(2)}</span></div>
+      <div class="info-row"><span class="info-label">${t('supplierBalance')}</span><span class="info-value mono" style="color:${supplier.balance > 0 ? '#dc2626' : '#16a34a'}">${fmt(supplier.balance)}</span></div>
     </div>
   </div>
   <div class="summary">
-    <div class="summary-item"><div class="s-label">${t('purchaseTotal')}</div><div class="s-val">${totalAmount.toFixed(2)}</div></div>
-    <div class="summary-item"><div class="s-label">${t('purchasePaid2')}</div><div class="s-val" style="color:#16a34a">${totalPaid.toFixed(2)}</div></div>
-    <div class="summary-item"><div class="s-label">${t('purchaseRemaining')}</div><div class="s-val" style="color:${totalRem > 0 ? '#dc2626' : '#16a34a'}">${totalRem.toFixed(2)}</div></div>
+    <div class="summary-item"><div class="s-label">${t('purchaseTotal')}</div><div class="s-val">${fmt(totalAmount)}</div></div>
+    <div class="summary-item"><div class="s-label">${t('purchasePaid2')}</div><div class="s-val" style="color:#16a34a">${fmt(totalPaid)}</div></div>
+    <div class="summary-item"><div class="s-label">${t('purchaseRemaining')}</div><div class="s-val" style="color:${totalRem > 0 ? '#dc2626' : '#16a34a'}">${fmt(totalRem)}</div></div>
   </div>
   <p class="section-title">${t('purchasesPage')} (${allItems.length})</p>
   <table>
@@ -415,9 +472,9 @@ export default function Suppliers({ path }) {
     <tbody>${tableRows || `<tr><td colspan="6" style="text-align:center;padding:20px;color:#9ca3af">${t('noPurchases')}</td></tr>`}</tbody>
     <tfoot><tr>
       <td colspan="3" style="text-align:right;font-size:10px;color:#6b7280">${t('showing')} ${allItems.length}</td>
-      <td style="text-align:right">${totalAmount.toFixed(2)}</td>
-      <td style="text-align:right;color:#16a34a">${totalPaid.toFixed(2)}</td>
-      <td style="text-align:right;color:${totalRem > 0 ? '#dc2626' : '#16a34a'}">${totalRem.toFixed(2)}</td>
+      <td style="text-align:right">${fmt(totalAmount)}</td>
+      <td style="text-align:right;color:#16a34a">${fmt(totalPaid)}</td>
+      <td style="text-align:right;color:${totalRem > 0 ? '#dc2626' : '#16a34a'}">${fmt(totalRem)}</td>
     </tr></tfoot>
   </table>
   <div class="footer">
@@ -457,7 +514,7 @@ export default function Suppliers({ path }) {
       const rowClass = i % 2 === 0 ? '' : 'alt'
       return `<tr class="${rowClass}">
         <td>${date}</td>
-        <td class="mono amt green">${p.amount.toFixed(2)}</td>
+        <td class="mono amt green">${fmt(p.amount)}</td>
         <td>${p.note || '—'}</td>
         <td>${p.created_by}</td>
       </tr>`
@@ -518,11 +575,11 @@ export default function Suppliers({ path }) {
     </div>
     <div class="info-card">
       <h3>${t('supplierBalance')}</h3>
-      <div class="info-row"><span class="info-label">${t('supplierBalance')}</span><span class="info-value mono" style="color:${supplier.balance > 0 ? '#dc2626' : '#16a34a'}">${supplier.balance.toFixed(2)}</span></div>
+      <div class="info-row"><span class="info-label">${t('supplierBalance')}</span><span class="info-value mono" style="color:${supplier.balance > 0 ? '#dc2626' : '#16a34a'}">${fmt(supplier.balance)}</span></div>
     </div>
   </div>
   <div class="summary">
-    <div class="summary-item"><div class="s-label">${t('paymentsCollected')}</div><div class="s-val">${totalPaid.toFixed(2)}</div></div>
+    <div class="summary-item"><div class="s-label">${t('paymentsCollected')}</div><div class="s-val">${fmt(totalPaid)}</div></div>
   </div>
   <p class="section-title">${t('paymentHistory')} (${allItems.length})</p>
   <table>
@@ -533,7 +590,7 @@ export default function Suppliers({ path }) {
     <tbody>${tableRows || `<tr><td colspan="4" style="text-align:center;padding:20px;color:#9ca3af">${t('noPayments')}</td></tr>`}</tbody>
     <tfoot><tr>
       <td style="text-align:right;font-size:10px;color:#6b7280" colspan="1">${t('showing')} ${allItems.length}</td>
-      <td style="text-align:right;color:#16a34a">${totalPaid.toFixed(2)}</td>
+      <td style="text-align:right;color:#16a34a">${fmt(totalPaid)}</td>
       <td colspan="2"></td>
     </tr></tfoot>
   </table>
@@ -605,7 +662,7 @@ export default function Suppliers({ path }) {
                 <td class="px-3 py-2.5 text-sm">{s.phone || '—'}</td>
                 <td class="px-3 py-2.5 text-sm">{s.address || '—'}</td>
                 <td class={`px-3 py-2.5 text-sm text-end font-mono font-semibold ${s.balance > 0 ? 'text-error' : 'text-success'}`}>
-                  {s.balance.toFixed(2)}
+                  {fmt(s.balance)}
                 </td>
                 {canWrite && (
                   <td class="px-3 py-2.5 text-end">
@@ -661,16 +718,8 @@ export default function Suppliers({ path }) {
           </tbody>
         </table>
       </div>
-      {pages > 1 && (
-        <div class="flex items-center justify-between px-4 py-3 border-t border-base-200 bg-base-50">
-          <span class="text-xs text-base-content/70">{page} / {pages}</span>
-          <div class="join">
-            <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
-            <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>›</button>
-          </div>
-        </div>
-      )}
       </div>
+      <Pagination page={page} pages={pages} total={result.total} limit={10} onPageChange={setPage} />
 
       {/* ── Purchases Modal ── */}
       <Modal id="purchases-modal" size="xl" title={`${t('purchasesPage')} — ${purTarget?.name || ''}`}>
@@ -746,8 +795,8 @@ export default function Suppliers({ path }) {
                       </span>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                      {!isPaid && <span class="text-xs font-mono text-error/80">{t('purchaseRemaining')}: {remaining.toFixed(2)}</span>}
-                      <span class="font-mono text-sm font-semibold">{p.total.toFixed(2)}</span>
+                      {!isPaid && <span class="text-xs font-mono text-error/80">{t('purchaseRemaining')}: {fmt(remaining)}</span>}
+                      <span class="font-mono text-sm font-semibold">{fmt(p.total)}</span>
                       <svg xmlns="http://www.w3.org/2000/svg" class={`w-3.5 h-3.5 text-base-content/70 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                       </svg>
@@ -775,15 +824,15 @@ export default function Suppliers({ path }) {
                             <tr key={i}>
                               <td class="font-medium">{l.product_name}</td>
                               <td class="text-center font-mono">{l.qty}</td>
-                              <td class="text-end font-mono">{l.prix_achat?.toFixed(2)}</td>
-                              <td class="text-end font-mono font-semibold">{(l.qty * (l.prix_achat || 0)).toFixed(2)}</td>
+                              <td class="text-end font-mono">{fmt(l.prix_achat)}</td>
+                              <td class="text-end font-mono font-semibold">{fmt((l.qty * (l.prix_achat || 0)))}</td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
                           <tr class="font-semibold border-t border-base-300">
                             <td colSpan={3} class="text-end text-xs text-base-content/80">{t('purchaseTotal')}</td>
-                            <td class="text-end font-mono">{p.total.toFixed(2)}</td>
+                            <td class="text-end font-mono">{fmt(p.total)}</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -827,17 +876,29 @@ export default function Suppliers({ path }) {
 
       {/* ── Payment Statement Modal ── */}
       <Modal id="stmt-modal" size="xl" title={
-        <div>
-          <span>{stmtTarget?.name}</span>
-          <div class={`font-mono font-bold text-sm mt-0.5 ${stmtTarget?.balance > 0 ? 'text-error' : 'text-success'}`}>
-            {t('supplierBalance')}: {stmtTarget?.balance?.toFixed(2)}
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+            </svg>
+          </div>
+          <div>
+            <span class="text-lg font-bold">{stmtTarget?.name}</span>
+            <div class={`font-mono font-bold text-sm ${stmtTarget?.balance > 0 ? 'text-error' : 'text-success'}`}>
+              {t('supplierBalance')}: {fmt(stmtTarget?.balance)}
+            </div>
           </div>
         </div>
       }>
         {/* Inline payment form */}
         {canPay && (
-          <div class="-mx-1 px-4 py-3 bg-base-200 rounded-lg border border-base-300 mb-4">
-            <p class="text-xs font-semibold text-base-content/80 mb-2">{t('recordPayment')}</p>
+          <div class="-mx-1 px-4 py-3 bg-base-200/50 rounded-xl border border-base-300 mb-4">
+            <p class="text-xs font-semibold text-base-content/80 mb-2 flex items-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              {t('recordPayment')}
+            </p>
             <div class="flex gap-2">
               <label class="form-control flex-1">
                 <span class="label-text text-xs">{t('paymentAmountLabel')}</span>
@@ -868,7 +929,7 @@ export default function Suppliers({ path }) {
         )}
 
         {/* Date filter */}
-        <div class="flex gap-2 mb-3 items-end">
+        <div class="flex gap-2 mb-4 items-end">
           <label class="form-control flex-1">
             <span class="label-text text-xs">{t('dateFrom')}</span>
             <input type="date" class="input input-bordered input-sm" value={stmtDraftFrom}
@@ -885,50 +946,79 @@ export default function Suppliers({ path }) {
         </div>
 
         <div class="flex items-center justify-between mb-3">
-          <p class="text-xs font-semibold text-base-content/80">{t('paymentHistory')}</p>
-          {payments.total > 0 && <span class="text-xs text-base-content/70">{payments.total}</span>}
+          <p class="text-sm font-semibold text-base-content/80">{t('paymentHistory')}</p>
+          {payments.total > 0 && <span class="badge badge-sm badge-ghost">{payments.total}</span>}
         </div>
 
-        <div class="space-y-2 max-h-[40vh] overflow-y-auto pe-1">
-          {stmtLoading ? (
-            <div class="flex justify-center py-8"><span class="loading loading-spinner loading-md" /></div>
-          ) : payments.items.length === 0 ? (
-            <p class="text-center text-sm text-base-content/70 py-8">{t('noPayments')}</p>
-          ) : payments.items.map((p) => (
-            <div key={p.id} class="rounded-lg border border-success/20 bg-success/5">
-              <div class="px-3 py-2.5">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <span class="badge badge-xs badge-success shrink-0">{t('stmtPayment')}</span>
-                    <span class="text-xs text-base-content/70 truncate">{p.note || '—'}</span>
-                  </div>
-                  <span class="font-mono text-sm font-semibold text-success shrink-0">−{p.amount.toFixed(2)}</span>
-                </div>
-                <div class="flex items-center justify-between mt-1">
-                  <span class="text-xs text-base-content/70">
-                    {new Date(p.created_at).toLocaleDateString()} {new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  <span class="text-xs text-base-content/70">{p.created_by}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {payments.total > PAGE_SIZE && (
-          <div class="flex items-center justify-between mt-3 pt-2 border-t border-base-300">
-            <span class="text-xs text-base-content/70">
-              {t('showing')} {(stmtPage - 1) * PAGE_SIZE + 1}–{Math.min(stmtPage * PAGE_SIZE, payments.total)} {t('of')} {payments.total}
-            </span>
-            <div class="flex gap-1">
-              <button class="btn btn-xs btn-ghost" disabled={stmtPage <= 1}
-                onClick={() => { const p = stmtPage - 1; setStmtPage(p); loadPayments(stmtTarget.id, stmtFrom, stmtTo, p) }}>‹</button>
-              <span class="btn btn-xs btn-ghost no-animation">{stmtPage} / {payments.pages}</span>
-              <button class="btn btn-xs btn-ghost" disabled={stmtPage * PAGE_SIZE >= payments.total}
-                onClick={() => { const p = stmtPage + 1; setStmtPage(p); loadPayments(stmtTarget.id, stmtFrom, stmtTo, p) }}>›</button>
-            </div>
+        {/* Payment list as table */}
+        <div class="card bg-base-100 shadow-sm border border-base-300 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="table table-sm w-full">
+              <thead class="bg-base-200/60">
+                <tr>
+                  <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('date')}</th>
+                  <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('type')}</th>
+                  <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('paymentNote')}</th>
+                  <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70">{t('createdBy')}</th>
+                  <th class="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-base-content/70 text-end">{t('paymentAmountLabel')}</th>
+                  {canPay && <th class="px-3 py-2.5 w-10"></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {stmtLoading && (
+                  <tr><td colSpan={canPay ? 6 : 5} class="py-10 text-center"><span class="loading loading-spinner loading-md text-primary" /></td></tr>
+                )}
+                {!stmtLoading && payments.items.length === 0 && (
+                  <tr><td colSpan={canPay ? 6 : 5} class="py-10 text-center text-base-content/50 text-sm">{t('noPayments')}</td></tr>
+                )}
+                {!stmtLoading && payments.items.map((p) => {
+                  const isReversal = !!p.reversal_of
+                  const isReversed = !!p.reversed
+                  return (
+                    <tr key={p.id} class={`border-b border-base-200 transition-colors ${isReversed ? 'opacity-50 line-through' : isReversal ? 'bg-error/5' : 'hover:bg-base-50'}`}>
+                      <td class="px-3 py-2.5 text-sm whitespace-nowrap">
+                        {new Date(p.created_at).toLocaleDateString()} <span class="text-base-content/50">{new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </td>
+                      <td class="px-3 py-2.5">
+                        {isReversal
+                          ? <span class="badge badge-xs badge-error">{t('stmtReversal')}</span>
+                          : isReversed
+                            ? <span class="badge badge-xs badge-ghost">{t('reversed')}</span>
+                            : p.type === 'purchase'
+                              ? <span class="badge badge-xs badge-info">{t('sourcePurchase')}{p.purchase_ref ? ` ${p.purchase_ref}` : ''}</span>
+                              : <span class="badge badge-xs badge-success">{t('stmtPayment')}</span>
+                        }
+                      </td>
+                      <td class="px-3 py-2.5 text-sm text-base-content/70 max-w-[200px] truncate">{p.note || '—'}</td>
+                      <td class="px-3 py-2.5 text-sm text-base-content/70">{p.created_by}</td>
+                      <td class="px-3 py-2.5 text-end">
+                        <span class={`font-mono text-sm font-semibold ${isReversal ? 'text-error' : 'text-success'}`}>
+                          {p.amount > 0 ? '-' : '+'}{fmt(Math.abs(p.amount))}
+                        </span>
+                      </td>
+                      {canPay && (
+                        <td class="px-3 py-2.5">
+                          {!isReversed && !isReversal && (
+                            <div class="tooltip tooltip-left" data-tip={t('reversePayment')}>
+                              <button class="btn btn-xs btn-ghost btn-square text-error" onClick={() => handleReverse(p)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
+
+        <Pagination page={stmtPage} pages={payments.pages || 1} total={payments.total} limit={PAGE_SIZE}
+          onPageChange={(p) => { setStmtPage(p); loadPayments(stmtTarget.id, stmtFrom, stmtTo, p) }} />
 
         <div class="modal-action">
           {payments.total > 0 && (
@@ -946,22 +1036,56 @@ export default function Suppliers({ path }) {
       {/* Create / Edit Modal */}
       <Modal id="supplier-modal" title={editing ? t('editSupplier') : t('newSupplier')}>
         <div class="space-y-3">
-          <label class="form-control">
-            <span class="label-text text-xs">{t('supplierName')} *</span>
-            <input class="input input-bordered input-sm" value={form.name}
-              onInput={(e) => setForm({ ...form, name: e.target.value })}
-              onKeyDown={(e) => e.key === 'Enter' && handleSave()} />
-          </label>
-          <label class="form-control">
-            <span class="label-text text-xs">{t('supplierPhone')}</span>
-            <input class="input input-bordered input-sm" value={form.phone}
-              onInput={(e) => setForm({ ...form, phone: e.target.value })} />
-          </label>
-          <label class="form-control">
-            <span class="label-text text-xs">{t('supplierAddress')}</span>
-            <input class="input input-bordered input-sm" value={form.address}
-              onInput={(e) => setForm({ ...form, address: e.target.value })} />
-          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="form-control">
+              <span class="label-text text-xs">{t('supplierName')} *</span>
+              <input class="input input-bordered input-sm" value={form.name}
+                onInput={(e) => setForm({ ...form, name: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && handleSave()} />
+            </label>
+            <label class="form-control">
+              <span class="label-text text-xs">{t('supplierPhone')}</span>
+              <input class="input input-bordered input-sm" value={form.phone}
+                onInput={(e) => setForm({ ...form, phone: e.target.value })} />
+            </label>
+            <label class="form-control">
+              <span class="label-text text-xs">{t('supplierEmail')}</span>
+              <input class="input input-bordered input-sm" value={form.email}
+                onInput={(e) => setForm({ ...form, email: e.target.value })} />
+            </label>
+            <label class="form-control">
+              <span class="label-text text-xs">{t('supplierAddress')}</span>
+              <input class="input input-bordered input-sm" value={form.address}
+                onInput={(e) => setForm({ ...form, address: e.target.value })} />
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="form-control">
+              <span class="label-text text-xs">{t('supplierRC')}</span>
+              <input class="input input-bordered input-sm" value={form.rc}
+                onInput={(e) => setForm({ ...form, rc: e.target.value })} />
+            </label>
+            <label class="form-control">
+              <span class="label-text text-xs">{t('supplierNIF')}</span>
+              <input class="input input-bordered input-sm" value={form.nif}
+                onInput={(e) => setForm({ ...form, nif: e.target.value })} />
+            </label>
+            <label class="form-control">
+              <span class="label-text text-xs">{t('supplierNIS')}</span>
+              <input class="input input-bordered input-sm" value={form.nis}
+                onInput={(e) => setForm({ ...form, nis: e.target.value })} />
+            </label>
+            <label class="form-control">
+              <span class="label-text text-xs">{t('supplierNART')}</span>
+              <input class="input input-bordered input-sm" value={form.nart}
+                onInput={(e) => setForm({ ...form, nart: e.target.value })} />
+            </label>
+            <label class="form-control col-span-2">
+              <span class="label-text text-xs">{t('supplierRIB')}</span>
+              <input class="input input-bordered input-sm" value={form.compte_rib}
+                onInput={(e) => setForm({ ...form, compte_rib: e.target.value })} />
+            </label>
+          </div>
           {!editing && (
             <label class="form-control">
               <span class="label-text text-xs">{t('supplierBalance')}</span>
@@ -981,7 +1105,7 @@ export default function Suppliers({ path }) {
       <Modal id="balance-modal" title={t('adjustBalance')}>
         <p class="text-sm mb-1 font-medium">{balanceTarget?.name}</p>
         <p class="text-xs text-base-content/80 mb-3">
-          {t('supplierBalance')}: <span class="font-mono">{balanceTarget?.balance?.toFixed(2)}</span>
+          {t('supplierBalance')}: <span class="font-mono">{fmt(balanceTarget?.balance)}</span>
         </p>
         <label class="form-control mb-3">
           <span class="label-text text-xs">{t('balanceAmount')}</span>
@@ -996,6 +1120,19 @@ export default function Suppliers({ path }) {
       </Modal>
 
       {/* Delete Modal */}
+      <Modal id="reverse-confirm-modal" title={t('reversePayment')}>
+        <p class="text-sm mb-4">{t('reversePaymentConfirm')}</p>
+        {reverseTarget && (
+          <p class="text-sm text-base-content/70 mb-2">
+            {fmt(Math.abs(reverseTarget.amount))} — {reverseTarget.note || '—'}
+          </p>
+        )}
+        <div class="modal-action">
+          <button class="btn btn-error btn-sm" onClick={confirmReverse}>{t('confirm')}</button>
+          <button class="btn btn-sm btn-ghost" onClick={() => { setReverseTarget(null); closeModal('reverse-confirm-modal') }}>{t('back')}</button>
+        </div>
+      </Modal>
+
       <Modal id="delete-modal" title={t('deleteSupplier')}>
         <p class="text-sm mb-4">{deleteTarget?.name}</p>
         <div class="modal-action">
@@ -1025,7 +1162,7 @@ export default function Suppliers({ path }) {
                   <tr key={s.id}>
                     <td>{s.name}</td>
                     <td>{s.phone || '—'}</td>
-                    <td>{(s.balance || 0).toFixed(2)}</td>
+                    <td>{fmt((s.balance || 0))}</td>
                     <td>
                       <button class="btn btn-xs btn-success btn-outline" onClick={() => handleUnarchive(s.id)}>{t('unarchive')}</button>
                     </td>

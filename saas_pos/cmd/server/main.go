@@ -363,6 +363,7 @@ func registerRoutes(app *fiber.App) {
 	tpSuppliers.Patch("/suppliers/:id/balance", middleware.RequirePermission("suppliers", "edit"), supplier.HandleAdjustBalance)
 	tpSuppliers.Post("/suppliers/:id/pay", middleware.RequirePermission("suppliers", "pay"), supplier.HandlePayBalance)
 	tpSuppliers.Get("/suppliers/:id/payments", middleware.RequirePermission("suppliers", "view"), supplier.HandleListPayments)
+	tpSuppliers.Post("/suppliers/:id/payments/:paymentId/reverse", middleware.RequirePermission("suppliers", "pay"), supplier.HandleReversePayment)
 	tpSuppliers.Get("/suppliers/:id/products", middleware.RequirePermission("suppliers", "view"), supplier_product.HandleListBySupplier)
 	tpSuppliers.Post("/supplier-products", middleware.RequirePermission("suppliers", "edit"), supplier_product.HandleCreate)
 	tpSuppliers.Delete("/supplier-products/:id", middleware.RequirePermission("suppliers", "edit"), supplier_product.HandleDelete)

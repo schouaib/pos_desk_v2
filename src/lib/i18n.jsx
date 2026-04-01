@@ -39,7 +39,11 @@ export function I18nProvider({ children }) {
   }, [lang])
 
   const t = useCallback((key) => dict[key] ?? en[key] ?? key, [dict])
-  const value = useMemo(() => ({ lang, setLang, t }), [lang, t])
+  const fmt = useCallback((v) => {
+    const locale = lang === 'ar' ? 'ar-DZ' : 'fr-DZ'
+    return Number(v ?? 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }, [lang])
+  const value = useMemo(() => ({ lang, setLang, t, fmt }), [lang, t, fmt])
 
   return (
     <I18nContext.Provider value={value}>

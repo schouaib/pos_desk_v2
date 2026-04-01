@@ -86,7 +86,7 @@ const GroupButton = memo(({ label, icon, isActive, isOpen, onClick }) => (
 ))
 
 export function Layout({ children, currentPath }) {
-  const { t, lang } = useI18n()
+  const { t, lang, fmt } = useI18n()
   const rtl = lang === 'ar'
   const [open, setOpen] = useState(false)
 
@@ -395,7 +395,7 @@ export function Layout({ children, currentPath }) {
                     <td class="font-mono text-xs">{b.batch_number}</td>
                     <td class="text-sm">{b.expiry_date ? new Date(b.expiry_date).toLocaleDateString() : '—'}</td>
                     <td class="text-end font-mono">{b.qty}</td>
-                    <td class="text-end font-mono">{b.prix_achat}</td>
+                    <td class="text-end font-mono">{fmt(b.prix_achat)}</td>
                   </tr>
                 ))}
               </tbody>

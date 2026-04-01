@@ -36,7 +36,7 @@ function calcTimbre(totalTTC, paymentMethod) {
   return Math.max(5, round2(totalTTC * rate))
 }
 function fmt(v) {
-  return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return Number(v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 // ─── Sound effects (Web Audio API — no files needed) ──────────────────────────
@@ -963,6 +963,7 @@ export default function Pos({ path }) {
         pv2: vp2 || 0,
         pv3: vp3 || 0,
         pvMin: product.prix_minimum || 0,
+        prixAchat: product.prix_achat || 0,
         isService: product.is_service,
         stockQty: variantData?.qty_available ?? product.qty_available ?? 0,
         stockMin: product.qty_min ?? 0,
@@ -1886,6 +1887,12 @@ export default function Pos({ path }) {
                               title={`${line.expiryWarning.batch_number} — ${line.expiryWarning.date.toLocaleDateString()}`}
                             >
                               {line.expiryWarning.days <= 0 ? t('expired') : line.expiryWarning.days <= 1 ? t('expiresToday') : `${t('expiring')} ${line.expiryWarning.days}j`}
+                            </span>
+                          )}
+                          {line.prixAchat > 0 && line.unitPrice < line.prixAchat && (
+                            <span class="badge badge-xs badge-warning gap-0.5 whitespace-nowrap animate-pulse" title={`${t('prixAchat')}: ${fmt(line.prixAchat)}`}>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" /></svg>
+                              {t('priceBelowCost')}
                             </span>
                           )}
                         </div>

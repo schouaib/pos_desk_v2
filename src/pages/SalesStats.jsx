@@ -4,10 +4,8 @@ import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 
 const today = () => new Date().toISOString().slice(0, 10)
-const fmt = (v) => (v ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-
 export default function SalesStats({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [draftFrom, setDraftFrom] = useState(today)
   const [draftFromTime, setDraftFromTime] = useState('00:00')
   const [draftTo, setDraftTo] = useState(today)

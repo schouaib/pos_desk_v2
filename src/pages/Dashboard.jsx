@@ -10,7 +10,6 @@ const Icon = ({ d, className = 'w-5 h-5' }) => (
   </svg>
 )
 
-const fmt = (v) => (v ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtInt = (v) => (v ?? 0).toLocaleString()
 
 function getDateRange(period) {
@@ -30,7 +29,7 @@ function getDateRange(period) {
 }
 
 export default function Dashboard({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [period, setPeriod] = useState('today')
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState(null)

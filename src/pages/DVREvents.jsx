@@ -2,9 +2,10 @@ import { useState, useEffect } from 'preact/hooks'
 import { Layout } from '../components/Layout'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
+import { Pagination } from '../components/Pagination'
 
 export default function DVREvents({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [events, setEvents] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -24,7 +25,7 @@ export default function DVREvents({ path }) {
   async function load() {
     setLoading(true)
     try {
-      const data = await api.listDVREvents({ from, to, type: typeFilter, ref: refFilter, page, limit: 20 })
+      const data = await api.listDVREvents({ from, to, type: typeFilter, ref: refFilter, page, limit: 10 })
       setEvents(data.items || [])
       setTotal(data.total || 0)
     } catch {}
@@ -72,7 +73,7 @@ export default function DVREvents({ path }) {
     document.getElementById('clip-dialog')?.close()
   }
 
-  const pages = Math.ceil(total / 20) || 1
+  const pages = Math.ceil(total / 10) || 1
 
   return (
     <Layout currentPath={path}>
@@ -164,7 +165,7 @@ export default function DVREvents({ path }) {
                   <td class="px-3 py-2 font-mono text-sm">{ev.event_ref}</td>
                   <td class="px-3 py-2 text-sm">{new Date(ev.created_at).toLocaleString()}</td>
                   <td class="px-3 py-2 text-sm">{ev.cashier_email}</td>
-                  <td class="px-3 py-2 text-sm text-end font-mono">{ev.amount ? ev.amount.toFixed(2) : '-'}</td>
+                  <td class="px-3 py-2 text-sm text-end font-mono">{ev.amount ? fmt(ev.amount) : '-'}</td>
                   <td class="px-3 py-2 text-sm">CH {ev.camera_channel}</td>
                   <td class="px-3 py-2">
                     {ev.status === 'done' && <span class="badge badge-sm badge-success">{t('saved')}</span>}
@@ -197,22 +198,7 @@ export default function DVREvents({ path }) {
           </table>
         </div>
 
-        {/* Pagination */}
-        {pages > 1 && (
-          <div class="flex justify-center gap-1 py-3">
-            <button class="btn btn-sm btn-ghost" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
-            </button>
-            <span class="btn btn-sm btn-ghost no-animation">{page} / {pages}</span>
-            <button class="btn btn-sm btn-ghost" disabled={page >= pages} onClick={() => setPage(p => p + 1)}>
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
-            </button>
-          </div>
-        )}
+        <Pagination page={page} pages={pages} total={total} limit={10} onPageChange={setPage} />
       </div>
 
       {/* Video Player Dialog */}

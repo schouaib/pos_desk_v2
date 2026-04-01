@@ -3,6 +3,7 @@ import { Layout } from '../components/Layout'
 import { api } from '../lib/api'
 import { hasPerm, hasFeature, isTenantAdmin } from '../lib/auth'
 import { useI18n } from '../lib/i18n'
+import { Pagination } from '../components/Pagination'
 import { buildReceipt } from '../lib/escpos'
 import { printBytes, getConnection } from '../lib/webusbPrint'
 import { printBL } from '../lib/blPrint'
@@ -19,7 +20,7 @@ function defaultTo() {
 }
 
 export default function Sales({ path }) {
-  const { t, lang } = useI18n()
+  const { t, lang, fmt } = useI18n()
   const showEarnings = hasPerm('sales', 'earnings')
   const canReturn = hasPerm('sales', 'return')
 
@@ -44,6 +45,29 @@ export default function Sales({ path }) {
     let cancelled = false
     api.getStoreSettings().then((d) => { if (!cancelled) setStore(d) }).catch(() => {})
     return () => { cancelled = true }
+  }, [])
+
+  function closeAllDialogs() {
+    document.getElementById('detail-dialog')?.close()
+    document.getElementById('return-dialog')?.close()
+    setDetailSale(null)
+    setReturnTarget(null)
+    setReturnLines([])
+    setReturnError('')
+  }
+
+  // Clear state when dialogs are closed via Escape or backdrop
+  useEffect(() => {
+    const detailDlg = document.getElementById('detail-dialog')
+    const returnDlg = document.getElementById('return-dialog')
+    const onDetailClose = () => { setDetailSale(null) }
+    const onReturnClose = () => { setReturnTarget(null); setReturnLines([]); setReturnError('') }
+    detailDlg?.addEventListener('close', onDetailClose)
+    returnDlg?.addEventListener('close', onReturnClose)
+    return () => {
+      detailDlg?.removeEventListener('close', onDetailClose)
+      returnDlg?.removeEventListener('close', onReturnClose)
+    }
   }, [])
 
   async function handlePrintReceipt(e, s) {
@@ -174,6 +198,7 @@ export default function Sales({ path }) {
   }
 
   function openReturn(s) {
+    closeAllDialogs()
     setReturnTarget(s)
     setReturnLines((s.lines || []).filter(l => l.qty > 0).map(l => ({ product_id: l.product_id, product_name: l.product_name, max_qty: l.qty, qty: 0, reason: '' })))
     setReturnError('')
@@ -229,8 +254,6 @@ export default function Sales({ path }) {
     return () => { cancelled = true }
   }, [from, to, page, searchRef])
 
-  const start = total === 0 ? 0 : (page - 1) * limit + 1
-  const end   = Math.min(page * limit, total)
 
   return (
     <Layout currentPath={path}>
@@ -317,18 +340,18 @@ export default function Sales({ path }) {
                   <td class="px-3 py-2.5 text-center">
                     <span class="badge badge-sm badge-ghost">{s.lines?.length || 0}</span>
                   </td>
-                  {store.use_vat_sale && <td class="px-3 py-2.5 text-end font-mono text-sm">{s.total_ht.toFixed(2)}</td>}
-                  {store.use_vat_sale && <td class="px-3 py-2.5 text-end font-mono text-sm text-warning">{s.total_vat.toFixed(2)}</td>}
-                  <td class="px-3 py-2.5 text-end font-mono text-sm font-semibold text-primary">{s.total.toFixed(2)}</td>
-                  <td class="px-3 py-2.5 text-end font-mono text-sm">{s.amount_paid.toFixed(2)}</td>
-                  <td class="px-3 py-2.5 text-end font-mono text-sm text-success">{s.change.toFixed(2)}</td>
-                  {showEarnings && <td class="px-3 py-2.5 text-end font-mono text-sm font-semibold text-success">{(s.total_earning ?? 0).toFixed(2)}</td>}
+                  {store.use_vat_sale && <td class="px-3 py-2.5 text-end font-mono text-sm">{fmt(s.total_ht)}</td>}
+                  {store.use_vat_sale && <td class="px-3 py-2.5 text-end font-mono text-sm text-warning">{fmt(s.total_vat)}</td>}
+                  <td class="px-3 py-2.5 text-end font-mono text-sm font-semibold text-primary">{fmt(s.total)}</td>
+                  <td class="px-3 py-2.5 text-end font-mono text-sm">{fmt(s.amount_paid)}</td>
+                  <td class="px-3 py-2.5 text-end font-mono text-sm text-success">{fmt(s.change)}</td>
+                  {showEarnings && <td class="px-3 py-2.5 text-end font-mono text-sm font-semibold text-success">{fmt(s.total_earning)}</td>}
                   <td class="px-3 py-2.5 text-end">
                     <div class="flex items-center justify-end gap-1">
                       <button
                         class="btn btn-sm btn-ghost btn-square"
                         title={t('viewSale')}
-                        onClick={() => { setDetailSale(s); document.getElementById('detail-dialog')?.showModal() }}
+                        onClick={() => { closeAllDialogs(); setDetailSale(s); document.getElementById('detail-dialog')?.showModal() }}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
@@ -398,20 +421,7 @@ export default function Sales({ path }) {
         </div>
       </div>
 
-      {/* Pagination */}
-      {total > 0 && (
-        <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/80">{t('showing')} {start}–{end} {t('of')} {total}</span>
-          <div class="join">
-            <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
-            {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-              <button key={p} class={`join-item btn btn-sm ${p === page ? 'btn-active' : ''}`}
-                onClick={() => setPage(p)}>{p}</button>
-            ))}
-            <button class="join-item btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>»</button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} pages={pages} total={total} limit={limit} onPageChange={setPage} />
       {/* Sale Detail dialog */}
       <dialog id="detail-dialog" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box w-full sm:max-w-2xl">
@@ -445,13 +455,13 @@ export default function Sales({ path }) {
                           {l.barcode && <div class="text-xs text-base-content/70">{l.barcode}</div>}
                         </td>
                         <td class="text-center font-mono text-xs">{l.qty}</td>
-                        <td class="text-end font-mono text-xs">{l.unit_price.toFixed(2)}</td>
+                        <td class="text-end font-mono text-xs">{fmt(l.unit_price)}</td>
                         <td class="text-end font-mono text-xs">
-                          {l.discount > 0 ? `-${l.discount.toFixed(2)}` : '—'}
+                          {l.discount > 0 ? `-${fmt(l.discount)}` : '—'}
                         </td>
-                        <td class="text-end font-mono text-xs">{l.total_ht.toFixed(2)}</td>
-                        <td class="text-end font-mono text-xs font-medium">{l.total_ttc.toFixed(2)}</td>
-                        {showEarnings && <td class="text-end font-mono text-xs font-semibold text-success">{(l.line_earning ?? 0).toFixed(2)}</td>}
+                        <td class="text-end font-mono text-xs">{fmt(l.total_ht)}</td>
+                        <td class="text-end font-mono text-xs font-medium">{fmt(l.total_ttc)}</td>
+                        {showEarnings && <td class="text-end font-mono text-xs font-semibold text-success">{fmt(l.line_earning)}</td>}
                       </tr>
                     ))}
                   </tbody>
@@ -459,18 +469,18 @@ export default function Sales({ path }) {
               </div>
               <div class="divider my-2"></div>
               <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm font-mono">
-                {store.use_vat_sale && <span>{t('saleTotalHT')}: <b>{detailSale.total_ht.toFixed(2)}</b></span>}
-                {store.use_vat_sale && <span class="text-warning">{t('saleTotalVAT')}: <b>{detailSale.total_vat.toFixed(2)}</b></span>}
-                <span class="text-primary font-semibold">{store.use_vat_sale ? t('saleTotalTTC') : t('purchaseTotal')}: {detailSale.total.toFixed(2)}</span>
-                <span>{t('saleAmountPaid')}: {detailSale.amount_paid.toFixed(2)}</span>
-                <span class="text-success">{t('saleChange')}: {detailSale.change.toFixed(2)}</span>
-                {showEarnings && <span class="text-success font-semibold">{t('saleEarning')}: {(detailSale.total_earning ?? 0).toFixed(2)}</span>}
+                {store.use_vat_sale && <span>{t('saleTotalHT')}: <b>{fmt(detailSale.total_ht)}</b></span>}
+                {store.use_vat_sale && <span class="text-warning">{t('saleTotalVAT')}: <b>{fmt(detailSale.total_vat)}</b></span>}
+                <span class="text-primary font-semibold">{store.use_vat_sale ? t('saleTotalTTC') : t('purchaseTotal')}: {fmt(detailSale.total)}</span>
+                <span>{t('saleAmountPaid')}: {fmt(detailSale.amount_paid)}</span>
+                <span class="text-success">{t('saleChange')}: {fmt(detailSale.change)}</span>
+                {showEarnings && <span class="text-success font-semibold">{t('saleEarning')}: {fmt(detailSale.total_earning)}</span>}
               </div>
             </>
           )}
           <div class="modal-action">
             {canReturn && detailSale && detailSale.total > 0 && (
-              <button class="btn btn-sm btn-warning btn-outline" onClick={() => { document.getElementById('detail-dialog')?.close(); openReturn(detailSale) }}>
+              <button class="btn btn-sm btn-warning btn-outline" onClick={() => openReturn(detailSale)}>
                 {t('returnSale')}
               </button>
             )}

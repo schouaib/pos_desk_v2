@@ -110,7 +110,7 @@ function ConfirmDialog({ open, message, onConfirm, onCancel, t }) {
 
 /* ── Main component ──────────────────────────────────────────────────────── */
 export default function Favorites({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const canEdit = hasPerm('favorites', 'edit')
 
   const [favorites, setFavorites] = useState([])
@@ -443,7 +443,7 @@ export default function Favorites({ path }) {
                         </div>
                       </td>
                       <td class="px-4 py-3 font-mono text-xs text-base-content/60">{p.barcodes?.[0] || '-'}</td>
-                      <td class="px-4 py-3 font-mono text-sm font-medium">{(p.pv1 || 0).toFixed(2)}</td>
+                      <td class="px-4 py-3 font-mono text-sm font-medium">{fmt(p.pv1)}</td>
                       <td class="px-4 py-3">
                         <ColorDot color={pc} onChange={(c) => setProductColor(p.id, c)} />
                       </td>
@@ -552,7 +552,7 @@ export default function Favorites({ path }) {
                     <p class="font-medium text-sm truncate">{p.name}</p>
                     <p class="font-mono text-xs text-base-content/50">{p.barcodes?.[0] || '-'}</p>
                   </div>
-                  <span class="font-mono text-sm font-medium shrink-0">{(p.pv1 || 0).toFixed(2)}</span>
+                  <span class="font-mono text-sm font-medium shrink-0">{fmt(p.pv1)}</span>
                   <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 shrink-0">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

@@ -16,7 +16,7 @@ import (
 func HandleList(c *fiber.Ctx) error {
 	tenantID := middleware.GetClaims(c).TenantID
 	page, _ := strconv.Atoi(c.Query("page", "1"))
-	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
 	docType := c.Query("doc_type", "")
 	status := c.Query("status", "")
 	clientID := c.Query("client_id", "")

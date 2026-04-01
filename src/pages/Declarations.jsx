@@ -102,7 +102,7 @@ function DecRow({ label, value, bold, highlight, indent, loading }) {
     <div class={`flex items-center justify-between py-2.5 px-4 ${highlight ? 'bg-primary/5 rounded-lg' : 'border-b border-base-200'} ${indent ? 'ms-6' : ''}`}>
       <span class={`text-sm ${bold ? 'font-bold' : 'text-base-content/80'}`}>{label}</span>
       <span class={`text-sm tabular-nums ${bold ? 'font-bold text-primary' : ''}`}>
-        {loading ? <span class="loading loading-dots loading-xs" /> : (value ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {loading ? <span class="loading loading-dots loading-xs" /> : fmt(value ?? 0)}
       </span>
     </div>
   )
@@ -114,14 +114,14 @@ function DecRowHighlight({ label, value, positive, loading }) {
     <div class={`flex items-center justify-between py-3 px-4 rounded-lg ${isPos ? 'bg-success/10' : 'bg-error/10'}`}>
       <span class="text-sm font-bold">{label}</span>
       <span class={`text-lg font-bold tabular-nums ${isPos ? 'text-success' : 'text-error'}`}>
-        {loading ? <span class="loading loading-dots loading-sm" /> : (value ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {loading ? <span class="loading loading-dots loading-sm" /> : fmt(value ?? 0)}
       </span>
     </div>
   )
 }
 
 function PrintButton({ onClick, printRef, printTitle }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const handleClick = () => {
     if (onClick) return onClick()
     if (printRef?.current) {
@@ -141,7 +141,7 @@ function PrintButton({ onClick, printRef, printTitle }) {
 // G50 — Déclaration Mensuelle
 // ──────────────────────────────────────────────
 function G50Tab() {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [month, setMonth] = useState(currentMonth)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -186,23 +186,23 @@ function G50Tab() {
 
   function handlePrint() {
     if (!printRef.current) return
-    const fmtVal = v => (v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
     const html = buildPrintHtml(`G50 — ${month}`, {
       innerHTML: `
         <h2>G50 — ${t('declG50Title')}</h2>
         <p class="subtitle">${t('declG50Subtitle')} — ${month}</p>
         <div class="section-title">TVA — ${t('declTVA')}</div>
-        <div class="row"><span class="label">${t('declCAHT')}</span><span class="value">${fmtVal(salesHT)}</span></div>
-        <div class="row"><span class="label">${t('declTVACollectee')}</span><span class="value">${fmtVal(tvaCollectee)}</span></div>
-        <div class="row"><span class="label">${t('declTVADeductible')}</span><span class="value">${fmtVal(tvaDeductible)}</span></div>
-        ${precompte > 0 ? `<div class="row"><span class="label">${t('declPrecompte')}</span><span class="value">${fmtVal(precompte)}</span></div>` : ''}
-        <div class="row highlight"><span class="label">${t('declTVAAPayer')}</span><span class="value positive">${fmtVal(tvaAPayer)}</span></div>
+        <div class="row"><span class="label">${t('declCAHT')}</span><span class="value">${fmt(salesHT)}</span></div>
+        <div class="row"><span class="label">${t('declTVACollectee')}</span><span class="value">${fmt(tvaCollectee)}</span></div>
+        <div class="row"><span class="label">${t('declTVADeductible')}</span><span class="value">${fmt(tvaDeductible)}</span></div>
+        ${precompte > 0 ? `<div class="row"><span class="label">${t('declPrecompte')}</span><span class="value">${fmt(precompte)}</span></div>` : ''}
+        <div class="row highlight"><span class="label">${t('declTVAAPayer')}</span><span class="value positive">${fmt(tvaAPayer)}</span></div>
         <div class="section-title">TAP — ${t('declTAP')}</div>
-        <div class="row"><span class="label">${t('declCAHT')} x ${tapRate}%</span><span class="value">${fmtVal(tap)}</span></div>
-        <div class="row highlight"><span class="label">${t('declTAPAPayer')}</span><span class="value positive">${fmtVal(tap)}</span></div>
+        <div class="row"><span class="label">${t('declCAHT')} x ${tapRate}%</span><span class="value">${fmt(tap)}</span></div>
+        <div class="row highlight"><span class="label">${t('declTAPAPayer')}</span><span class="value positive">${fmt(tap)}</span></div>
         <div class="section-title">${t('declTimbre')}</div>
-        <div class="row"><span class="label">${t('declTimbreFiscal')}</span><span class="value">${fmtVal(timbreFiscal)}</span></div>
-        <div class="total-box"><span class="label">${t('declTotalAPayer')}</span><span class="value">${fmtVal(totalAPayer)}</span></div>
+        <div class="row"><span class="label">${t('declTimbreFiscal')}</span><span class="value">${fmt(timbreFiscal)}</span></div>
+        <div class="total-box"><span class="label">${t('declTotalAPayer')}</span><span class="value">${fmt(totalAPayer)}</span></div>
       `
     })
     printViaHtml(html)
@@ -269,7 +269,7 @@ function G50Tab() {
             <div class="flex items-center justify-between">
               <span class="text-base font-bold">{t('declTotalAPayer')}</span>
               <span class="text-2xl font-bold text-primary tabular-nums">
-                {loading ? <span class="loading loading-dots loading-sm" /> : totalAPayer.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {loading ? <span class="loading loading-dots loading-sm" /> : fmt(totalAPayer)}
               </span>
             </div>
           </div>
@@ -283,7 +283,7 @@ function G50Tab() {
 // G50A — Annexe (Détail par client)
 // ──────────────────────────────────────────────
 function G50ATab() {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [month, setMonth] = useState(currentMonth)
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(false)
@@ -336,15 +336,15 @@ function G50ATab() {
         </label>
         <div class="flex-1" />
         <PrintButton onClick={() => {
-          const fmtVal = v => (v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          const rows = clients.map((c, i) => `<tr><td>${i + 1}</td><td>${c.name}</td><td>${c.nif || '—'}</td><td class="num">${c.count}</td><td class="num">${fmtVal(c.totalHT)}</td><td class="num">${fmtVal(c.totalVAT)}</td><td class="num">${fmtVal(c.totalTTC)}</td></tr>`).join('')
+
+          const rows = clients.map((c, i) => `<tr><td>${i + 1}</td><td>${c.name}</td><td>${c.nif || '—'}</td><td class="num">${c.count}</td><td class="num">${fmt(c.totalHT)}</td><td class="num">${fmt(c.totalVAT)}</td><td class="num">${fmt(c.totalTTC)}</td></tr>`).join('')
           const html = buildPrintHtml(`G50A — ${month}`, {
             innerHTML: `
               <h2>G50A — ${t('declG50ATitle')}</h2>
               <p class="subtitle">${t('declG50ASubtitle')} — ${month}</p>
               <table><thead><tr><th>#</th><th>${t('clientName')}</th><th>NIF</th><th class="num">${t('salesCount')}</th><th class="num">${t('htLabel')}</th><th class="num">TVA</th><th class="num">${t('ttcLabel')}</th></tr></thead>
               <tbody>${rows || `<tr><td colspan="7" style="text-align:center">${t('noData')}</td></tr>`}</tbody>
-              ${clients.length > 0 ? `<tfoot><tr><td colspan="4" class="num">${t('grandTotal')}</td><td class="num">${fmtVal(totalHT)}</td><td class="num">${fmtVal(totalVAT)}</td><td class="num">${fmtVal(totalTTC)}</td></tr></tfoot>` : ''}
+              ${clients.length > 0 ? `<tfoot><tr><td colspan="4" class="num">${t('grandTotal')}</td><td class="num">${fmt(totalHT)}</td><td class="num">${fmt(totalVAT)}</td><td class="num">${fmt(totalTTC)}</td></tr></tfoot>` : ''}
               </table>
             `
           })
@@ -383,9 +383,9 @@ function G50ATab() {
                     <td class="font-medium">{c.name}</td>
                     <td class="text-xs text-base-content/70">{c.nif || '—'}</td>
                     <td class="text-end">{c.count}</td>
-                    <td class="text-end tabular-nums">{c.totalHT.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })}</td>
-                    <td class="text-end tabular-nums">{c.totalVAT.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })}</td>
-                    <td class="text-end tabular-nums font-medium">{c.totalTTC.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })}</td>
+                    <td class="text-end tabular-nums">{fmt(c.totalHT)}</td>
+                    <td class="text-end tabular-nums">{fmt(c.totalVAT)}</td>
+                    <td class="text-end tabular-nums font-medium">{fmt(c.totalTTC)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -393,9 +393,9 @@ function G50ATab() {
                 <tfoot>
                   <tr class="font-bold bg-base-200/30">
                     <td colspan="4" class="text-end">{t('grandTotal')}</td>
-                    <td class="text-end tabular-nums">{totalHT.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })}</td>
-                    <td class="text-end tabular-nums">{totalVAT.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })}</td>
-                    <td class="text-end tabular-nums">{totalTTC.toLocaleString('fr-DZ', { minimumFractionDigits: 2 })}</td>
+                    <td class="text-end tabular-nums">{fmt(totalHT)}</td>
+                    <td class="text-end tabular-nums">{fmt(totalVAT)}</td>
+                    <td class="text-end tabular-nums">{fmt(totalTTC)}</td>
                   </tr>
                 </tfoot>
               )}
@@ -411,7 +411,7 @@ function G50ATab() {
 // G11 — Bilan Fiscal Annuel
 // ──────────────────────────────────────────────
 function G11Tab() {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [year, setYear] = useState(currentYear)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -465,7 +465,7 @@ function G11Tab() {
         </label>
         <div class="flex-1" />
         <PrintButton onClick={() => {
-          const fmtVal = v => (v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
           const html = buildPrintHtml(`G11 — ${year}`, {
             innerHTML: `
               <h2>G11 — ${t('declBilan')} ${year}</h2>
@@ -474,28 +474,28 @@ function G11Tab() {
                   <div class="card-title">${t('declTCR')}</div>
                   <div class="card-subtitle">${t('declTCRSubtitle')}</div>
                   <div class="section-title">${t('declRevenues')}</div>
-                  <div class="row"><span class="label">${t('revenueTTC')}</span><span class="value">${fmtVal(revenueTTC)}</span></div>
-                  <div class="row"><span class="label">${t('revenueHT')}</span><span class="value">${fmtVal(revenueHT)}</span></div>
-                  <div class="row"><span class="label">${t('statsTotalVAT')}</span><span class="value">${fmtVal(totalVAT)}</span></div>
+                  <div class="row"><span class="label">${t('revenueTTC')}</span><span class="value">${fmt(revenueTTC)}</span></div>
+                  <div class="row"><span class="label">${t('revenueHT')}</span><span class="value">${fmt(revenueHT)}</span></div>
+                  <div class="row"><span class="label">${t('statsTotalVAT')}</span><span class="value">${fmt(totalVAT)}</span></div>
                   <div class="section-title">${t('declCharges')}</div>
-                  <div class="row"><span class="label">${t('totalCost')}</span><span class="value">${fmtVal(costOfGoods)}</span></div>
-                  <div class="row"><span class="label">${t('lossCost')}</span><span class="value">${fmtVal(lossCost)}</span></div>
-                  <div class="row"><span class="label">${t('expenseCost')}</span><span class="value">${fmtVal(expenses)}</span></div>
+                  <div class="row"><span class="label">${t('totalCost')}</span><span class="value">${fmt(costOfGoods)}</span></div>
+                  <div class="row"><span class="label">${t('lossCost')}</span><span class="value">${fmt(lossCost)}</span></div>
+                  <div class="row"><span class="label">${t('expenseCost')}</span><span class="value">${fmt(expenses)}</span></div>
                   <div class="section-title">${t('declResult')}</div>
-                  <div class="row bold"><span class="label">${t('grossEarning')}</span><span class="value">${fmtVal(grossMargin)}</span></div>
-                  <div class="row highlight ${netResult >= 0 ? '' : 'negative'}"><span class="label">${t('declNetResult')}</span><span class="value ${netResult >= 0 ? 'positive' : 'negative'}">${fmtVal(netResult)}</span></div>
+                  <div class="row bold"><span class="label">${t('grossEarning')}</span><span class="value">${fmt(grossMargin)}</span></div>
+                  <div class="row highlight ${netResult >= 0 ? '' : 'negative'}"><span class="label">${t('declNetResult')}</span><span class="value ${netResult >= 0 ? 'positive' : 'negative'}">${fmt(netResult)}</span></div>
                 </div>
                 <div class="card">
                   <div class="card-title">${t('declBilan')}</div>
                   <div class="card-subtitle">${t('declBilanSubtitle')}</div>
                   <div class="section-title">${t('declActif')}</div>
-                  <div class="row"><span class="label">${t('declStockValue')}</span><span class="value">${fmtVal(stockValue)}</span></div>
+                  <div class="row"><span class="label">${t('declStockValue')}</span><span class="value">${fmt(stockValue)}</span></div>
                   <div class="section-title">${t('declPassif')}</div>
-                  <div class="row"><span class="label">${t('declSupplierDebt')}</span><span class="value">${fmtVal(purchaseRemaining)}</span></div>
-                  <div class="row"><span class="label">${t('declTotalPurchases')}</span><span class="value">${fmtVal(purchaseTotal)}</span></div>
-                  <div class="row"><span class="label">${t('declPurchasesPaid')}</span><span class="value">${fmtVal(purchasePaid)}</span></div>
+                  <div class="row"><span class="label">${t('declSupplierDebt')}</span><span class="value">${fmt(purchaseRemaining)}</span></div>
+                  <div class="row"><span class="label">${t('declTotalPurchases')}</span><span class="value">${fmt(purchaseTotal)}</span></div>
+                  <div class="row"><span class="label">${t('declPurchasesPaid')}</span><span class="value">${fmt(purchasePaid)}</span></div>
                   <div class="section-title">${t('declSummary')}</div>
-                  <div class="row highlight ${netResult >= 0 ? '' : 'negative'}"><span class="label">${t('declNetResult')}</span><span class="value ${netResult >= 0 ? 'positive' : 'negative'}">${fmtVal(netResult)}</span></div>
+                  <div class="row highlight ${netResult >= 0 ? '' : 'negative'}"><span class="label">${t('declNetResult')}</span><span class="value ${netResult >= 0 ? 'positive' : 'negative'}">${fmt(netResult)}</span></div>
                 </div>
               </div>
             `
@@ -562,7 +562,7 @@ function G11Tab() {
 // G12 — IRG (Personnes physiques)
 // ──────────────────────────────────────────────
 function G12Tab() {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [year, setYear] = useState(currentYear)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -618,24 +618,24 @@ function G12Tab() {
         </label>
         <div class="flex-1" />
         <PrintButton onClick={() => {
-          const fmtVal = v => (v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
           const html = buildPrintHtml(`G12 — ${year}`, {
             innerHTML: `
               <h2>G12 — ${t('declG12Title')}</h2>
               <p class="subtitle">${t('declG12Subtitle')} — ${year}</p>
               <div class="section-title">${t('declRevenues')}</div>
-              <div class="row"><span class="label">${t('revenueHT')}</span><span class="value">${fmtVal(revenueHT)}</span></div>
-              <div class="row"><span class="label">${t('totalCost')}</span><span class="value">${fmtVal(costOfGoods)}</span></div>
-              <div class="row bold"><span class="label">${t('grossEarning')}</span><span class="value">${fmtVal(grossMargin)}</span></div>
+              <div class="row"><span class="label">${t('revenueHT')}</span><span class="value">${fmt(revenueHT)}</span></div>
+              <div class="row"><span class="label">${t('totalCost')}</span><span class="value">${fmt(costOfGoods)}</span></div>
+              <div class="row bold"><span class="label">${t('grossEarning')}</span><span class="value">${fmt(grossMargin)}</span></div>
               <div class="section-title">${t('declCharges')}</div>
-              <div class="row"><span class="label">${t('lossCost')}</span><span class="value">${fmtVal(lossCost)}</span></div>
-              <div class="row"><span class="label">${t('expenseCost')}</span><span class="value">${fmtVal(expenses)}</span></div>
+              <div class="row"><span class="label">${t('lossCost')}</span><span class="value">${fmt(lossCost)}</span></div>
+              <div class="row"><span class="label">${t('expenseCost')}</span><span class="value">${fmt(expenses)}</span></div>
               <div class="section-title">${t('declNetProfit')}</div>
-              <div class="row bold"><span class="label">${t('declNetResult')}</span><span class="value">${fmtVal(netProfit)}</span></div>
+              <div class="row bold"><span class="label">${t('declNetResult')}</span><span class="value">${fmt(netProfit)}</span></div>
               <div class="section-title">IRG — ${t('declIRGCalc')}</div>
-              <div class="row"><span class="label">${t('declTaxableIncome')}</span><span class="value">${fmtVal(netProfit > 0 ? netProfit : 0)}</span></div>
-              <div class="row"><span class="label">${t('declEffectiveRate')}: ${effectiveRate}%</span><span class="value">${fmtVal(irgAmount)}</span></div>
-              <div class="row highlight negative"><span class="label">${t('declIRGAPayer')}</span><span class="value negative">${fmtVal(irgAmount)}</span></div>
+              <div class="row"><span class="label">${t('declTaxableIncome')}</span><span class="value">${fmt(netProfit > 0 ? netProfit : 0)}</span></div>
+              <div class="row"><span class="label">${t('declEffectiveRate')}: ${effectiveRate}%</span><span class="value">${fmt(irgAmount)}</span></div>
+              <div class="row highlight negative"><span class="label">${t('declIRGAPayer')}</span><span class="value negative">${fmt(irgAmount)}</span></div>
               <div class="brackets">
                 <p style="font-weight:600;margin-bottom:4px">${t('declIRGBrackets')}</p>
                 <p>0 - 240,000 DA: 0%</p>
@@ -702,7 +702,7 @@ function G12Tab() {
 // G20 — IBS (Sociétés)
 // ──────────────────────────────────────────────
 function G20Tab() {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [year, setYear] = useState(currentYear)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -763,26 +763,26 @@ function G20Tab() {
         </label>
         <div class="flex-1" />
         <PrintButton onClick={() => {
-          const fmtVal = v => (v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
           const html = buildPrintHtml(`G20 — ${year}`, {
             innerHTML: `
               <h2>G20 — ${t('declG20Title')}</h2>
               <p class="subtitle">${t('declG20Subtitle')} — ${year}</p>
               <div class="section-title">${t('declProfitCalc')}</div>
-              <div class="row"><span class="label">${t('revenueHT')}</span><span class="value">${fmtVal(revenueHT)}</span></div>
-              <div class="row"><span class="label">${t('totalCost')}</span><span class="value">${fmtVal(costOfGoods)}</span></div>
-              <div class="row bold"><span class="label">${t('grossEarning')}</span><span class="value">${fmtVal(grossMargin)}</span></div>
-              <div class="row"><span class="label">${t('lossCost')}</span><span class="value">${fmtVal(lossCost)}</span></div>
-              <div class="row"><span class="label">${t('expenseCost')}</span><span class="value">${fmtVal(expenses)}</span></div>
-              <div class="row bold"><span class="label">${t('declNetResult')}</span><span class="value">${fmtVal(netProfit)}</span></div>
+              <div class="row"><span class="label">${t('revenueHT')}</span><span class="value">${fmt(revenueHT)}</span></div>
+              <div class="row"><span class="label">${t('totalCost')}</span><span class="value">${fmt(costOfGoods)}</span></div>
+              <div class="row bold"><span class="label">${t('grossEarning')}</span><span class="value">${fmt(grossMargin)}</span></div>
+              <div class="row"><span class="label">${t('lossCost')}</span><span class="value">${fmt(lossCost)}</span></div>
+              <div class="row"><span class="label">${t('expenseCost')}</span><span class="value">${fmt(expenses)}</span></div>
+              <div class="row bold"><span class="label">${t('declNetResult')}</span><span class="value">${fmt(netProfit)}</span></div>
               <div class="section-title">IBS — ${t('declIBSCalc')}</div>
-              <div class="row"><span class="label">${t('declTaxableIncome')} x ${ibsRate}%</span><span class="value">${fmtVal(ibsAmount)}</span></div>
+              <div class="row"><span class="label">${t('declTaxableIncome')} x ${ibsRate}%</span><span class="value">${fmt(ibsAmount)}</span></div>
               <div class="section-title">${t('declAcomptes')}</div>
-              <div class="row"><span class="label">${t('declAcompte')} 1 (20 mars) — 30%</span><span class="value">${fmtVal(acompte1)}</span></div>
-              <div class="row"><span class="label">${t('declAcompte')} 2 (20 juin) — 30%</span><span class="value">${fmtVal(acompte2)}</span></div>
-              <div class="row"><span class="label">${t('declAcompte')} 3 (20 nov.) — 30%</span><span class="value">${fmtVal(acompte3)}</span></div>
-              <div class="row"><span class="label">${t('declSolde')}</span><span class="value">${fmtVal(solde)}</span></div>
-              <div class="row highlight negative"><span class="label">${t('declIBSTotal')}</span><span class="value negative">${fmtVal(ibsAmount)}</span></div>
+              <div class="row"><span class="label">${t('declAcompte')} 1 (20 mars) — 30%</span><span class="value">${fmt(acompte1)}</span></div>
+              <div class="row"><span class="label">${t('declAcompte')} 2 (20 juin) — 30%</span><span class="value">${fmt(acompte2)}</span></div>
+              <div class="row"><span class="label">${t('declAcompte')} 3 (20 nov.) — 30%</span><span class="value">${fmt(acompte3)}</span></div>
+              <div class="row"><span class="label">${t('declSolde')}</span><span class="value">${fmt(solde)}</span></div>
+              <div class="row highlight negative"><span class="label">${t('declIBSTotal')}</span><span class="value negative">${fmt(ibsAmount)}</span></div>
             `
           })
           printViaHtml(html)
@@ -830,7 +830,7 @@ function G20Tab() {
 const TABS = ['g50', 'g50a', 'g11', 'g12', 'g20']
 
 export default function Declarations({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [tab, setTab] = useState('g50')
 
   return (

@@ -23,7 +23,7 @@ const KBD = ({ children }) => (
 )
 
 export default function Purchases({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const canAdd      = hasPerm('purchases', 'add')
   const canEdit     = hasPerm('purchases', 'edit')
   const canDelete   = hasPerm('purchases', 'delete')
@@ -40,9 +40,13 @@ export default function Purchases({ path }) {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
+  const [filterSupplier, setFilterSupplier] = useState('')
   const [suppliers, setSuppliers] = useState([])
   const [brands, setBrands] = useState([])
   const [categories, setCategories] = useState([])
+
+  // Purchase stats
+  const [stats, setStats] = useState(null)
 
   // Form state
   const [formOpen, setFormOpen] = useState(false)
@@ -77,7 +81,9 @@ export default function Purchases({ path }) {
 
   // Supplier search dialog state
   const [supplierDialogQ, setSupplierDialogQ] = useState('')
-  const [supplierDialogResults, setSupplierDialogResults] = useState([])
+  const [supplierDialogResult, setSupplierDialogResult] = useState({ items: [], total: 0, page: 1, pages: 0 })
+  const [supplierDialogPage, setSupplierDialogPage] = useState(1)
+  const SUPPLIER_PAGE_SIZE = 10
 
   // Payment modal
   const [payTarget, setPayTarget] = useState(null)
@@ -128,6 +134,58 @@ export default function Purchases({ path }) {
     setImportResult(null)
   }, [])
 
+  function closeAllDialogs() {
+    // Close Modal components
+    closeModal('preview-modal')
+    closeModal('pay-modal')
+    closeModal('pay-history-modal')
+    closeModal('delete-modal')
+    closeModal('return-modal')
+    // Close dialog elements
+    document.getElementById('product-dialog')?.close()
+    document.getElementById('line-dialog')?.close()
+    document.getElementById('purchase-variant-dialog')?.close()
+    document.getElementById('supplier-dialog')?.close()
+    // Close inline dialogs
+    setLowStockOpen(false)
+    setImportOpen(false)
+    setQuickAddOpen(false)
+    // Clear all target states
+    setDeleteTarget(null)
+    setPayTarget(null)
+    setPayAmount(0)
+    setPayNote('')
+    setPayError('')
+    setPayHistoryTarget(null)
+    setPayHistory([])
+    setPreviewData(null)
+    setPreviewTarget(null)
+    setReturnTarget(null)
+    setReturnLines([])
+    setReturnError('')
+    setPurchaseVariantProduct(null)
+    setPurchaseVariants([])
+    setLowStockItems([])
+  }
+
+  // Clear target state when dialog elements are closed (e.g. via Escape)
+  useEffect(() => {
+    function handleDialogClose(e) {
+      const id = e.target.id
+      if (id === 'product-dialog') {
+        setDialogQ(''); setDialogResults([])
+      } else if (id === 'purchase-variant-dialog') {
+        setPurchaseVariantProduct(null); setPurchaseVariants([])
+      } else if (id === 'supplier-dialog') {
+        setSupplierDialogQ(''); setSupplierDialogResult({ items: [], total: 0, page: 1, pages: 0 })
+      }
+    }
+    const ids = ['product-dialog', 'line-dialog', 'purchase-variant-dialog', 'supplier-dialog']
+    const els = ids.map(id => document.getElementById(id)).filter(Boolean)
+    els.forEach(el => el.addEventListener('close', handleDialogClose))
+    return () => els.forEach(el => el.removeEventListener('close', handleDialogClose))
+  }, [])
+
   const handleImportFile = useCallback((e) => {
     e.preventDefault()
     const f = e.dataTransfer ? e.dataTransfer.files[0] : e.target.files[0]
@@ -174,14 +232,20 @@ export default function Purchases({ path }) {
   }, [])
 
   const [newSupplierName, setNewSupplierName] = useState('')
-  const handleCreateImportSupplier = useCallback(async () => {
+  const handleCreateSupplierAndSelect = useCallback(async (forImport = false) => {
     if (!newSupplierName.trim()) return
     try {
       const s = await api.createSupplier({ name: newSupplierName.trim() })
       setSuppliers(prev => [...prev, s])
-      setImportSupplierID(s.id)
       setNewSupplierName('')
-    } catch (err) { setImportError(err.message) }
+      if (forImport) {
+        setImportSupplierID(s.id)
+      } else {
+        setSupplierID(s.id)
+        setSupplierName(s.name)
+        document.getElementById('supplier-dialog')?.close()
+      }
+    } catch (err) { if (forImport) setImportError(err.message) }
   }, [newSupplierName])
 
   // VAT setting
@@ -198,10 +262,11 @@ export default function Purchases({ path }) {
       if (filterStatus) params.status = filterStatus
       if (filterDateFrom) params.date_from = filterDateFrom
       if (filterDateTo) params.date_to = filterDateTo
+      if (filterSupplier) params.supplier_id = filterSupplier
       const data = await api.listPurchases(params)
       setResult(data)
     } catch {}
-  }, [page, searchQ, filterStatus, filterDateFrom, filterDateTo])
+  }, [page, searchQ, filterStatus, filterDateFrom, filterDateTo, filterSupplier])
 
   function doSearch() {
     setPage(1)
@@ -215,11 +280,12 @@ export default function Purchases({ path }) {
     if (filterStatus) params.status = filterStatus
     if (filterDateFrom) params.date_from = filterDateFrom
     if (filterDateTo) params.date_to = filterDateTo
+    if (filterSupplier) params.supplier_id = filterSupplier
     api.listPurchases(params)
       .then(data => { if (!cancelled) setResult(data) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [page, searchQ, filterStatus, filterDateFrom, filterDateTo])
+  }, [page, searchQ, filterStatus, filterDateFrom, filterDateTo, filterSupplier])
 
   useEffect(() => {
     let cancelled = false
@@ -227,6 +293,7 @@ export default function Purchases({ path }) {
     api.listBrands().then(d => { if (!cancelled) setBrands(d) }).catch(() => {})
     api.listCategories().then(d => { if (!cancelled) setCategories(d) }).catch(() => {})
     api.getStoreSettings().then(d => { if (!cancelled) { setUseVAT(!!(d?.use_vat_purchase ?? d?.use_vat)); if (d?.visible_prices) setVisiblePrices(d.visible_prices) } }).catch(() => {})
+    api.getPurchaseStats({}).then(d => { if (!cancelled) setStats(d) }).catch(() => {})
     return () => { cancelled = true }
   }, [])
 
@@ -245,10 +312,12 @@ export default function Purchases({ path }) {
   }
 
   function openProductDialog() {
+    closeAllDialogs()
     setDialogQ('')
     setDialogResults([])
     lastDialogSearchRef.current = ''
     document.getElementById('product-dialog')?.showModal()
+    setTimeout(() => document.getElementById('product-dialog')?.querySelector('input')?.focus(), 50)
   }
 
   async function selectProduct(p) {
@@ -395,22 +464,24 @@ export default function Purchases({ path }) {
     return Math.round(price * 100) / 100
   }
 
+  async function fetchSupplierDialog(pg = 1, q = '') {
+    try {
+      const res = await api.listSuppliersPage({ q, page: pg, limit: SUPPLIER_PAGE_SIZE })
+      setSupplierDialogResult(res)
+      setSupplierDialogPage(pg)
+    } catch {}
+  }
+
   function openSupplierDialog() {
+    closeAllDialogs()
     setSupplierDialogQ('')
-    setSupplierDialogResults(suppliers.slice(0, 20))
+    fetchSupplierDialog(1, '')
     document.getElementById('supplier-dialog')?.showModal()
+    setTimeout(() => document.getElementById('supplier-dialog')?.querySelector('input')?.focus(), 50)
   }
 
   function doSupplierSearch() {
-    const q = supplierDialogQ.trim().toLowerCase()
-    const filtered = q
-      ? suppliers.filter((s) =>
-          s.name.toLowerCase().includes(q) ||
-          (s.phone || '').toLowerCase().includes(q) ||
-          (s.address || '').toLowerCase().includes(q)
-        ).slice(0, 20)
-      : suppliers.slice(0, 20)
-    setSupplierDialogResults(filtered)
+    fetchSupplierDialog(1, supplierDialogQ.trim())
   }
 
   function selectSupplier(s) {
@@ -496,6 +567,7 @@ export default function Purchases({ path }) {
 
   // Validate with preview
   async function openPreview(item) {
+    closeAllDialogs()
     try {
       const preview = await api.previewValidation(item.id)
       setPreviewData(preview)
@@ -516,6 +588,7 @@ export default function Purchases({ path }) {
 
   // Payment
   function openPay(item) {
+    closeAllDialogs()
     setPayTarget(item)
     setPayAmount(+(item.total - item.paid_amount).toFixed(2))
     setPayNote('')
@@ -534,6 +607,7 @@ export default function Purchases({ path }) {
 
   // Payment history
   async function openPayHistory(item) {
+    closeAllDialogs()
     setPayHistoryTarget(item)
     try {
       const data = await api.listPurchasePayments(item.id, { limit: 50 })
@@ -546,6 +620,7 @@ export default function Purchases({ path }) {
 
   // Delete
   function openDelete(item) {
+    closeAllDialogs()
     setDeleteTarget(item)
     openModal('delete-modal')
   }
@@ -564,6 +639,7 @@ export default function Purchases({ path }) {
 
   // Return
   async function openReturn(item) {
+    closeAllDialogs()
     try {
       const [p, returnable] = await Promise.all([
         api.getPurchase(item.id),
@@ -601,6 +677,7 @@ export default function Purchases({ path }) {
 
   // Low stock
   async function openLowStock() {
+    closeAllDialogs()
     try {
       const items = await api.getLowStock({ limit: 50 })
       setLowStockItems(items)
@@ -634,13 +711,13 @@ export default function Purchases({ path }) {
     const linesHtml = (item.lines || []).map(l => {
       const lotCell = canBatches ? `<td>${l.lot || '-'}</td>` : ''
       const expiryCell = canBatches ? `<td>${l.expiry_date ? new Date(l.expiry_date).toLocaleDateString() : '-'}</td>` : ''
-      return `<tr><td>${l.product_name}</td><td style="text-align:right">${l.qty}</td><td style="text-align:right">${l.received_qty || 0}</td><td style="text-align:right">${l.prix_achat.toFixed(2)}</td><td style="text-align:right">${l.remise ? l.remise + '%' : '-'}</td>${lotCell}${expiryCell}<td style="text-align:right">${(l.qty * l.prix_achat * (1 - (l.remise || 0) / 100)).toFixed(2)}</td></tr>`
+      return `<tr><td>${l.product_name}</td><td style="text-align:right">${l.qty}</td><td style="text-align:right">${l.received_qty || 0}</td><td style="text-align:right">${fmt(l.prix_achat)}</td><td style="text-align:right">${l.remise ? l.remise + '%' : '-'}</td>${lotCell}${expiryCell}<td style="text-align:right">${fmt(l.qty * l.prix_achat * (1 - (l.remise || 0) / 100))}</td></tr>`
     }).join('')
     const discountHtml = (item.discount_total || 0) > 0
-      ? `<p style="color:red"><strong>${t('totalDiscount')}:</strong> -${item.discount_total.toFixed(2)}${item.global_remise ? ` (${t('globalDiscount')}: ${item.global_remise}%)` : ''}</p>`
+      ? `<p style="color:red"><strong>${t('totalDiscount')}:</strong> -${fmt(item.discount_total)}${item.global_remise ? ` (${t('globalDiscount')}: ${item.global_remise}%)` : ''}</p>`
       : ''
     const expensesHtml = (item.expenses || []).length > 0
-      ? `<h3>${t('purchaseExpenses')}</h3><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%"><thead><tr><th>${t('expenseLabel')}</th><th style="text-align:right">${t('expenseAmountShort')}</th></tr></thead><tbody>${item.expenses.map(e => `<tr><td>${e.label}</td><td style="text-align:right">${e.amount.toFixed(2)}</td></tr>`).join('')}</tbody></table>`
+      ? `<h3>${t('purchaseExpenses')}</h3><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%"><thead><tr><th>${t('expenseLabel')}</th><th style="text-align:right">${t('expenseAmountShort')}</th></tr></thead><tbody>${item.expenses.map(e => `<tr><td>${e.label}</td><td style="text-align:right">${fmt(e.amount)}</td></tr>`).join('')}</tbody></table>`
       : ''
     w.document.write(`<html><head><title>${item.ref}</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:6px 8px}th{background:#f5f5f5;text-align:left}</style></head><body>
       <h2>${t('purchaseRef')}: ${item.ref}</h2>
@@ -652,13 +729,28 @@ export default function Purchases({ path }) {
       ${item.validated_by_email ? `<p><strong>${t('validatedBy')}:</strong> ${item.validated_by_email}</p>` : ''}
       ${item.note ? `<p><strong>${t('purchaseNote')}:</strong> ${item.note}</p>` : ''}
       <table><thead><tr><th>${t('productName')}</th><th style="text-align:right">${t('orderedQty')}</th><th style="text-align:right">${t('receivedQty')}</th><th style="text-align:right">${t('prixAchat')}</th><th style="text-align:right">${t('remise')}</th>${canBatches ? `<th>${t('batchNumber')}</th><th>${t('expiryDate')}</th>` : ''}<th style="text-align:right">Total</th></tr></thead><tbody>${linesHtml}</tbody>
-      <tfoot><tr><td colspan="${canBatches ? 7 : 5}" style="text-align:right;font-weight:bold">${t('purchaseTotal')}</td><td style="text-align:right;font-weight:bold">${item.total.toFixed(2)}</td></tr></tfoot></table>
+      <tfoot><tr><td colspan="${canBatches ? 7 : 5}" style="text-align:right;font-weight:bold">${t('purchaseTotal')}</td><td style="text-align:right;font-weight:bold">${fmt(item.total)}</td></tr></tfoot></table>
       ${discountHtml}
       ${expensesHtml}
-      <p style="margin-top:16px"><strong>${t('purchaseTotal')}:</strong> ${item.total.toFixed(2)} | <strong>${t('purchasePaid2')}:</strong> ${item.paid_amount.toFixed(2)} | <strong>${t('purchaseRemaining')}:</strong> ${(item.total - item.paid_amount).toFixed(2)}</p>
+      <p style="margin-top:16px"><strong>${t('purchaseTotal')}:</strong> ${fmt(item.total)} | <strong>${t('purchasePaid2')}:</strong> ${fmt(item.paid_amount)} | <strong>${t('purchaseRemaining')}:</strong> ${fmt((item.total - item.paid_amount))}</p>
     </body></html>`)
     w.document.close()
     w.print()
+  }
+
+  // CSV export
+  function exportCSV() {
+    const headers = [t('ref'), t('purchaseDate'), t('purchaseSupplier'), t('supplierInvoice'), t('purchaseStatus'), t('purchaseTotal'), t('purchasePaid2'), t('purchaseRemaining')]
+    const rows = items.map(p => [
+      p.ref || '', new Date(p.created_at).toLocaleDateString(), p.supplier_name || '',
+      p.supplier_invoice || '', p.status, p.total, p.paid_amount, (p.total - p.paid_amount),
+    ])
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `purchases_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click(); URL.revokeObjectURL(url)
   }
 
   const { items, pages } = result
@@ -711,7 +803,7 @@ export default function Purchases({ path }) {
   // ── Purchase form view ──────────────────────────────────────────────────────
   if (formOpen) {
     const pvCount = (visiblePrices.pv1 ? 1 : 0) + (visiblePrices.pv2 ? 1 : 0) + (visiblePrices.pv3 ? 1 : 0)
-    const colCount = 5 + pvCount + (showEffective ? 1 : 0) + (canBatches ? 2 : 0)
+    const colCount = 5 + pvCount + (showEffective ? 1 : 0) + 1 + (canBatches ? 2 : 0)
     return (
       <Layout currentPath={path}>
         <div class="flex flex-col h-[calc(100vh-80px)]">
@@ -805,6 +897,7 @@ export default function Purchases({ path }) {
                   {visiblePrices.pv1 && <th class="font-semibold text-end w-20">{t('prixVente1')}</th>}
                   {visiblePrices.pv2 && <th class="font-semibold text-end w-20">{t('prixVente2')}</th>}
                   {visiblePrices.pv3 && <th class="font-semibold text-end w-20">{t('prixVente3')}</th>}
+                  <th class="font-semibold text-end w-16">{t('margin')}</th>
                   {canBatches && <th class="font-semibold w-20">{t('batchNumber')}</th>}
                   {canBatches && <th class="font-semibold w-24">{t('expiryDate')}</th>}
                   <th class="font-semibold text-end w-24">Total</th>
@@ -834,13 +927,19 @@ export default function Purchases({ path }) {
                       <td class="text-end"><input type="number" min="1" step="1" class="input input-bordered input-xs w-16 font-mono text-end" value={l.qty} onInput={(e) => updateLine('qty', Math.max(1, parseInt(e.target.value) || 1))} /></td>
                       <td class="text-end"><input type="number" min="0" step="any" class="input input-bordered input-xs w-20 font-mono text-end" value={l.prix_achat} onInput={(e) => updateLine('prix_achat', parseFloat(e.target.value) || 0)} /></td>
                       <td class="text-end"><input type="number" min="0" max="100" step="any" class="input input-bordered input-xs w-16 font-mono text-end" value={l.remise || 0} onInput={(e) => updateLine('remise', parseFloat(e.target.value) || 0)} /></td>
-                      {showEffective && <td class="text-end font-mono text-sm text-primary font-semibold">{effectiveUnitPrice(l).toFixed(2)}</td>}
+                      {showEffective && <td class="text-end font-mono text-sm text-primary font-semibold">{fmt(effectiveUnitPrice(l))}</td>}
                       {visiblePrices.pv1 && <td class="text-end"><input type="number" min="0" step="any" class="input input-bordered input-xs w-20 font-mono text-end" value={l.prix_vente_1} onInput={(e) => updateLine('prix_vente_1', parseFloat(e.target.value) || 0)} /></td>}
                       {visiblePrices.pv2 && <td class="text-end"><input type="number" min="0" step="any" class="input input-bordered input-xs w-20 font-mono text-end" value={l.prix_vente_2} onInput={(e) => updateLine('prix_vente_2', parseFloat(e.target.value) || 0)} /></td>}
                       {visiblePrices.pv3 && <td class="text-end"><input type="number" min="0" step="any" class="input input-bordered input-xs w-20 font-mono text-end" value={l.prix_vente_3} onInput={(e) => updateLine('prix_vente_3', parseFloat(e.target.value) || 0)} /></td>}
+                      {(() => {
+                        const cost = effectiveUnitPrice(l)
+                        const pv = l.prix_vente_1 || l.prix_vente_2 || l.prix_vente_3 || 0
+                        const marginPct = pv > 0 && cost > 0 ? ((pv - cost) / pv * 100) : 0
+                        return <td class={`text-end font-mono text-xs font-semibold ${!pv || !cost ? 'text-base-content/40' : marginPct < 0 ? 'text-error' : marginPct < 10 ? 'text-warning' : 'text-success'}`}>{pv > 0 && cost > 0 ? marginPct.toFixed(1) + '%' : '—'}</td>
+                      })()}
                       {canBatches && <td><input type="text" class="input input-bordered input-xs w-20 text-sm" value={l.lot || ''} onInput={(e) => updateLine('lot', e.target.value)} /></td>}
                       {canBatches && <td><input type="date" class="input input-bordered input-xs w-28 text-sm" value={l.expiry_date ? (typeof l.expiry_date === 'string' ? l.expiry_date.slice(0, 10) : new Date(l.expiry_date).toISOString().slice(0, 10)) : ''} onInput={(e) => updateLine('expiry_date', e.target.value)} /></td>}
-                      <td class="text-end font-mono text-sm font-semibold">{lineTotal.toFixed(2)}</td>
+                      <td class="text-end font-mono text-sm font-semibold">{fmt(lineTotal)}</td>
                       <td class="text-end">
                         <button class="btn btn-xs btn-ghost text-error opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeLine(i)}>
                           <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -870,7 +969,7 @@ export default function Purchases({ path }) {
                     class="input input-bordered input-xs w-20 font-mono"
                     value={globalRemise}
                     onInput={(e) => setGlobalRemise(Number(e.target.value))} />
-                  {globalRemise > 0 && <span class="text-xs text-error font-mono font-bold">-{globalDiscountAmt.toFixed(2)}</span>}
+                  {globalRemise > 0 && <span class="text-xs text-error font-mono font-bold">-{fmt(globalDiscountAmt)}</span>}
                 </div>
 
                 {/* Expenses inline */}
@@ -905,16 +1004,16 @@ export default function Purchases({ path }) {
                 <div class="flex flex-col items-end gap-1">
                   {hasDiscount && (
                     <div class="text-xs text-base-content/80">
-                      {t('totalDiscount')}: <span class="font-mono text-error font-bold">-{discountTotal.toFixed(2)}</span>
+                      {t('totalDiscount')}: <span class="font-mono text-error font-bold">-{fmt(discountTotal)}</span>
                     </div>
                   )}
                   {expensesTotal > 0 && (
                     <div class="text-xs text-base-content/80">
-                      {t('purchaseExpenses')}: <span class="font-mono font-bold">+{expensesTotal.toFixed(2)}</span>
+                      {t('purchaseExpenses')}: <span class="font-mono font-bold">+{fmt(expensesTotal)}</span>
                     </div>
                   )}
                   <div class="text-xl font-bold font-mono text-primary">
-                    {grandTotal.toFixed(2)}
+                    {fmt(grandTotal)}
                   </div>
                   <div class="text-[11px] text-base-content/75">{lines.length} {t('productName').toLowerCase()}</div>
                 </div>
@@ -981,8 +1080,8 @@ export default function Purchases({ path }) {
                       <td class={`text-end text-sm font-mono ${p.qty_available <= p.qty_min ? 'text-error' : ''}`}>
                         {p.qty_available}
                       </td>
-                      <td class="text-end text-sm font-mono">{p.prix_achat}</td>
-                      <td class="text-end text-sm font-mono">{p.prix_vente_1}</td>
+                      <td class="text-end text-sm font-mono">{fmt(p.prix_achat)}</td>
+                      <td class="text-end text-sm font-mono">{fmt(p.prix_vente_1)}</td>
                       <td class="text-end text-sm">
                         {p.vat > 0 ? <span class="badge badge-warning badge-xs">{p.vat}%</span> : '0%'}
                       </td>
@@ -1076,8 +1175,13 @@ export default function Purchases({ path }) {
               )}
             </div>
             {lineForm.prix_achat > 0 && (
-              <div class="mt-3 text-end text-sm text-base-content/80">
-                {t('purchaseTotal')}: <span class="font-mono font-bold text-primary">{(lineForm.qty * lineForm.prix_achat * (1 - (lineForm.remise || 0) / 100)).toFixed(2)}</span>
+              <div class="mt-3 flex items-center justify-end gap-4 text-sm text-base-content/80">
+                {lineForm.prix_vente_1 > 0 && (() => {
+                  const cost = lineForm.prix_achat * (1 - (lineForm.remise || 0) / 100)
+                  const m = ((lineForm.prix_vente_1 - cost) / lineForm.prix_vente_1 * 100)
+                  return <span>{t('margin')}: <span class={`font-mono font-bold ${m < 0 ? 'text-error' : m < 10 ? 'text-warning' : 'text-success'}`}>{m.toFixed(1)}%</span></span>
+                })()}
+                <span>{t('purchaseTotal')}: <span class="font-mono font-bold text-primary">{fmt((lineForm.qty * lineForm.prix_achat * (1 - (lineForm.remise || 0) / 100)))}</span></span>
               </div>
             )}
             <div class="modal-action">
@@ -1114,7 +1218,7 @@ export default function Purchases({ path }) {
                 onClick={selectPurchaseNoVariant}
               >
                 <span>{purchaseVariantProduct?.name} ({t('noVariant')})</span>
-                <span class="font-mono">{purchaseVariantProduct?.prix_achat?.toFixed(2)}</span>
+                <span class="font-mono">{fmt(purchaseVariantProduct?.prix_achat)}</span>
               </button>
               {purchaseVariants.map(v => {
                 const attrStr = v.attributes ? Object.entries(v.attributes).map(([k, val]) => `${k}: ${val}`).join(', ') : ''
@@ -1127,7 +1231,7 @@ export default function Purchases({ path }) {
                     <span class="text-left">{attrStr || '—'}</span>
                     <span class="flex items-center gap-2">
                       <span class="badge badge-ghost badge-sm">{t('qty')}: {v.qty_available}</span>
-                      <span class="font-mono font-bold">{v.prix_achat?.toFixed(2)}</span>
+                      <span class="font-mono font-bold">{fmt(v.prix_achat)}</span>
                     </span>
                   </button>
                 )
@@ -1168,23 +1272,40 @@ export default function Purchases({ path }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {supplierDialogResults.length === 0 && (
+                  {supplierDialogResult.items.length === 0 && (
                     <tr>
                       <td colSpan={4} class="text-center text-base-content/80 py-8">{t('noSuppliers')}</td>
                     </tr>
                   )}
-                  {supplierDialogResults.map((s) => (
+                  {supplierDialogResult.items.map((s) => (
                     <tr key={s.id} class="cursor-pointer hover" onClick={() => selectSupplier(s)}>
                       <td class="font-medium">{s.name}</td>
                       <td class="text-sm">{s.phone || '—'}</td>
                       <td class="text-sm">{s.address || '—'}</td>
                       <td class={`text-end text-sm font-mono ${s.balance > 0 ? 'text-error' : 'text-success'}`}>
-                        {s.balance.toFixed(2)}
+                        {fmt(s.balance)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {supplierDialogResult.pages > 1 && (
+              <div class="flex items-center justify-center gap-2 mt-2">
+                <button class="btn btn-xs btn-ghost" disabled={supplierDialogPage <= 1} onClick={() => fetchSupplierDialog(supplierDialogPage - 1, supplierDialogQ.trim())}>«</button>
+                <span class="text-xs">{supplierDialogPage} / {supplierDialogResult.pages}</span>
+                <button class="btn btn-xs btn-ghost" disabled={supplierDialogPage >= supplierDialogResult.pages} onClick={() => fetchSupplierDialog(supplierDialogPage + 1, supplierDialogQ.trim())}>»</button>
+              </div>
+            )}
+
+            <div class="flex items-center gap-2 mt-3">
+              <input type="text" class="input input-bordered input-sm flex-1"
+                placeholder={t('newSupplierName')}
+                value={newSupplierName}
+                onInput={e => setNewSupplierName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCreateSupplierAndSelect(false)} />
+              <button class="btn btn-sm btn-primary" onClick={() => handleCreateSupplierAndSelect(false)} disabled={!newSupplierName.trim()}>+ {t('add')}</button>
             </div>
 
             <div class="modal-action">
@@ -1223,7 +1344,7 @@ export default function Purchases({ path }) {
                           <td class="font-medium">{p.name}</td>
                           <td class="text-end font-mono text-error">{p.qty_available}</td>
                           <td class="text-end font-mono">{p.qty_min}</td>
-                          <td class="text-end font-mono">{p.prix_achat}</td>
+                          <td class="text-end font-mono">{fmt(p.prix_achat)}</td>
                           <td class="text-end">
                             <button class="btn btn-xs btn-primary" onClick={() => addLowStockToForm(p)}
                               disabled={lines.some(l => l.product_id === p.id)}>
@@ -1273,6 +1394,28 @@ export default function Purchases({ path }) {
         </div>
       </div>
 
+      {/* Stats cards */}
+      {stats && (
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
+            <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchases')}</div>
+            <div class="text-xl font-bold font-mono mt-1">{stats.total_count || 0}</div>
+          </div>
+          <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
+            <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchaseAmount')}</div>
+            <div class="text-xl font-bold font-mono mt-1">{fmt(stats.total_ttc || stats.total_amount || 0)}</div>
+          </div>
+          <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
+            <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchasePaid')}</div>
+            <div class="text-xl font-bold font-mono text-success mt-1">{fmt(stats.total_paid || 0)}</div>
+          </div>
+          <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
+            <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchaseRemaining')}</div>
+            <div class="text-xl font-bold font-mono text-error mt-1">{fmt(stats.total_remaining || 0)}</div>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex flex-wrap gap-3 items-center">
         <div class="flex flex-col flex-1 min-w-40">
@@ -1282,6 +1425,15 @@ export default function Purchases({ path }) {
             value={filterQ}
             onInput={(e) => setFilterQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && doSearch()} />
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs text-base-content/70 mb-0.5">{t('purchaseSupplier')}</span>
+          <select class="select select-bordered select-sm"
+            value={filterSupplier}
+            onChange={(e) => { setFilterSupplier(e.target.value); setPage(1) }}>
+            <option value="">{t('allSuppliers')}</option>
+            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
         </div>
         <div class="flex flex-col">
           <span class="text-xs text-base-content/70 mb-0.5">{t('status')}</span>
@@ -1308,6 +1460,12 @@ export default function Purchases({ path }) {
             onInput={(e) => { setFilterDateTo(e.target.value); setPage(1) }} />
         </div>
         <button class="btn btn-sm btn-primary btn-outline" onClick={doSearch}>{t('search')}</button>
+        {items.length > 0 && (
+          <button class="btn btn-sm btn-ghost btn-outline" onClick={exportCSV}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+            {t('exportCSV')}
+          </button>
+        )}
       </div>
 
       <div class="card bg-base-100 shadow overflow-hidden">
@@ -1354,12 +1512,12 @@ export default function Purchases({ path }) {
                       {t('purchase' + p.status.charAt(0).toUpperCase() + p.status.slice(1))}
                     </span>
                   </td>
-                  {useVAT && <td class="px-3 py-2.5 text-end font-mono text-sm">{(p.total_ht || 0).toFixed(2)}</td>}
-                  {useVAT && <td class="px-3 py-2.5 text-end font-mono text-sm text-warning">{(p.total_vat || 0).toFixed(2)}</td>}
-                  <td class="px-3 py-2.5 text-end font-mono text-sm">{p.total.toFixed(2)}</td>
-                  <td class="px-3 py-2.5 text-end font-mono text-sm">{p.paid_amount.toFixed(2)}</td>
+                  {useVAT && <td class="px-3 py-2.5 text-end font-mono text-sm">{fmt((p.total_ht || 0))}</td>}
+                  {useVAT && <td class="px-3 py-2.5 text-end font-mono text-sm text-warning">{fmt((p.total_vat || 0))}</td>}
+                  <td class="px-3 py-2.5 text-end font-mono text-sm">{fmt(p.total)}</td>
+                  <td class="px-3 py-2.5 text-end font-mono text-sm">{fmt(p.paid_amount)}</td>
                   <td class={`px-3 py-2.5 text-end font-mono text-sm ${remaining > 0 ? 'text-error' : 'text-success'}`}>
-                    {remaining.toFixed(2)}
+                    {fmt(remaining)}
                   </td>
                   {canWrite && (
                     <td class="px-3 py-2.5 text-end">
@@ -1429,23 +1587,26 @@ export default function Purchases({ path }) {
                           </div>
                         )}
 
-                        {(p.status === 'validated' || p.status === 'partially_validated') && canPay && (
-                          <>
-                            <div class="tooltip tooltip-left" data-tip={t('recordPayment')}>
-                              <button class="btn btn-sm btn-ghost btn-square text-primary" onClick={() => openPay(p)}>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
-                                </svg>
-                              </button>
-                            </div>
-                            <div class="tooltip tooltip-left" data-tip={t('purchasePayments')}>
-                              <button class="btn btn-sm btn-ghost btn-square" onClick={() => openPayHistory(p)}>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                              </button>
-                            </div>
-                          </>
+                        {/* Record payment — for any non-draft purchase with remaining balance */}
+                        {p.status !== 'draft' && canPay && remaining > 0 && (
+                          <div class="tooltip tooltip-left" data-tip={t('recordPayment')}>
+                            <button class="btn btn-sm btn-ghost btn-square text-primary" onClick={() => openPay(p)}>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Payment history — for any non-draft purchase */}
+                        {p.status !== 'draft' && (
+                          <div class="tooltip tooltip-left" data-tip={t('purchasePayments')}>
+                            <button class="btn btn-sm btn-ghost btn-square" onClick={() => openPayHistory(p)}>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
+                          </div>
                         )}
 
                         {/* Return — for validated/paid purchases */}
@@ -1454,16 +1615,6 @@ export default function Purchases({ path }) {
                             <button class="btn btn-sm btn-ghost btn-square text-warning" onClick={() => openReturn(p)}>
                               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-
-                        {p.status === 'paid' && canPay && (
-                          <div class="tooltip tooltip-left" data-tip={t('purchasePayments')}>
-                            <button class="btn btn-sm btn-ghost btn-square" onClick={() => openPayHistory(p)}>
-                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                             </button>
                           </div>
@@ -1492,7 +1643,7 @@ export default function Purchases({ path }) {
       <Modal id="pay-modal" title={t('recordPayment')}>
         <p class="text-sm mb-1">{payTarget?.supplier_name}</p>
         <p class="text-xs text-base-content/80 mb-3">
-          {t('purchaseRemaining')}: <span class="font-mono">{payTarget ? (payTarget.total - payTarget.paid_amount).toFixed(2) : 0}</span>
+          {t('purchaseRemaining')}: <span class="font-mono">{payTarget ? fmt(payTarget.total - payTarget.paid_amount) : 0}</span>
         </p>
         <label class="form-control mb-3">
           <span class="label-text">{t('paymentAmount')}</span>
@@ -1530,7 +1681,7 @@ export default function Purchases({ path }) {
                 {payHistory.map((ph) => (
                   <tr key={ph.id}>
                     <td class="text-sm">{new Date(ph.created_at).toLocaleString()}</td>
-                    <td class="text-end font-mono text-sm">{ph.amount.toFixed(2)}</td>
+                    <td class="text-end font-mono text-sm">{fmt(ph.amount)}</td>
                     <td class="text-sm text-base-content/80">{ph.note || '—'}</td>
                   </tr>
                 ))}
@@ -1571,10 +1722,10 @@ export default function Purchases({ path }) {
                   <tr key={pl.product_id}>
                     <td class="font-medium">{pl.product_name}</td>
                     <td class="text-end font-mono">{pl.current_qty}</td>
-                    <td class="text-end font-mono">{pl.current_prix_achat.toFixed(2)}</td>
-                    <td class="text-end font-mono">{pl.incoming_qty} x {pl.incoming_prix_achat.toFixed(2)}</td>
+                    <td class="text-end font-mono">{fmt(pl.current_prix_achat)}</td>
+                    <td class="text-end font-mono">{pl.incoming_qty} x {fmt(pl.incoming_prix_achat)}</td>
                     <td class={`text-end font-mono font-bold ${pl.new_prix_achat !== pl.current_prix_achat ? 'text-warning' : ''}`}>
-                      {pl.new_prix_achat.toFixed(2)}
+                      {fmt(pl.new_prix_achat)}
                     </td>
                   </tr>
                 ))}
@@ -1721,8 +1872,8 @@ export default function Purchases({ path }) {
                     )}
                     {!importSupplierID && (
                       <div class="flex gap-1 mt-1">
-                        <input type="text" class="input input-bordered input-xs flex-1" placeholder={t('newSupplierName') || 'New supplier name'} value={newSupplierName} onInput={e => setNewSupplierName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreateImportSupplier()} />
-                        <button class="btn btn-xs btn-primary" onClick={handleCreateImportSupplier} disabled={!newSupplierName.trim()}>+</button>
+                        <input type="text" class="input input-bordered input-xs flex-1" placeholder={t('newSupplierName')} value={newSupplierName} onInput={e => setNewSupplierName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreateSupplierAndSelect(true)} />
+                        <button class="btn btn-xs btn-primary" onClick={() => handleCreateSupplierAndSelect(true)} disabled={!newSupplierName.trim()}>+</button>
                       </div>
                     )}
                   </div>

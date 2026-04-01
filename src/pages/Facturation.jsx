@@ -5,10 +5,11 @@ import { api } from '../lib/api'
 import { hasPerm } from '../lib/auth'
 import { useI18n } from '../lib/i18n'
 import { printInvoice, printHtml } from '../lib/invoicePrint'
+import { Pagination } from '../components/Pagination'
 
 const DOC_TYPES = ['bc', 'devis', 'facture', 'avoir']
 const STATUSES = ['draft', 'sent', 'accepted', 'rejected', 'unpaid', 'partial', 'paid', 'cancelled']
-const LIMIT = 15
+const LIMIT = 10
 
 const STATUS_BADGE = {
   draft: 'badge-ghost', sent: 'badge-info', accepted: 'badge-success', rejected: 'badge-error',
@@ -27,7 +28,7 @@ function defaultFrom() {
 function defaultTo() { return new Date().toISOString().slice(0, 10) }
 
 export default function Facturation({ path }) {
-  const { t, lang } = useI18n()
+  const { t, lang, fmt } = useI18n()
   const canAdd = hasPerm('facturation', 'add')
   const canEdit = hasPerm('facturation', 'edit')
   const canDelete = hasPerm('facturation', 'delete')
@@ -71,6 +72,35 @@ export default function Facturation({ path }) {
   // Lookups
   const [store, setStore] = useState({})
 
+  function closeAllDialogs() {
+    closeModal('avoir-modal')
+    closeModal('pay-modal')
+    closeModal('convert-modal')
+    setDetail(null)
+    setAvoirTarget(null); setAvoirLines([]); setAvoirNote(''); setAvoirError('')
+    setPayTarget(null); setPayAmount(''); setPayNote(''); setPayPayMethod('cash'); setPayError('')
+    setConvertTarget(null); setConvertPayMethod('cash')
+  }
+
+  // Close target state when dialog is dismissed via Escape
+  useEffect(() => {
+    function handleClose(e) {
+      const id = e.target?.id
+      if (id === 'avoir-modal') { setAvoirTarget(null); setAvoirLines([]); setAvoirNote(''); setAvoirError('') }
+      if (id === 'pay-modal') { setPayTarget(null); setPayAmount(''); setPayNote(''); setPayPayMethod('cash'); setPayError('') }
+      if (id === 'convert-modal') { setConvertTarget(null); setConvertPayMethod('cash') }
+    }
+    function handleKeydown(e) {
+      if (e.key === 'Escape') setDetail(null)
+    }
+    document.addEventListener('close', handleClose)
+    document.addEventListener('keydown', handleKeydown)
+    return () => {
+      document.removeEventListener('close', handleClose)
+      document.removeEventListener('keydown', handleKeydown)
+    }
+  }, [])
+
   useEffect(() => {
     api.getStoreSettings().then((d) => setStore(d)).catch(() => {})
   }, [])
@@ -98,6 +128,7 @@ export default function Facturation({ path }) {
   }
 
   function openConvertModal(doc) {
+    closeAllDialogs()
     setConvertTarget(doc)
     setConvertPayMethod('cash')
     openModal('convert-modal')
@@ -188,11 +219,11 @@ export default function Facturation({ path }) {
   </div>
   <div class="details">
     <div class="detail-row"><span class="label">${lang === 'ar' ? 'رقم الفاتورة' : 'Facture N°'}</span><span class="value">${doc.ref}</span></div>
-    <div class="detail-row"><span class="label">${t('totalTTC')}</span><span class="value">${formatDA(doc.total)}</span></div>
+    <div class="detail-row"><span class="label">${t('totalTTC')}</span><span class="value">${fmt(doc.total)}</span></div>
     <div class="detail-row"><span class="label">${t('blPaymentMethod')}</span><span class="value">${pmLabels[payment.payment_method] || payment.payment_method}</span></div>
     ${payment.timbre > 0 ? `<div class="detail-row timbre-row"><span class="label">${t('timbreFiscal')}</span><span class="value">${formatDA(payment.timbre)}</span></div>` : ''}
-    <div class="detail-row"><span class="label">${t('paidAmount')}</span><span class="value">${formatDA(doc.paid_amount)}</span></div>
-    <div class="detail-row"><span class="label"><strong>${t('remaining')}</strong></span><span class="value"><strong>${formatDA(doc.total - doc.paid_amount)}</strong></span></div>
+    <div class="detail-row"><span class="label">${t('paidAmount')}</span><span class="value">${fmt(doc.paid_amount)}</span></div>
+    <div class="detail-row"><span class="label"><strong>${t('remaining')}</strong></span><span class="value"><strong>${fmt(doc.total - doc.paid_amount)}</strong></span></div>
     ${payment.note ? `<div class="detail-row"><span class="label">${t('note')}</span><span class="value">${payment.note}</span></div>` : ''}
   </div>
   <div class="signature">
@@ -273,6 +304,7 @@ export default function Facturation({ path }) {
 
   // Avoir
   function openAvoirModal(doc) {
+    closeAllDialogs()
     setAvoirTarget(doc)
     setAvoirLines(doc.lines.map((l) => ({ product_id: l.product_id, variant_id: l.variant_id || '', qty: 0, max: l.qty, name: l.product_name })))
     setAvoirNote(''); setAvoirError('')
@@ -295,6 +327,7 @@ export default function Facturation({ path }) {
 
   // Pay
   function openPayModal(doc) {
+    closeAllDialogs()
     setPayTarget(doc); setPayAmount(''); setPayNote(''); setPayPayMethod(doc.payment_method || 'cash'); setPayError('')
     openModal('pay-modal')
   }
@@ -309,7 +342,6 @@ export default function Facturation({ path }) {
     setPayLoading(false)
   }
 
-  function formatDA(n) { return new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 2 }).format(n) + ' DA' }
   function formatDate(d) { return d ? new Date(d).toLocaleDateString(lang === 'ar' ? 'ar-DZ' : 'fr-DZ') : '—' }
 
   const docTypeLabel = (dt) => t(DOC_LABEL[dt] || dt)
@@ -368,11 +400,11 @@ export default function Facturation({ path }) {
           </thead>
           <tbody>
             {items.map((doc) => (
-              <tr key={doc.id} class="hover cursor-pointer" onClick={() => setDetail(doc)}>
+              <tr key={doc.id} class="hover cursor-pointer" onClick={() => { closeAllDialogs(); setDetail(doc) }}>
                 <td class="px-3 py-2 font-mono text-xs">{doc.ref}</td>
                 <td class="px-3 py-2"><span class="badge badge-xs badge-outline">{docTypeLabel(doc.doc_type)}</span></td>
                 <td class="px-3 py-2 text-sm">{doc.client_name}</td>
-                <td class="px-3 py-2 text-right font-mono text-sm">{formatDA(doc.total)}</td>
+                <td class="px-3 py-2 text-right font-mono text-sm">{fmt(doc.total)}</td>
                 <td class="px-3 py-2"><span class={`badge badge-xs ${STATUS_BADGE[doc.status]}`}>{statusLabel(doc.status)}</span></td>
                 <td class="px-3 py-2 text-xs">{formatDate(doc.created_at)}</td>
                 <td class="px-3 py-2" onClick={(e) => e.stopPropagation()}>
@@ -416,14 +448,7 @@ export default function Facturation({ path }) {
         </table>
       </div>
 
-      {/* Pagination */}
-      {pages > 1 && (
-        <div class="flex justify-center gap-1 mt-3">
-          <button class="btn btn-xs" disabled={page <= 1} onClick={() => setPage(page - 1)}>&laquo;</button>
-          <span class="btn btn-xs btn-ghost">{page} / {pages}</span>
-          <button class="btn btn-xs" disabled={page >= pages} onClick={() => setPage(page + 1)}>&raquo;</button>
-        </div>
-      )}
+      <Pagination page={page} pages={pages} total={total} limit={LIMIT} onPageChange={setPage} />
 
       {/* Detail Panel */}
       {detail && (
@@ -479,8 +504,8 @@ export default function Facturation({ path }) {
               {detail.doc_type === 'facture' && (
                 <div class="mb-5 bg-base-200/50 rounded-xl p-4 border border-base-300/50">
                   <div class="flex justify-between text-xs mb-2">
-                    <span class="text-base-content/70">{t('paidAmount')}: <span class="font-semibold text-success">{formatDA(detail.paid_amount)}</span></span>
-                    <span class="text-base-content/70">{t('remaining')}: <span class="font-semibold text-error">{formatDA(detail.total - detail.paid_amount)}</span></span>
+                    <span class="text-base-content/70">{t('paidAmount')}: <span class="font-semibold text-success">{fmt(detail.paid_amount)}</span></span>
+                    <span class="text-base-content/70">{t('remaining')}: <span class="font-semibold text-error">{fmt(detail.total - detail.paid_amount)}</span></span>
                   </div>
                   <div class="w-full bg-base-300 rounded-full h-2.5">
                     <div class={`h-2.5 rounded-full transition-all ${detail.status === 'paid' ? 'bg-success' : 'bg-primary'}`}
@@ -488,7 +513,7 @@ export default function Facturation({ path }) {
                   </div>
                   {(detail.timbre ?? 0) > 0 && (
                     <div class="flex justify-end mt-2">
-                      <span class="text-xs text-warning font-medium">{t('timbreFiscal')}: {formatDA(detail.timbre)}</span>
+                      <span class="text-xs text-warning font-medium">{t('timbreFiscal')}: {fmt(detail.timbre)}</span>
                     </div>
                   )}
                 </div>
@@ -514,10 +539,10 @@ export default function Facturation({ path }) {
                         <td class="text-xs text-base-content/50">{i + 1}</td>
                         <td class="font-medium text-sm">{l.product_name}</td>
                         <td class="text-right font-mono text-sm">{l.qty}</td>
-                        <td class="text-right font-mono text-sm">{formatDA(l.unit_price)}</td>
-                        <td class="text-right font-mono text-sm text-error">{l.discount > 0 ? formatDA(l.discount) : <span class="text-base-content/50">—</span>}</td>
+                        <td class="text-right font-mono text-sm">{fmt(l.unit_price)}</td>
+                        <td class="text-right font-mono text-sm text-error">{l.discount > 0 ? fmt(l.discount) : <span class="text-base-content/50">—</span>}</td>
                         <td class="text-right"><span class="badge badge-xs badge-outline">{l.vat}%</span></td>
-                        <td class="text-right font-mono text-sm font-semibold">{formatDA(l.total_ttc)}</td>
+                        <td class="text-right font-mono text-sm font-semibold">{fmt(l.total_ttc)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -527,13 +552,13 @@ export default function Facturation({ path }) {
               {/* Totals */}
               <div class="flex justify-end mb-4">
                 <div class="bg-base-200/50 rounded-xl border border-base-300/50 p-4 min-w-[280px]">
-                  <div class="flex justify-between text-sm py-1"><span class="text-base-content/80">{t('totalHT')}</span><span class="font-mono">{formatDA(detail.total_ht)}</span></div>
-                  <div class="flex justify-between text-sm py-1"><span class="text-base-content/80">{t('tva')}</span><span class="font-mono">{formatDA(detail.total_vat)}</span></div>
+                  <div class="flex justify-between text-sm py-1"><span class="text-base-content/80">{t('totalHT')}</span><span class="font-mono">{fmt(detail.total_ht)}</span></div>
+                  <div class="flex justify-between text-sm py-1"><span class="text-base-content/80">{t('tva')}</span><span class="font-mono">{fmt(detail.total_vat)}</span></div>
                   <div class="divider my-1" />
                   {(detail.timbre ?? 0) > 0 && (
-                    <div class="flex justify-between text-sm py-1"><span class="text-warning">{t('timbreFiscal')}</span><span class="font-mono text-warning">{formatDA(detail.timbre)}</span></div>
+                    <div class="flex justify-between text-sm py-1"><span class="text-warning">{t('timbreFiscal')}</span><span class="font-mono text-warning">{fmt(detail.timbre)}</span></div>
                   )}
-                  <div class="flex justify-between text-base font-bold py-1"><span>{t('totalTTC')}</span><span class="font-mono">{formatDA(detail.total)}</span></div>
+                  <div class="flex justify-between text-base font-bold py-1"><span>{t('totalTTC')}</span><span class="font-mono">{fmt(detail.total)}</span></div>
                 </div>
               </div>
 
@@ -544,9 +569,9 @@ export default function Facturation({ path }) {
                   <div class="space-y-1.5">
                     {detail.payments.map((p, i) => (
                       <div key={i} class="flex items-center gap-2 text-xs bg-success/5 border border-success/15 rounded-lg px-3 py-2">
-                        <span class="font-mono font-bold text-success text-sm">{formatDA(p.amount)}</span>
+                        <span class="font-mono font-bold text-success text-sm">{fmt(p.amount)}</span>
                         <span class={`badge badge-xs ${p.payment_method === 'cash' ? 'badge-warning' : 'badge-info'}`}>{t('payMethod_' + p.payment_method)}</span>
-                        {p.timbre > 0 && <span class="badge badge-xs badge-warning badge-outline">{t('timbreFiscal')}: {formatDA(p.timbre)}</span>}
+                        {p.timbre > 0 && <span class="badge badge-xs badge-warning badge-outline">{t('timbreFiscal')}: {fmt(p.timbre)}</span>}
                         <span class="text-base-content/70 ms-auto">{formatDate(p.created_at)}</span>
                         {p.note && <span class="text-base-content/70 italic">{p.note}</span>}
                         <button class="btn btn-xs btn-ghost border border-base-300" onClick={() => printPaymentReceipt(detail, p, i)}>
@@ -569,13 +594,13 @@ export default function Facturation({ path }) {
               {/* Action buttons */}
               <div class="flex justify-end gap-2">
                 {canEdit && detail.doc_type === 'facture' && detail.status !== 'paid' && (
-                  <button class="btn btn-sm btn-success gap-1" onClick={() => { setDetail(null); openPayModal(detail) }}>
+                  <button class="btn btn-sm btn-success gap-1" onClick={() => openPayModal(detail)}>
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
                     {t('recordPayment')}
                   </button>
                 )}
                 {canAvoir && detail.doc_type === 'facture' && (
-                  <button class="btn btn-sm btn-warning btn-outline gap-1" onClick={() => { setDetail(null); openAvoirModal(detail) }}>
+                  <button class="btn btn-sm btn-warning btn-outline gap-1" onClick={() => openAvoirModal(detail)}>
                     {t('avoir')}
                   </button>
                 )}
@@ -623,7 +648,7 @@ export default function Facturation({ path }) {
           <form onSubmit={submitPay}>
             <div class="text-sm mb-3">
               <span class="text-base-content/80">{t('remaining')}: </span>
-              <span class="font-semibold">{formatDA(payTarget.total - payTarget.paid_amount)}</span>
+              <span class="font-semibold">{fmt(payTarget.total - payTarget.paid_amount)}</span>
             </div>
             {/* Payment method (locked to facture's method) */}
             <div class="form-control mb-3">
@@ -644,7 +669,7 @@ export default function Facturation({ path }) {
                   if (amt <= 300) return '0.00'
                   const tr = Math.ceil(amt / 100)
                   const rate = amt <= 30000 ? 1 : amt <= 100000 ? 1.5 : 2
-                  return Math.max(5, Math.round(tr * rate * 100) / 100).toLocaleString('fr-DZ', { minimumFractionDigits: 2 })
+                  return fmt(Math.max(5, Math.round(tr * rate * 100) / 100))
                 })()}</span>
               </div>
             )}

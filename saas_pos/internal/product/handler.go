@@ -58,8 +58,9 @@ func HandleList(c *fiber.Ctx) error {
 	limit, _ := strconv.Atoi(c.Query("limit", "10"))
 	catID := c.Query("category_id", "")
 	brandID := c.Query("brand_id", "")
+	priceBelowCost := c.Query("price_below_cost", "")
 
-	result, err := List(tenantID, q, page, limit, catID, brandID)
+	result, err := List(tenantID, q, page, limit, catID, brandID, priceBelowCost)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, err.Error())
 	}
@@ -129,7 +130,7 @@ func HandleDelete(c *fiber.Ctx) error {
 func HandleListMovements(c *fiber.Ctx) error {
 	tenantID := middleware.GetClaims(c).TenantID
 	page, _ := strconv.Atoi(c.Query("page", "1"))
-	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
 	dateFrom := c.Query("date_from", "")
 	dateTo := c.Query("date_to", "")
 	result, err := ListMovements(tenantID, c.Params("id"), dateFrom, dateTo, page, limit)

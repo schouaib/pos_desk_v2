@@ -3,11 +3,12 @@ import { Layout } from '../components/Layout'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 import { hasPerm } from '../lib/auth'
+import { Pagination } from '../components/Pagination'
 
 const LIMIT = 10
 
 export default function ArchivedProducts({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const canArchive = hasPerm('products', 'archive')
 
   const [items, setItems] = useState([])
@@ -40,8 +41,6 @@ export default function ArchivedProducts({ path }) {
     try { await api.unarchiveProduct(p.id); load() } catch {}
   }
 
-  const start = total === 0 ? 0 : (page - 1) * LIMIT + 1
-  const end = Math.min(page * LIMIT, total)
 
   return (
     <Layout currentPath={path}>
@@ -89,7 +88,7 @@ export default function ArchivedProducts({ path }) {
                   <td class="px-3 py-2.5 text-sm">
                     {p.is_service ? <span class="badge badge-outline badge-xs">{t('isService')}</span> : p.qty_available}
                   </td>
-                  <td class="px-3 py-2.5 text-sm">{p.prix_vente_1}</td>
+                  <td class="px-3 py-2.5 text-sm">{fmt(p.prix_vente_1)}</td>
                   <td class="px-3 py-2.5 text-xs text-base-content/70">
                     {p.archived_at ? new Date(p.archived_at).toLocaleDateString() : '—'}
                   </td>
@@ -117,29 +116,7 @@ export default function ArchivedProducts({ path }) {
         </div>
       </div>
 
-      {total > 0 && (
-        <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/80">{t('showing')} {start}–{end} {t('of')} {total}</span>
-          <div class="join">
-            <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
-            {(() => {
-              const btns = []
-              const wing = 2
-              let s = Math.max(1, page - wing)
-              let e = Math.min(pages, page + wing)
-              if (s > 1) { btns.push(1); if (s > 2) btns.push('...') }
-              for (let i = s; i <= e; i++) btns.push(i)
-              if (e < pages) { if (e < pages - 1) btns.push('...'); btns.push(pages) }
-              return btns.map((b, i) =>
-                b === '...'
-                  ? <button key={`d${i}`} class="join-item btn btn-sm btn-disabled">…</button>
-                  : <button key={b} class={`join-item btn btn-sm ${b === page ? 'btn-active' : ''}`} onClick={() => setPage(b)}>{b}</button>
-              )
-            })()}
-            <button class="join-item btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>»</button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} pages={pages} total={total} limit={LIMIT} onPageChange={setPage} />
     </Layout>
   )
 }

@@ -9,6 +9,7 @@ import { hasPerm, hasFeature } from '../lib/auth'
 import { getServerUrl, isWindows } from '../lib/config'
 import { compressImage } from '../lib/imageCompress'
 import { toast } from '../components/Toast'
+import { Pagination } from '../components/Pagination'
 
 const PRINT_MODAL_ID = 'print-label-modal'
 const PrintLabelModal = lazy(() =>
@@ -37,7 +38,7 @@ function NumInput({ label, value, onChange }) {
 }
 
 export default function Products({ path }) {
-  const { t, lang } = useI18n()
+  const { t, lang, fmt } = useI18n()
   const canAdd      = hasPerm('products', 'add')
   const canEdit     = hasPerm('products', 'edit')
   const canDelete   = hasPerm('products', 'delete')
@@ -73,6 +74,7 @@ export default function Products({ path }) {
   const [q, setQ] = useState('')
   const [filterCat, setFilterCat] = useState('')
   const [filterBrand, setFilterBrand] = useState('')
+  const [filterBelowCost, setFilterBelowCost] = useState(false)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
 
@@ -163,21 +165,23 @@ export default function Products({ path }) {
       const params = { q, page, limit }
       if (filterCat) params.category_id = filterCat
       if (filterBrand) params.brand_id = filterBrand
+      if (filterBelowCost) params.price_below_cost = '1'
       const data = await api.listProducts(params)
       setResult(data)
     } catch {}
-  }, [q, page, limit, filterCat, filterBrand])
+  }, [q, page, limit, filterCat, filterBrand, filterBelowCost])
 
   useEffect(() => {
     let cancelled = false
     const params = { q, page, limit }
     if (filterCat) params.category_id = filterCat
     if (filterBrand) params.brand_id = filterBrand
+    if (filterBelowCost) params.price_below_cost = '1'
     api.listProducts(params)
       .then(data => { if (!cancelled) setResult(data) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [q, page, limit, filterCat, filterBrand])
+  }, [q, page, limit, filterCat, filterBrand, filterBelowCost])
 
   // Revoke blob URL when it changes or on unmount to avoid memory leaks
   useEffect(() => () => { URL.revokeObjectURL(imagePreview) }, [imagePreview])
@@ -188,14 +192,21 @@ export default function Products({ path }) {
     setImageUploading(false)
   }
 
+  function closeAllDialogs() {
+    ;['product-modal', 'delete-modal', 'duplicate-modal', 'delete-discount-modal', 'delete-batch-modal', 'delete-variant-modal', 'mov-dialog', 'loss-dialog', 'adjust-dialog', 'batch-dialog', 'print-modal'].forEach(id => closeModal(id))
+    setDeleteTarget(null)
+    setDupTarget(null)
+    setDeleteBarcodeTarget(null)
+  }
+
   function openCreate() {
+    closeAllDialogs()
     setEditing(null)
     setForm(emptyForm)
     setBarcodeInput('')
     setError('')
     setFieldErrors({})
     setTab(0)
-    // quickMode keeps the value loaded from tenant settings — don't reset it
     resetImageState()
     openModal('product-modal')
   }
@@ -225,7 +236,21 @@ export default function Products({ path }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [quickMode])
 
+  // Clear state when dialogs close (Escape or backdrop)
+  useEffect(() => {
+    const ids = ['delete-modal', 'duplicate-modal', 'delete-discount-modal', 'delete-batch-modal', 'delete-variant-modal']
+    const handlers = ids.map(id => {
+      const el = document.getElementById(id)
+      if (!el) return null
+      const handler = () => { setDeleteTarget(null); setDupTarget(null) }
+      el.addEventListener('close', handler)
+      return () => el.removeEventListener('close', handler)
+    }).filter(Boolean)
+    return () => handlers.forEach(fn => fn())
+  }, [])
+
   function openEdit(p) {
+    closeAllDialogs()
     setEditing(p)
     setForm({
       name: p.name,
@@ -289,8 +314,15 @@ export default function Products({ path }) {
     setBarcodeInput('')
   }
 
+  const [deleteBarcodeTarget, setDeleteBarcodeTarget] = useState(null)
+
   function removeBarcode(b) {
-    setForm({ ...form, barcodes: form.barcodes.filter((x) => x !== b) })
+    setDeleteBarcodeTarget(b)
+  }
+
+  function confirmRemoveBarcode() {
+    setForm({ ...form, barcodes: form.barcodes.filter((x) => x !== deleteBarcodeTarget) })
+    setDeleteBarcodeTarget(null)
   }
 
   async function handleSubmit(e) {
@@ -629,8 +661,6 @@ export default function Products({ path }) {
   function removeBundleItem(pid) { setBundleItems(bundleItems.filter(b => b.product_id !== pid)) }
 
   const { items, total, pages } = result
-  const start = total === 0 ? 0 : (page - 1) * limit + 1
-  const end = Math.min(page * limit, total)
 
   const catMap   = useMemo(() => new Map(categories.map(c => [c.id, c.name])), [categories])
   const brandMap = useMemo(() => new Map(brands.map(b => [b.id, b.name])), [brands])
@@ -679,6 +709,13 @@ export default function Products({ path }) {
           </select>
         </div>
         <div class="flex gap-1.5 self-end">
+          {canViewPrixAchat && (
+            <button class={`btn btn-sm gap-1 ${filterBelowCost ? 'btn-warning' : 'btn-ghost text-warning'}`}
+              onClick={() => { setFilterBelowCost(!filterBelowCost); setPage(1) }}>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+              {t('priceBelowCost')}
+            </button>
+          )}
           {canAlert && (
             <button class="btn btn-sm btn-ghost gap-1 text-warning" onClick={() => route('/low-stock')}>
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
@@ -743,6 +780,12 @@ export default function Products({ path }) {
                         {useVAT && p.vat > 0 && <span class="badge badge-warning gap-0 text-xs px-1.5 py-0 h-4">{p.vat}%</span>}
                         {p.is_service && <span class="badge badge-outline gap-0 text-xs px-1.5 py-0 h-4">{t('isService')}</span>}
                         {canScale && p.is_weighable && <span class="badge badge-info badge-outline gap-0 text-xs px-1.5 py-0 h-4">{t('weighable')}</span>}
+                        {p.prix_achat > 0 && ((p.prix_vente_1 > 0 && p.prix_vente_1 < p.prix_achat) || (p.prix_vente_2 > 0 && p.prix_vente_2 < p.prix_achat) || (p.prix_vente_3 > 0 && p.prix_vente_3 < p.prix_achat)) && (
+                          <span class="badge badge-warning gap-0.5 text-xs px-1.5 py-0 h-4" title={t('priceBelowCostWarn')}>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" /></svg>
+                            {t('priceBelowCost')}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -771,13 +814,13 @@ export default function Products({ path }) {
                 {/* Prix achat */}
                 {canViewPrixAchat && (
                   <td class="px-3 py-2.5 text-end">
-                    <span class="text-sm tabular-nums text-base-content/80">{p.prix_achat || <span class="text-base-content/50">—</span>}</span>
+                    <span class="text-sm tabular-nums text-base-content/80">{p.prix_achat ? fmt(p.prix_achat) : <span class="text-base-content/50">—</span>}</span>
                   </td>
                 )}
                 {/* Prix vente */}
                 {(defaultSalePrice === 1 ? canViewPV1 : defaultSalePrice === 2 ? canViewPV2 : canViewPV3) && (
                   <td class="px-3 py-2.5 text-end">
-                    <span class="text-sm font-semibold tabular-nums">{(defaultSalePrice === 2 ? p.prix_vente_2 : defaultSalePrice === 3 ? p.prix_vente_3 : p.prix_vente_1)?.toFixed(2)}</span>
+                    <span class="text-sm font-semibold tabular-nums">{fmt(defaultSalePrice === 2 ? p.prix_vente_2 : defaultSalePrice === 3 ? p.prix_vente_3 : p.prix_vente_1)}</span>
                   </td>
                 )}
                 {/* Actions — compact dropdown + primary actions */}
@@ -803,7 +846,7 @@ export default function Products({ path }) {
                     )}
                     {canDelete && (
                       <div class="tooltip tooltip-left" data-tip={t('disable')}>
-                        <button class="btn btn-sm btn-ghost btn-square text-error" onClick={() => { setDeleteTarget(p); openModal('delete-modal') }}>
+                        <button class="btn btn-sm btn-ghost btn-square text-error" onClick={() => { closeAllDialogs(); setDeleteTarget(p); openModal('delete-modal') }}>
                           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                           </svg>
@@ -844,30 +887,7 @@ export default function Products({ path }) {
         </div>
       </div>
 
-      {/* Pagination */}
-      {total > 0 && (
-        <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/80">{t('showing')} {start}–{end} {t('of')} {total}</span>
-          <div class="join">
-            <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
-            {(() => {
-              const btns = []
-              const wing = 2
-              let s = Math.max(1, page - wing)
-              let e = Math.min(pages, page + wing)
-              if (s > 1) { btns.push(1); if (s > 2) btns.push('...') }
-              for (let i = s; i <= e; i++) btns.push(i)
-              if (e < pages) { if (e < pages - 1) btns.push('...'); btns.push(pages) }
-              return btns.map((b, i) =>
-                b === '...'
-                  ? <button key={`d${i}`} class="join-item btn btn-sm btn-disabled">…</button>
-                  : <button key={b} class={`join-item btn btn-sm ${b === page ? 'btn-active' : ''}`} onClick={() => setPage(b)}>{b}</button>
-              )
-            })()}
-            <button class="join-item btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>»</button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} pages={pages} total={total} limit={limit} onPageChange={setPage} />
 
       {/* Create / Edit Modal */}
       <Modal id="product-modal" title={editing ? t('editProduct') : t('newProductTitle')} size="2xl">
@@ -993,6 +1013,15 @@ export default function Products({ path }) {
                         setFieldErrors(f => ({...f, prix_vente_1: ''}))
                       }} />
                     {fieldErrors.prix_vente_1 && <span class="text-xs text-error mt-1">{fieldErrors.prix_vente_1}</span>}
+                    {(() => {
+                      const pvKey = defaultSalePrice === 2 ? 'prix_vente_2' : defaultSalePrice === 3 ? 'prix_vente_3' : 'prix_vente_1'
+                      return form.prix_achat > 0 && form[pvKey] > 0 && form[pvKey] < form.prix_achat && (
+                        <div class="flex items-center gap-1 mt-1 text-warning text-xs">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" /></svg>
+                          <span>{t('priceBelowCostWarn')}</span>
+                        </div>
+                      )
+                    })()}
                   </label>
                   {!editing && (
                     <label class="form-control">
@@ -1320,32 +1349,41 @@ export default function Products({ path }) {
                       ? (((form[key] - form.prix_achat) / form.prix_achat) * 100)
                       : 0
                     const marginRounded = Math.round(margin * 100) / 100
+                    const isBelowCost = form.prix_achat > 0 && form[key] > 0 && form[key] < form.prix_achat
                     return (
-                      <div key={key} class={`flex items-center gap-2 p-2.5 rounded-lg bg-base-100 border border-base-300/50`} dir="ltr">
-                        <span class={`text-xs font-bold text-${color} min-w-16 text-start`}>{label}</span>
-                        <div class="flex items-center gap-1.5 flex-1">
-                          <input type="number" step="any" min="0" class="input input-bordered input-sm w-28 font-mono"
-                            value={form[key]}
-                            onInput={(e) => setForm({ ...form, [key]: parseFloat(e.target.value) || 0 })} />
-                          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-base-content/50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
-                          <div class="relative">
-                            <input type="number" step="any" min="0" class="input input-bordered input-sm w-20 pe-6 text-end"
-                              value={marginRounded || ''}
-                              placeholder="0"
-                              onInput={(e) => {
-                                const pct = parseFloat(e.target.value)
-                                if (!isNaN(pct) && form.prix_achat > 0) {
-                                  setForm({ ...form, [key]: Math.round(form.prix_achat * (1 + pct / 100) * 100) / 100 })
-                                }
-                              }} />
-                            <span class="absolute end-2 top-1/2 -translate-y-1/2 text-xs text-base-content/50 pointer-events-none">%</span>
+                      <div key={key}>
+                        <div class={`flex items-center gap-2 p-2.5 rounded-lg bg-base-100 border ${isBelowCost ? 'border-warning bg-warning/5' : 'border-base-300/50'}`} dir="ltr">
+                          <span class={`text-xs font-bold text-${color} min-w-16 text-start`}>{label}</span>
+                          <div class="flex items-center gap-1.5 flex-1">
+                            <input type="number" step="any" min="0" class={`input input-bordered input-sm w-28 font-mono ${isBelowCost ? 'input-warning' : ''}`}
+                              value={form[key]}
+                              onInput={(e) => setForm({ ...form, [key]: parseFloat(e.target.value) || 0 })} />
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-base-content/50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
+                            <div class="relative">
+                              <input type="number" step="any" min="0" class="input input-bordered input-sm w-20 pe-6 text-end"
+                                value={marginRounded || ''}
+                                placeholder="0"
+                                onInput={(e) => {
+                                  const pct = parseFloat(e.target.value)
+                                  if (!isNaN(pct) && form.prix_achat > 0) {
+                                    setForm({ ...form, [key]: Math.round(form.prix_achat * (1 + pct / 100) * 100) / 100 })
+                                  }
+                                }} />
+                              <span class="absolute end-2 top-1/2 -translate-y-1/2 text-xs text-base-content/50 pointer-events-none">%</span>
+                            </div>
+                            {useVAT && form.vat > 0 && (
+                              <span class="text-xs font-mono text-warning font-semibold whitespace-nowrap">
+                                TTC: {fmt((form[key] * (1 + form.vat / 100)))}
+                              </span>
+                            )}
                           </div>
-                          {useVAT && form.vat > 0 && (
-                            <span class="text-xs font-mono text-warning font-semibold whitespace-nowrap">
-                              TTC: {(form[key] * (1 + form.vat / 100)).toFixed(2)}
-                            </span>
-                          )}
                         </div>
+                        {isBelowCost && (
+                          <div class="flex items-center gap-1.5 mt-1 ms-1 text-warning text-xs">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" /></svg>
+                            <span>{label}: {t('priceBelowCostWarn')} ({t('prixAchat')}: {fmt(form.prix_achat)})</span>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -1399,6 +1437,21 @@ export default function Products({ path }) {
             </button>
           </div>
         </form>
+
+        {/* Barcode delete confirmation — inside product modal */}
+        {deleteBarcodeTarget && (
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={(e) => { e.stopPropagation(); setDeleteBarcodeTarget(null) }}>
+            <div class="bg-base-100 rounded-xl shadow-xl max-w-xs w-full mx-4 p-5" onClick={(e) => e.stopPropagation()}>
+              <h3 class="font-bold text-lg mb-2">{t('deleteBarcode')}</h3>
+              <p class="text-sm text-base-content/80 mb-1">{t('deleteBarcodeConfirm')}</p>
+              <p class="font-mono text-sm font-semibold bg-base-200 rounded-lg px-3 py-2 mb-4">{deleteBarcodeTarget}</p>
+              <div class="flex justify-end gap-2">
+                <button class="btn btn-sm btn-ghost" onClick={() => setDeleteBarcodeTarget(null)}>{t('back')}</button>
+                <button class="btn btn-sm btn-error" onClick={confirmRemoveBarcode}>{t('delete')}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Delete confirmation */}
@@ -1564,7 +1617,7 @@ export default function Products({ path }) {
               {/* Total Value */}
               <div class="rounded-xl border border-primary/20 bg-primary/5 p-4">
                 <div class="text-xs font-medium uppercase tracking-wider text-base-content/70 mb-1">{t('totalValue')}</div>
-                <div class="text-3xl font-extrabold text-primary tabular-nums">{Number(valuationData.total_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div class="text-3xl font-extrabold text-primary tabular-nums">{fmt(valuationData.total_value)}</div>
               </div>
               {/* Qty + Count row */}
               <div class="grid grid-cols-2 gap-3">
@@ -1607,10 +1660,10 @@ export default function Products({ path }) {
                 {priceHistItems.map((r, i) => (
                   <tr key={i} class="border-b border-base-200">
                     <td class="text-sm whitespace-nowrap">{new Date(r.created_at).toLocaleDateString()}</td>
-                    <td class="font-mono text-sm text-end">{r.prix_achat?.toFixed(2)}</td>
-                    {visiblePrices.pv1 && <td class="font-mono text-sm text-end">{r.prix_vente_1?.toFixed(2)}</td>}
-                    {visiblePrices.pv2 && <td class="font-mono text-sm text-end">{r.prix_vente_2?.toFixed(2)}</td>}
-                    {visiblePrices.pv3 && <td class="font-mono text-sm text-end">{r.prix_vente_3?.toFixed(2)}</td>}
+                    <td class="font-mono text-sm text-end">{fmt(r.prix_achat)}</td>
+                    {visiblePrices.pv1 && <td class="font-mono text-sm text-end">{fmt(r.prix_vente_1)}</td>}
+                    {visiblePrices.pv2 && <td class="font-mono text-sm text-end">{fmt(r.prix_vente_2)}</td>}
+                    {visiblePrices.pv3 && <td class="font-mono text-sm text-end">{fmt(r.prix_vente_3)}</td>}
                     <td class="text-xs">
                       <span class="badge badge-xs badge-ghost">{r.source === 'purchase_validation' ? t('sourcePurchase') : r.source === 'manual' ? t('sourceManual') : r.source}</span>
                     </td>
@@ -1761,7 +1814,7 @@ export default function Products({ path }) {
                         {/* Prices row */}
                         <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/80">
                           <span>{t('qtyAvailable')}: <span class="font-semibold text-base-content">{v.qty_available}</span></span>
-                          <span>{t('prixAchat')}: <span class="font-mono">{v.prix_achat}</span></span>
+                          <span>{t('prixAchat')}: <span class="font-mono">{fmt(v.prix_achat)}</span></span>
                           {visiblePrices.pv1 && <span>{t('prixVente1')}: <span class="font-mono">{v.prix_vente_1}</span></span>}
                           {visiblePrices.pv2 && <span>{t('prixVente2')}: <span class="font-mono">{v.prix_vente_2}</span></span>}
                           {visiblePrices.pv3 && <span>{t('prixVente3')}: <span class="font-mono">{v.prix_vente_3}</span></span>}
@@ -2170,8 +2223,8 @@ export default function Products({ path }) {
                       <td class={`text-end font-mono text-sm font-semibold ${m.qty < 0 ? 'text-error' : 'text-success'}`}>
                         {m.qty >= 0 ? '+' : ''}{m.qty}
                       </td>
-                      <td class="text-end font-mono text-sm tabular-nums">{m.prix_achat?.toFixed(2) ?? '—'}</td>
-                      <td class="text-end font-mono text-sm font-semibold tabular-nums">{m.prix_achat ? (Math.abs(m.qty) * m.prix_achat).toFixed(2) : '—'}</td>
+                      <td class="text-end font-mono text-sm tabular-nums">{fmt(m.prix_achat)}</td>
+                      <td class="text-end font-mono text-sm font-semibold tabular-nums">{m.prix_achat ? fmt(Math.abs(m.qty) * m.prix_achat) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

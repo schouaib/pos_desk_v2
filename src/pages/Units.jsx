@@ -4,6 +4,7 @@ import { Modal, openModal, closeModal } from '../components/Modal'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 import { hasPerm } from '../lib/auth'
+import { Pagination } from '../components/Pagination'
 
 export default function Units({ path }) {
   const { t } = useI18n()
@@ -39,12 +40,17 @@ export default function Units({ path }) {
 
   function doSearch() { setPage(1); setSearchQ(filterQ) }
 
+  function closeAllDialogs() {
+    closeModal('unit-modal'); closeModal('unit-delete-modal')
+    setDeleteTarget(null)
+  }
+
   function openCreate() {
-    setEditing(null); setForm({ name: '' }); setError(''); openModal('unit-modal')
+    closeAllDialogs(); setEditing(null); setForm({ name: '' }); setError(''); openModal('unit-modal')
   }
 
   function openEdit(item) {
-    setEditing(item); setForm({ name: item.name }); setError(''); openModal('unit-modal')
+    closeAllDialogs(); setEditing(item); setForm({ name: item.name }); setError(''); openModal('unit-modal')
   }
 
   async function handleSubmit(e) {
@@ -107,7 +113,7 @@ export default function Units({ path }) {
                         )}
                         {canDelete && (
                           <div class="tooltip tooltip-left" data-tip={t('delete')}>
-                            <button class="btn btn-sm btn-ghost btn-square text-error" onClick={() => { setDeleteTarget(item); openModal('unit-delete-modal') }}>
+                            <button class="btn btn-sm btn-ghost btn-square text-error" onClick={() => { closeAllDialogs(); setDeleteTarget(item); openModal('unit-delete-modal') }}>
                               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                               </svg>
@@ -134,16 +140,8 @@ export default function Units({ path }) {
             </tbody>
           </table>
         </div>
-        {pages > 1 && (
-          <div class="flex items-center justify-between px-4 py-3 border-t border-base-200 bg-base-50">
-            <span class="text-xs text-base-content/70">{page} / {pages}</span>
-            <div class="join">
-              <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
-              <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>›</button>
-            </div>
-          </div>
-        )}
       </div>
+      <Pagination page={page} pages={pages} total={result.total} limit={10} onPageChange={setPage} />
 
       <Modal id="unit-modal" title={editing ? t('editUnit') : t('newUnit')}>
         {error && <div class="alert alert-error text-sm py-2 mb-3"><span>{error}</span></div>}

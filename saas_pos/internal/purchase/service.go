@@ -13,6 +13,7 @@ import (
 	"saas_pos/internal/database"
 	"saas_pos/internal/expense"
 	"saas_pos/internal/price_history"
+	"saas_pos/internal/supplier"
 	"saas_pos/internal/supplier_product"
 	"saas_pos/internal/variant"
 
@@ -889,6 +890,15 @@ func Pay(tenantID, id, userID string, input PayInput) (*Purchase, error) {
 	); err != nil {
 		return nil, err
 	}
+
+	// Also record in supplier_payments so it appears in supplier payment history
+	note := input.Note
+	if note == "" {
+		note = p.Ref
+	} else {
+		note = p.Ref + " — " + note
+	}
+	_ = supplier.RecordPaymentWithType(tenantID, p.SupplierID.Hex(), p.SupplierName, input.Amount, note, userID, "purchase", p.Ref)
 
 	after := options.After
 	var updated Purchase

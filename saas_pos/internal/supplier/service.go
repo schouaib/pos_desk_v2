@@ -3,7 +3,9 @@ package supplier
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
+	"sort"
 	"time"
 
 	"saas_pos/internal/database"
@@ -23,6 +25,10 @@ func paymentCol() *mongo.Collection {
 }
 
 func RecordPayment(tenantID, supplierID, supplierName string, amount float64, note, createdBy string) error {
+	return RecordPaymentWithType(tenantID, supplierID, supplierName, amount, note, createdBy, "direct", "")
+}
+
+func RecordPaymentWithType(tenantID, supplierID, supplierName string, amount float64, note, createdBy, paymentType, purchaseRef string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -34,6 +40,8 @@ func RecordPayment(tenantID, supplierID, supplierName string, amount float64, no
 		TenantID:     tid,
 		SupplierID:   sid,
 		SupplierName: supplierName,
+		Type:         paymentType,
+		PurchaseRef:  purchaseRef,
 		Amount:       amount,
 		Note:         note,
 		CreatedBy:    createdBy,
@@ -44,7 +52,7 @@ func RecordPayment(tenantID, supplierID, supplierName string, amount float64, no
 }
 
 func ListPayments(tenantID, supplierID, dateFrom, dateTo string, page, limit int) (*PaymentListResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	tid, _ := primitive.ObjectIDFromHex(tenantID)
@@ -59,7 +67,6 @@ func ListPayments(tenantID, supplierID, dateFrom, dateTo string, page, limit int
 	if page < 1 {
 		page = 1
 	}
-	skip := int64((page - 1) * limit)
 
 	filter := bson.M{"tenant_id": tid, "supplier_id": sid}
 	if dateFrom != "" || dateTo != "" {
@@ -78,32 +85,257 @@ func ListPayments(tenantID, supplierID, dateFrom, dateTo string, page, limit int
 			filter["created_at"] = dateFilter
 		}
 	}
-	total, err := paymentCol().CountDocuments(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
 
+	// Fetch supplier_payments
+	var supplierItems []SupplierPayment
 	cursor, err := paymentCol().Find(ctx, filter,
-		options.Find().
-			SetSort(bson.M{"created_at": -1}).
-			SetSkip(skip).
-			SetLimit(int64(limit)),
+		options.Find().SetSort(bson.M{"created_at": -1}),
 	)
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
-
-	items := []SupplierPayment{}
-	if err = cursor.All(ctx, &items); err != nil {
+	if err = cursor.All(ctx, &supplierItems); err != nil {
 		return nil, err
 	}
+	cursor.Close(ctx)
+
+	// Also fetch purchase_payments that don't already have a matching supplier_payment
+	// (for backwards compatibility with payments made before the dual-write fix)
+	purchaseFilter := bson.M{"tenant_id": tid, "supplier_id": sid}
+	if dateFilter, ok := filter["created_at"]; ok {
+		purchaseFilter["created_at"] = dateFilter
+	}
+
+	type purchasePayment struct {
+		ID         primitive.ObjectID `bson:"_id"`
+		TenantID   primitive.ObjectID `bson:"tenant_id"`
+		PurchaseID primitive.ObjectID `bson:"purchase_id"`
+		SupplierID primitive.ObjectID `bson:"supplier_id"`
+		Amount     float64            `bson:"amount"`
+		Note       string             `bson:"note"`
+		CreatedBy  string             `bson:"created_by"`
+		CreatedAt  time.Time          `bson:"created_at"`
+	}
+
+	var purchasePayments []purchasePayment
+	pcursor, err := database.Col("purchase_payments").Find(ctx, purchaseFilter,
+		options.Find().SetSort(bson.M{"created_at": -1}),
+	)
+	if err == nil {
+		_ = pcursor.All(ctx, &purchasePayments)
+		pcursor.Close(ctx)
+	}
+
+	// Build a set of purchase_payment IDs that already have a supplier_payment (type=purchase)
+	// to avoid duplicates from the dual-write
+	existingPurchaseRefs := map[string]bool{}
+	for _, sp := range supplierItems {
+		if sp.Type == "purchase" && sp.PurchaseRef != "" {
+			// Key by purchase_ref + created_by + approximate time to detect duplicates
+			key := sp.PurchaseRef + "|" + fmt.Sprintf("%.2f", sp.Amount) + "|" + sp.CreatedBy
+			existingPurchaseRefs[key] = true
+		}
+	}
+
+	// Look up purchase refs for purchase_payments
+	purchaseRefCache := map[primitive.ObjectID]string{}
+	for _, pp := range purchasePayments {
+		if _, ok := purchaseRefCache[pp.PurchaseID]; !ok {
+			var doc struct {
+				Ref string `bson:"ref"`
+			}
+			if err := database.Col("purchases").FindOne(ctx, bson.M{"_id": pp.PurchaseID}).Decode(&doc); err == nil {
+				purchaseRefCache[pp.PurchaseID] = doc.Ref
+			}
+		}
+	}
+
+	// Merge purchase_payments that don't already exist as supplier_payments
+	for _, pp := range purchasePayments {
+		ref := purchaseRefCache[pp.PurchaseID]
+		key := ref + "|" + fmt.Sprintf("%.2f", pp.Amount) + "|" + pp.CreatedBy
+		if existingPurchaseRefs[key] {
+			continue // already exists via dual-write
+		}
+		note := pp.Note
+		if ref != "" {
+			if note != "" {
+				note = ref + " — " + note
+			} else {
+				note = ref
+			}
+		}
+		supplierItems = append(supplierItems, SupplierPayment{
+			ID:          pp.ID,
+			TenantID:    pp.TenantID,
+			SupplierID:  pp.SupplierID,
+			Type:        "purchase",
+			PurchaseRef: ref,
+			Amount:      pp.Amount,
+			Note:        note,
+			CreatedBy:   pp.CreatedBy,
+			CreatedAt:   pp.CreatedAt,
+		})
+	}
+
+	// Sort merged list by created_at descending
+	sort.Slice(supplierItems, func(i, j int) bool {
+		return supplierItems[i].CreatedAt.After(supplierItems[j].CreatedAt)
+	})
+
+	// Paginate in-memory
+	total := int64(len(supplierItems))
+	skip := int64((page - 1) * limit)
+	end := skip + int64(limit)
+	if skip > total {
+		skip = total
+	}
+	if end > total {
+		end = total
+	}
+	items := supplierItems[skip:end]
 
 	pages := int(math.Ceil(float64(total) / float64(limit)))
 	if pages == 0 {
 		pages = 1
 	}
 	return &PaymentListResult{Items: items, Total: total, Page: page, Limit: limit, Pages: pages}, nil
+}
+
+// ReversePayment marks a payment as reversed and records a negative reversal entry.
+// It adds the original amount back to the supplier balance.
+func ReversePayment(tenantID, supplierID, paymentID, reversedBy string) (*Supplier, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	tid, _ := primitive.ObjectIDFromHex(tenantID)
+	sid, err := primitive.ObjectIDFromHex(supplierID)
+	if err != nil {
+		return nil, errors.New("invalid supplier id")
+	}
+	pid, err := primitive.ObjectIDFromHex(paymentID)
+	if err != nil {
+		return nil, errors.New("invalid payment id")
+	}
+
+	// Find the original payment — check supplier_payments first, then purchase_payments
+	var original SupplierPayment
+	var fromPurchase bool
+	err = paymentCol().FindOne(ctx, bson.M{
+		"_id":         pid,
+		"tenant_id":   tid,
+		"supplier_id": sid,
+	}).Decode(&original)
+	if err != nil {
+		// Try purchase_payments collection
+		type pp struct {
+			ID         primitive.ObjectID `bson:"_id"`
+			TenantID   primitive.ObjectID `bson:"tenant_id"`
+			PurchaseID primitive.ObjectID `bson:"purchase_id"`
+			SupplierID primitive.ObjectID `bson:"supplier_id"`
+			Amount     float64            `bson:"amount"`
+			Note       string             `bson:"note"`
+			CreatedBy  string             `bson:"created_by"`
+			CreatedAt  time.Time          `bson:"created_at"`
+		}
+		var purchPayment pp
+		err2 := database.Col("purchase_payments").FindOne(ctx, bson.M{
+			"_id":         pid,
+			"tenant_id":   tid,
+			"supplier_id": sid,
+		}).Decode(&purchPayment)
+		if err2 != nil {
+			return nil, errors.New("payment not found")
+		}
+		// Look up purchase ref
+		var purchDoc struct {
+			Ref          string `bson:"ref"`
+			SupplierName string `bson:"supplier_name"`
+		}
+		_ = database.Col("purchases").FindOne(ctx, bson.M{"_id": purchPayment.PurchaseID}).Decode(&purchDoc)
+
+		original = SupplierPayment{
+			ID:           purchPayment.ID,
+			TenantID:     purchPayment.TenantID,
+			SupplierID:   purchPayment.SupplierID,
+			SupplierName: purchDoc.SupplierName,
+			Type:         "purchase",
+			PurchaseRef:  purchDoc.Ref,
+			Amount:       purchPayment.Amount,
+			Note:         purchPayment.Note,
+			CreatedBy:    purchPayment.CreatedBy,
+			CreatedAt:    purchPayment.CreatedAt,
+		}
+		fromPurchase = true
+	}
+	if original.Reversed {
+		return nil, errors.New("payment already reversed")
+	}
+	if original.ReversalOf != nil {
+		return nil, errors.New("cannot reverse a reversal entry")
+	}
+
+	now := time.Now()
+
+	if fromPurchase {
+		// For purchase payments: delete from purchase_payments and reverse in purchase
+		_, _ = database.Col("purchase_payments").DeleteOne(ctx, bson.M{"_id": pid})
+		// Subtract from purchase paid_amount
+		_, _ = database.Col("purchases").UpdateOne(ctx,
+			bson.M{"supplier_id": sid, "tenant_id": tid, "ref": original.PurchaseRef},
+			bson.M{
+				"$inc": bson.M{"paid_amount": -original.Amount},
+				"$set": bson.M{"status": "validated", "updated_at": now},
+			},
+		)
+	} else {
+		// Mark original as reversed in supplier_payments
+		_, err = paymentCol().UpdateOne(ctx, bson.M{"_id": pid}, bson.M{
+			"$set": bson.M{
+				"reversed":    true,
+				"reversed_at": now,
+				"reversed_by": reversedBy,
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Insert negative reversal entry in supplier_payments
+	reversal := SupplierPayment{
+		ID:           primitive.NewObjectID(),
+		TenantID:     tid,
+		SupplierID:   sid,
+		SupplierName: original.SupplierName,
+		Type:         original.Type,
+		PurchaseRef:  original.PurchaseRef,
+		Amount:       -original.Amount,
+		Note:         original.Note,
+		ReversalOf:   &pid,
+		CreatedBy:    reversedBy,
+		CreatedAt:    now,
+	}
+	if _, err = paymentCol().InsertOne(ctx, reversal); err != nil {
+		return nil, err
+	}
+
+	// Add amount back to supplier balance
+	after := options.After
+	var s Supplier
+	err = col().FindOneAndUpdate(ctx,
+		bson.M{"_id": sid, "tenant_id": tid},
+		bson.M{
+			"$inc": bson.M{"balance": original.Amount},
+			"$set": bson.M{"updated_at": now},
+		},
+		options.FindOneAndUpdate().SetReturnDocument(after),
+	).Decode(&s)
+	if err != nil {
+		return nil, errors.New("supplier not found")
+	}
+
+	return &s, nil
 }
 
 func Create(tenantID string, input CreateInput) (*Supplier, error) {
@@ -125,7 +357,13 @@ func Create(tenantID string, input CreateInput) (*Supplier, error) {
 		TenantID:  tid,
 		Name:      input.Name,
 		Phone:     input.Phone,
+		Email:     input.Email,
 		Address:   input.Address,
+		RC:        input.RC,
+		NIF:       input.NIF,
+		NIS:       input.NIS,
+		NART:      input.NART,
+		CompteRIB: input.CompteRIB,
 		Balance:   input.Balance,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -229,7 +467,13 @@ func Update(tenantID, id string, input UpdateInput) (*Supplier, error) {
 		bson.M{"$set": bson.M{
 			"name":       input.Name,
 			"phone":      input.Phone,
+			"email":      input.Email,
 			"address":    input.Address,
+			"rc":         input.RC,
+			"nif":        input.NIF,
+			"nis":        input.NIS,
+			"nart":       input.NART,
+			"compte_rib": input.CompteRIB,
 			"updated_at": time.Now(),
 		}},
 		options.FindOneAndUpdate().SetReturnDocument(after),

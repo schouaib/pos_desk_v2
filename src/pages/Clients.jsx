@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'preact/hooks'
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import { Layout } from '../components/Layout'
 import { Modal, openModal, closeModal } from '../components/Modal'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 import { hasPerm, hasFeature, authUser } from '../lib/auth'
 import { printHtml } from '../lib/invoicePrint'
+import { Pagination } from '../components/Pagination'
 
 const emptyForm = { name: '', phone: '', email: '', address: '', rc: '', nif: '', nis: '', nart: '', compte_rib: '' }
 const STMT_PAGE_SIZE = 10
@@ -14,7 +15,7 @@ function today() {
 }
 
 export default function Clients({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const canAdd      = hasPerm('clients', 'add')
   const canEdit     = hasPerm('clients', 'edit')
   const canDelete   = hasPerm('clients', 'delete')
@@ -76,6 +77,45 @@ export default function Clients({ path }) {
     return () => { cancelled = true }
   }, [searchQ, page])
 
+  const allModalIds = ['client-modal', 'stmt-modal', 'delete-modal', 'client-sales-modal']
+
+  function closeAllDialogs() {
+    allModalIds.forEach(id => closeModal(id))
+    setEditing(null)
+    setForm(emptyForm)
+    setError('')
+    setStmtTarget(null)
+    setStatement([])
+    setStmtLoading(false)
+    setStmtPage(1)
+    setPayAmount('')
+    setPayNote('')
+    setPayError('')
+    setPayLoading(false)
+    setDeleteTarget(null)
+    setDeleteError('')
+    setSalesTarget(null)
+    setSalesResult({ items: [], total: 0 })
+    setSalesPage(1)
+    setSalesLoading(false)
+    setExpandedSale(null)
+    setSelectedSales(new Set())
+    setSaleLinesToPrint(new Set())
+  }
+
+  // Clear target state when a dialog is dismissed via Escape
+  useEffect(() => {
+    const dialogs = allModalIds.map(id => document.getElementById(id)).filter(Boolean)
+    function handleClose(e) {
+      const id = e.target.id
+      if (id === 'client-modal') { setEditing(null); setForm(emptyForm); setError('') }
+      if (id === 'stmt-modal') { setStmtTarget(null); setStatement([]); setPayAmount(''); setPayNote(''); setPayError('') }
+      if (id === 'delete-modal') { setDeleteTarget(null); setDeleteError('') }
+      if (id === 'client-sales-modal') { setSalesTarget(null); setSalesResult({ items: [], total: 0 }); setExpandedSale(null); setSelectedSales(new Set()); setSaleLinesToPrint(new Set()) }
+    }
+    dialogs.forEach(d => d.addEventListener('close', handleClose))
+    return () => dialogs.forEach(d => d.removeEventListener('close', handleClose))
+  }, [])
 
   function doSearch() {
     setPage(1)
@@ -83,6 +123,7 @@ export default function Clients({ path }) {
   }
 
   function openCreate() {
+    closeAllDialogs()
     setEditing(null)
     setForm(emptyForm)
     setError('')
@@ -90,6 +131,7 @@ export default function Clients({ path }) {
   }
 
   function openEdit(c) {
+    closeAllDialogs()
     setEditing(c)
     setForm({ name: c.name, phone: c.phone || '', email: c.email || '', address: c.address || '', rc: c.rc || '', nif: c.nif || '', nis: c.nis || '', nart: c.nart || '', compte_rib: c.compte_rib || '' })
     setError('')
@@ -97,6 +139,7 @@ export default function Clients({ path }) {
   }
 
   async function openStatement(c) {
+    closeAllDialogs()
     setStmtTarget(c)
     setPayAmount('')
     setPayNote('')
@@ -117,6 +160,7 @@ export default function Clients({ path }) {
   }
 
   function openDelete(c) {
+    closeAllDialogs()
     setDeleteTarget(c)
     setDeleteError('')
     openModal('delete-modal')
@@ -131,6 +175,7 @@ export default function Clients({ path }) {
   }
 
   function openClientSales(c) {
+    closeAllDialogs()
     setSalesTarget(c)
     setSalesPage(1)
     setExpandedSale(null)
@@ -304,7 +349,7 @@ export default function Clients({ path }) {
       const linesHtml = isSale && e.lines && e.lines.length > 0
         ? `<tr class="lines-row ${rowClass}"><td colspan="6"><div class="lines-list">${
             e.lines.map(l =>
-              `<div class="line-item"><span class="line-name">${l.product_name}</span><span class="line-qty">${l.qty} × ${l.unit_price.toFixed(2)}</span><span class="line-ttc">${l.total_ttc.toFixed(2)}</span></div>`
+              `<div class="line-item"><span class="line-name">${l.product_name}</span><span class="line-qty">${l.qty} × ${fmt(l.unit_price)}</span><span class="line-ttc">${fmt(l.total_ttc)}</span></div>`
             ).join('')
           }</div></td></tr>`
         : ''
@@ -312,9 +357,9 @@ export default function Clients({ path }) {
         <td>${date}</td>
         <td><span class="badge ${isSale ? 'badge-debit' : 'badge-credit'}">${isSale ? t('stmtSale') : t('stmtPayment')}</span></td>
         <td class="mono ref">${e.ref || '—'}</td>
-        <td class="mono amt ${isSale ? 'red' : ''}">${isSale ? e.amount.toFixed(2) : ''}</td>
-        <td class="mono amt ${!isSale ? 'green' : ''}">${!isSale ? e.amount.toFixed(2) : ''}</td>
-        <td class="mono amt bold ${e.balance > 0 ? 'red' : 'green'}">${e.balance.toFixed(2)}</td>
+        <td class="mono amt ${isSale ? 'red' : ''}">${isSale ? fmt(e.amount) : ''}</td>
+        <td class="mono amt ${!isSale ? 'green' : ''}">${!isSale ? fmt(e.amount) : ''}</td>
+        <td class="mono amt bold ${e.balance > 0 ? 'red' : 'green'}">${fmt(e.balance)}</td>
       </tr>${linesHtml}`
     }).join('')
 
@@ -431,7 +476,7 @@ export default function Clients({ path }) {
     </div>
     <div class="info-card balance-card">
       <div class="balance-label">${t('outstandingBalance')}</div>
-      <div class="balance-big">${client.balance.toFixed(2)}</div>
+      <div class="balance-big">${fmt(client.balance)}</div>
     </div>
   </div>
 
@@ -439,15 +484,15 @@ export default function Clients({ path }) {
   <div class="summary">
     <div class="summary-item">
       <div class="s-label">${t('stmtSale')}s</div>
-      <div class="s-val red">${totalSales.toFixed(2)}</div>
+      <div class="s-val red">${fmt(totalSales)}</div>
     </div>
     <div class="summary-item">
       <div class="s-label">${t('stmtPayment')}s</div>
-      <div class="s-val green">${totalPayments.toFixed(2)}</div>
+      <div class="s-val green">${fmt(totalPayments)}</div>
     </div>
     <div class="summary-item">
       <div class="s-label">${t('outstandingBalance')}</div>
-      <div class="s-val" style="color:${balanceColor}">${client.balance.toFixed(2)}</div>
+      <div class="s-val" style="color:${balanceColor}">${fmt(client.balance)}</div>
     </div>
     <div class="summary-item">
       <div class="s-label">Transactions</div>
@@ -515,7 +560,7 @@ export default function Clients({ path }) {
       const linesHtml = saleLinesToPrint.has(s.id) && s.lines && s.lines.length > 0
         ? `<tr class="lines-row ${rowClass}"><td colspan="4"><div class="lines-list">${
             s.lines.map(l =>
-              `<div class="line-item"><span class="line-name">${l.product_name}</span><span class="line-qty">${l.qty} × ${l.unit_price.toFixed(2)}</span><span class="line-ttc">${l.total_ttc.toFixed(2)}</span></div>`
+              `<div class="line-item"><span class="line-name">${l.product_name}</span><span class="line-qty">${l.qty} × ${fmt(l.unit_price)}</span><span class="line-ttc">${fmt(l.total_ttc)}</span></div>`
             ).join('')
           }</div></td></tr>`
         : ''
@@ -523,7 +568,7 @@ export default function Clients({ path }) {
         <td>${date}</td>
         <td class="mono ref">${s.ref}</td>
         <td><span class="badge ${s.sale_type === 'cash' ? 'badge-cash' : 'badge-credit'}">${s.sale_type === 'cash' ? t('cashSale') : t('creditSale')}</span></td>
-        <td class="mono amt bold">${s.total.toFixed(2)}</td>
+        <td class="mono amt bold">${fmt(s.total)}</td>
       </tr>${linesHtml}`
     }).join('')
 
@@ -610,7 +655,7 @@ export default function Clients({ path }) {
     </div>
     <div class="info-card">
       <h3>${t('outstandingBalance')}</h3>
-      <div class="info-row"><span class="info-label">${t('outstandingBalance')}</span><span class="info-value mono" style="color:${client.balance > 0 ? '#dc2626' : '#16a34a'}">${client.balance.toFixed(2)}</span></div>
+      <div class="info-row"><span class="info-label">${t('outstandingBalance')}</span><span class="info-value mono" style="color:${client.balance > 0 ? '#dc2626' : '#16a34a'}">${fmt(client.balance)}</span></div>
     </div>
   </div>
   <div class="summary">
@@ -620,15 +665,15 @@ export default function Clients({ path }) {
     </div>
     <div class="summary-item">
       <div class="s-label">${t('totalTTC')}</div>
-      <div class="s-val" style="color:#1e3a5f">${totalTTC.toFixed(2)}</div>
+      <div class="s-val" style="color:#1e3a5f">${fmt(totalTTC)}</div>
     </div>
     <div class="summary-item">
       <div class="s-label">${t('cashSale')}</div>
-      <div class="s-val" style="color:#16a34a">${allSales.filter(x=>x.sale_type==='cash').reduce((s,x)=>s+x.total,0).toFixed(2)}</div>
+      <div class="s-val" style="color:#16a34a">${fmt(allSales.filter(x=>x.sale_type==='cash').reduce((s,x)=>s+x.total,0))}</div>
     </div>
     <div class="summary-item">
       <div class="s-label">${t('creditSale')}</div>
-      <div class="s-val" style="color:#d97706">${allSales.filter(x=>x.sale_type==='credit').reduce((s,x)=>s+x.total,0).toFixed(2)}</div>
+      <div class="s-val" style="color:#d97706">${fmt(allSales.filter(x=>x.sale_type==='credit').reduce((s,x)=>s+x.total,0))}</div>
     </div>
   </div>
   <div class="section-title">${t('salesHistory')}</div>
@@ -645,7 +690,7 @@ export default function Clients({ path }) {
     <tfoot>
       <tr>
         <td colspan="3" class="amt">${t('totalTTC')}</td>
-        <td class="amt mono">${totalTTC.toFixed(2)}</td>
+        <td class="amt mono">${fmt(totalTTC)}</td>
       </tr>
     </tfoot>
   </table>
@@ -760,7 +805,7 @@ export default function Clients({ path }) {
                 <td class="px-3 py-2.5 text-sm">{c.email || '—'}</td>
                 <td class="px-3 py-2.5 text-end">
                   <span class={`font-mono text-sm font-semibold ${c.balance > 0 ? 'text-error' : 'text-success'}`}>
-                    {c.balance.toFixed(2)}
+                    {fmt(c.balance)}
                   </span>
                 </td>
                 {canWrite && (
@@ -810,16 +855,8 @@ export default function Clients({ path }) {
           </tbody>
         </table>
       </div>
-      {pages > 1 && (
-        <div class="flex items-center justify-between px-4 py-3 border-t border-base-200 bg-base-50">
-          <span class="text-xs text-base-content/70">{page} / {pages}</span>
-          <div class="join">
-            <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
-            <button class="join-item btn btn-sm btn-ghost border border-base-300" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>›</button>
-          </div>
-        </div>
-      )}
       </div>
+      <Pagination page={page} pages={pages} total={result.total} limit={10} onPageChange={setPage} />
 
       {/* ── Statement Modal ── */}
       <Modal id="stmt-modal" size="xl" title={
@@ -827,7 +864,7 @@ export default function Clients({ path }) {
           <span>{stmtTarget?.name}</span>
           <span class="text-xs font-mono text-base-content/70 ms-2">{stmtTarget?.code}</span>
           <div class={`font-mono font-bold text-sm mt-0.5 ${stmtTarget?.balance > 0 ? 'text-error' : 'text-success'}`}>
-            {t('outstandingBalance')}: {stmtTarget?.balance?.toFixed(2)}
+            {t('outstandingBalance')}: {fmt(stmtTarget?.balance)}
           </div>
         </div>
       }>
@@ -885,8 +922,8 @@ export default function Clients({ path }) {
                   </div>
                   <div class="text-end shrink-0">
                     {e.type === 'sale'
-                      ? <span class="font-mono text-sm font-semibold text-error">+{e.amount.toFixed(2)}</span>
-                      : <span class="font-mono text-sm font-semibold text-success">−{e.amount.toFixed(2)}</span>
+                      ? <span class="font-mono text-sm font-semibold text-error">+{fmt(e.amount)}</span>
+                      : <span class="font-mono text-sm font-semibold text-success">−{fmt(e.amount)}</span>
                     }
                   </div>
                 </div>
@@ -899,7 +936,7 @@ export default function Clients({ path }) {
                       <button class="btn btn-xs btn-ghost border border-base-300" onClick={() => printClientPaymentReceipt(stmtTarget, e.amount, e.note || '', e.balance)}>{t('print')}</button>
                     )}
                     <span class={`text-xs font-mono font-medium ${e.balance > 0 ? 'text-error/70' : 'text-success/70'}`}>
-                      {t('outstandingBalance')}: {e.balance.toFixed(2)}
+                      {t('outstandingBalance')}: {fmt(e.balance)}
                     </span>
                   </div>
                 </div>
@@ -909,8 +946,8 @@ export default function Clients({ path }) {
                   {e.lines.map((l, i) => (
                     <div key={i} class="flex items-center justify-between gap-2 text-xs">
                       <span class="text-base-content/80 truncate flex-1">{l.product_name}</span>
-                      <span class="text-base-content/70 shrink-0">{l.qty} × {l.unit_price.toFixed(2)}</span>
-                      <span class="font-mono text-base-content/80 shrink-0">{l.total_ttc.toFixed(2)}</span>
+                      <span class="text-base-content/70 shrink-0">{l.qty} × {fmt(l.unit_price)}</span>
+                      <span class="font-mono text-base-content/80 shrink-0">{fmt(l.total_ttc)}</span>
                     </div>
                   ))}
                 </div>
@@ -1075,7 +1112,7 @@ export default function Clients({ path }) {
                     </span>
                   </div>
                   <div class="flex items-center gap-2 shrink-0">
-                    <span class="font-mono text-sm font-semibold">{s.total.toFixed(2)}</span>
+                    <span class="font-mono text-sm font-semibold">{fmt(s.total)}</span>
                     <svg xmlns="http://www.w3.org/2000/svg" class={`w-3.5 h-3.5 text-base-content/70 transition-transform ${expandedSale === s.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
@@ -1099,15 +1136,15 @@ export default function Clients({ path }) {
                         <tr key={i}>
                           <td class="font-medium">{l.product_name}</td>
                           <td class="text-center font-mono">{l.qty}</td>
-                          <td class="text-end font-mono">{l.unit_price.toFixed(2)}</td>
-                          <td class="text-end font-mono font-semibold">{l.total_ttc.toFixed(2)}</td>
+                          <td class="text-end font-mono">{fmt(l.unit_price)}</td>
+                          <td class="text-end font-mono font-semibold">{fmt(l.total_ttc)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr class="font-semibold border-t border-base-300">
                         <td colspan="3" class="text-end text-xs text-base-content/80">{t('totalTTC')}</td>
-                        <td class="text-end font-mono">{s.total.toFixed(2)}</td>
+                        <td class="text-end font-mono">{fmt(s.total)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1153,7 +1190,7 @@ export default function Clients({ path }) {
         <p class="text-sm mb-1">{deleteTarget?.name}</p>
         {deleteTarget?.balance > 0 && (
           <div class="alert alert-warning text-xs py-2 mb-3">
-            <span>{t('clientHasBalance')}: {deleteTarget.balance.toFixed(2)}</span>
+            <span>{t('clientHasBalance')}: {fmt(deleteTarget.balance)}</span>
           </div>
         )}
         {deleteError && <p class="text-error text-sm mb-2">{deleteError}</p>}
@@ -1187,7 +1224,7 @@ export default function Clients({ path }) {
                   <tr key={c.id}>
                     <td>{c.name}</td>
                     <td>{c.phone || '—'}</td>
-                    <td>{(c.balance || 0).toFixed(2)}</td>
+                    <td>{fmt((c.balance || 0))}</td>
                     <td>
                       <button class="btn btn-xs btn-success btn-outline" onClick={() => handleUnarchive(c.id)}>{t('unarchive')}</button>
                     </td>

@@ -246,6 +246,7 @@ export const api = {
   adjustSupplierBalance: (id, body) => request('PATCH', `/tenant/suppliers/${encodeURIComponent(id)}/balance`, body).then(r => { bust('/tenant/suppliers?limit=500'); return r }),
   paySupplierBalance: (id, body) => request('POST', `/tenant/suppliers/${encodeURIComponent(id)}/pay`, body).then(r => { bust('/tenant/suppliers?limit=500'); return r }),
   listSupplierPayments: (id, params) => request('GET', `/tenant/suppliers/${encodeURIComponent(id)}/payments?${new URLSearchParams(params)}`),
+  reverseSupplierPayment: (supplierId, paymentId) => request('POST', `/tenant/suppliers/${encodeURIComponent(supplierId)}/payments/${encodeURIComponent(paymentId)}/reverse`).then(r => { bust('/tenant/suppliers?limit=500'); return r }),
   listSupplierPurchases: (params) => request('GET', `/tenant/purchases?${new URLSearchParams(params)}`),
 
   // Store settings

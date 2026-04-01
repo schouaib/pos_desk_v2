@@ -4,6 +4,7 @@ import { Modal, openModal, closeModal } from '../components/Modal'
 import { api } from '../lib/api'
 import { hasPerm } from '../lib/auth'
 import { useI18n } from '../lib/i18n'
+import { Pagination } from '../components/Pagination'
 
 function defaultFrom() {
   const d = new Date()
@@ -17,7 +18,7 @@ function defaultTo() {
 const emptyForm = { amount: '', reason: '' }
 
 export default function Retraits({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const canAdd = hasPerm('retraits', 'add')
   const canDelete = hasPerm('retraits', 'delete')
   const [items, setItems] = useState([])
@@ -64,7 +65,13 @@ export default function Retraits({ path }) {
     return () => { cancelled = true }
   }, [from, to, page])
 
+  function closeAllDialogs() {
+    closeModal('retrait-modal')
+    setDeleteTarget(null)
+  }
+
   function openCreate() {
+    closeAllDialogs()
     setForm(emptyForm)
     setError('')
     openModal('retrait-modal')
@@ -94,8 +101,6 @@ export default function Retraits({ path }) {
     } catch {}
   }
 
-  const start = total === 0 ? 0 : (page - 1) * limit + 1
-  const end = Math.min(page * limit, total)
 
   return (
     <Layout currentPath={path}>
@@ -142,7 +147,7 @@ export default function Retraits({ path }) {
             {!loading && items.map((r) => (
               <tr key={r.id} class="border-b border-base-200 hover:bg-base-50 transition-colors">
                 <td class="px-3 py-2.5 text-sm whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
-                <td class="px-3 py-2.5 text-end font-mono font-semibold">{r.amount.toFixed(2)}</td>
+                <td class="px-3 py-2.5 text-end font-mono font-semibold">{fmt(r.amount)}</td>
                 <td class="px-3 py-2.5 text-sm text-base-content/80 max-w-xs truncate">{r.reason || '—'}</td>
                 <td class="px-3 py-2.5 text-sm text-base-content/70">{r.user_email}</td>
                 {canDelete && (
@@ -163,20 +168,7 @@ export default function Retraits({ path }) {
         </div>
       </div>
 
-      {/* Pagination */}
-      {total > 0 && (
-        <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/80">{t('showing')} {start}–{end} {t('of')} {total}</span>
-          <div class="join">
-            <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
-            {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-              <button key={p} class={`join-item btn btn-sm ${p === page ? 'btn-active' : ''}`}
-                onClick={() => setPage(p)}>{p}</button>
-            ))}
-            <button class="join-item btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>»</button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} pages={pages} total={total} limit={limit} onPageChange={setPage} />
 
       {/* Add modal */}
       <Modal id="retrait-modal" title={t('newRetrait')}>
@@ -205,7 +197,7 @@ export default function Retraits({ path }) {
         <div class="modal modal-open">
           <div class="modal-box max-w-sm">
             <p class="text-sm mb-4">{t('deleteRetrait')}</p>
-            <p class="font-semibold mb-4">{deleteTarget.amount.toFixed(2)} — {deleteTarget.reason || '—'}</p>
+            <p class="font-semibold mb-4">{fmt(deleteTarget.amount)} — {deleteTarget.reason || '—'}</p>
             <div class="modal-action">
               <button class="btn btn-sm btn-ghost" onClick={() => setDeleteTarget(null)}>{t('back')}</button>
               <button class="btn btn-sm btn-error" onClick={handleDelete}>{t('delete')}</button>

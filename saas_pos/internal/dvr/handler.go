@@ -32,7 +32,7 @@ func HandleList(c *fiber.Ctx) error {
 	eventType := c.Query("type")
 	ref := c.Query("ref")
 	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 20)
+	limit := c.QueryInt("limit", 10)
 
 	items, total, err := List(claims.TenantID, from, to, eventType, ref, page, limit)
 	if err != nil {

@@ -194,6 +194,22 @@ func List(tenantID string, query string, page, limit int, filters ...string) (*L
 		}
 	}
 
+	// Price below cost filter (filters[2]) — products where any active selling price > 0 and < prix_achat
+	if len(filters) > 2 && filters[2] == "1" {
+		ltCost := func(field string) bson.M {
+			return bson.M{"$and": bson.A{
+				bson.M{"$gt": bson.A{"$" + field, 0}},
+				bson.M{"$lt": bson.A{"$" + field, "$prix_achat"}},
+			}}
+		}
+		filter["prix_achat"] = bson.M{"$gt": 0}
+		filter["$expr"] = bson.M{"$or": bson.A{
+			ltCost("prix_vente_1"),
+			ltCost("prix_vente_2"),
+			ltCost("prix_vente_3"),
+		}}
+	}
+
 	if query != "" {
 		terms := strings.Fields(query)
 		andClauses := make(bson.A, len(terms))
@@ -618,6 +634,7 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 		type adjDoc struct {
 			QtyBefore    float64             `bson:"qty_before"`
 			QtyAfter     float64             `bson:"qty_after"`
+			PrixAchat    float64             `bson:"prix_achat"`
 			Reason       string              `bson:"reason"`
 			VariantID    *primitive.ObjectID  `bson:"variant_id"`
 			VariantLabel string              `bson:"variant_label"`
@@ -630,6 +647,7 @@ func ListMovements(tenantID, productID, dateFrom, dateTo string, page, limit int
 				Date:      a.CreatedAt,
 				Type:      "adjustment",
 				Qty:       a.QtyAfter - a.QtyBefore,
+				PrixAchat: a.PrixAchat,
 				Reference: a.Reason,
 			}
 			if a.VariantID != nil {

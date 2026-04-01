@@ -8,7 +8,7 @@ const emptyForm = {
 }
 
 export function QuickAddProductModal({ open, onClose, onCreated }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -172,6 +172,12 @@ export function QuickAddProductModal({ open, onClose, onCreated }) {
                 </label>
               </div>
             </div>
+            {form.prix_achat > 0 && form[priceKey] > 0 && form[priceKey] < form.prix_achat && (
+              <div class="flex items-center gap-1.5 mt-2 px-1 text-warning text-xs">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" /></svg>
+                <span>{t('priceBelowCostWarn')} ({t('prixAchat')}: {fmt(form.prix_achat)})</span>
+              </div>
+            )}
           </div>
 
           {/* VAT — only if activated */}

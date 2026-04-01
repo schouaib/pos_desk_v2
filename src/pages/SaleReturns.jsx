@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks'
 import { Layout } from '../components/Layout'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
+import { Pagination } from '../components/Pagination'
 
 function defaultFrom() {
   const d = new Date()
@@ -10,7 +11,7 @@ function defaultFrom() {
 }
 
 export default function SaleReturns({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [items, setItems] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -84,7 +85,7 @@ export default function SaleReturns({ path }) {
                     <td class="px-3 py-2.5 font-mono text-xs text-primary">{r.original_sale_ref}</td>
                     <td class="px-3 py-2.5 text-sm">{new Date(r.created_at).toLocaleDateString()}</td>
                     <td class="px-3 py-2.5 text-sm">{r.cashier_email}</td>
-                    <td class="px-3 py-2.5 text-end font-mono text-sm text-error font-semibold">{r.total?.toFixed(2)}</td>
+                    <td class="px-3 py-2.5 text-end font-mono text-sm text-error font-semibold">{fmt(r.total)}</td>
                     <td class="px-3 py-2.5">
                       <svg xmlns="http://www.w3.org/2000/svg"
                         class={`w-3.5 h-3.5 transition-transform duration-200 text-base-content/70 ${expanded === r.id ? 'rotate-180' : ''}`}
@@ -104,8 +105,8 @@ export default function SaleReturns({ path }) {
                                 <tr key={i}>
                                   <td class="text-xs font-medium">{l.product_name}</td>
                                   <td class="text-center font-mono text-xs">{l.qty}</td>
-                                  <td class="text-end font-mono text-xs">{l.total_ht?.toFixed(2)}</td>
-                                  <td class="text-end font-mono text-xs font-medium">{l.total_ttc?.toFixed(2)}</td>
+                                  <td class="text-end font-mono text-xs">{fmt(l.total_ht)}</td>
+                                  <td class="text-end font-mono text-xs font-medium">{fmt(l.total_ttc)}</td>
                                   <td class="text-xs text-base-content/80">{l.reason || '—'}</td>
                                 </tr>
                               ))}
@@ -122,16 +123,7 @@ export default function SaleReturns({ path }) {
         </div>
       </div>
 
-      {total > 0 && (
-        <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/80">{t('showing')} {Math.min((page - 1) * limit + 1, total)}–{Math.min(page * limit, total)} {t('of')} {total}</span>
-          <div class="join">
-            <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
-            <button class="join-item btn btn-sm btn-active">{page}</button>
-            <button class="join-item btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>»</button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} pages={pages} total={total} limit={limit} onPageChange={setPage} />
     </Layout>
   )
 }

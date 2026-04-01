@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks'
 import { Layout } from '../components/Layout'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
+import { Pagination } from '../components/Pagination'
 
 function defaultFrom() {
   const d = new Date()
@@ -73,8 +74,6 @@ export default function Losses({ path }) {
     load()
   }
 
-  const start = total === 0 ? 0 : (page - 1) * limit + 1
-  const end   = Math.min(page * limit, total)
 
   return (
     <Layout currentPath={path}>
@@ -164,20 +163,7 @@ export default function Losses({ path }) {
         </div>
       </div>
 
-      {/* Pagination */}
-      {total > 0 && (
-        <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/80">{t('showing')} {start}–{end} {t('of')} {total}</span>
-          <div class="join">
-            <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
-            {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-              <button key={p} class={`join-item btn btn-sm ${p === page ? 'btn-active' : ''}`}
-                onClick={() => setPage(p)}>{p}</button>
-            ))}
-            <button class="join-item btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>»</button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} pages={pages} total={total} limit={limit} onPageChange={setPage} />
     </Layout>
   )
 }

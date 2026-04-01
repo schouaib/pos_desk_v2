@@ -113,6 +113,16 @@ func HandlePayBalance(c *fiber.Ctx) error {
 	return response.OK(c, s)
 }
 
+// POST /api/tenant/suppliers/:id/payments/:paymentId/reverse
+func HandleReversePayment(c *fiber.Ctx) error {
+	claims := middleware.GetClaims(c)
+	s, err := ReversePayment(claims.TenantID, c.Params("id"), c.Params("paymentId"), claims.Email)
+	if err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.OK(c, s)
+}
+
 // GET /api/tenant/suppliers/:id/payments?page=1&limit=10&date_from=&date_to=
 func HandleListPayments(c *fiber.Ctx) error {
 	tenantID := middleware.GetClaims(c).TenantID

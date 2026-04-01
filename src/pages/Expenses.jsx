@@ -4,6 +4,7 @@ import { Modal, openModal, closeModal } from '../components/Modal'
 import { api } from '../lib/api'
 import { hasPerm } from '../lib/auth'
 import { useI18n } from '../lib/i18n'
+import { Pagination } from '../components/Pagination'
 
 function defaultFrom() {
   const d = new Date()
@@ -20,7 +21,7 @@ function todayStr() {
 const emptyForm = { label: '', amount: '', date_from: todayStr(), date_to: todayStr(), note: '' }
 
 export default function Expenses({ path }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const canAdd = hasPerm('expenses', 'add')
   const canEdit = hasPerm('expenses', 'edit')
   const canDelete = hasPerm('expenses', 'delete')
@@ -70,7 +71,13 @@ export default function Expenses({ path }) {
     return () => { cancelled = true }
   }, [search, from, to, page])
 
+  function closeAllDialogs() {
+    closeModal('expense-modal')
+    setDeleteTarget(null)
+  }
+
   function openCreate() {
+    closeAllDialogs()
     setEditing(null)
     setForm({ ...emptyForm, date_from: todayStr(), date_to: todayStr() })
     setError('')
@@ -78,6 +85,7 @@ export default function Expenses({ path }) {
   }
 
   function openEdit(exp) {
+    closeAllDialogs()
     setEditing(exp)
     setForm({
       label: exp.label,
@@ -125,8 +133,6 @@ export default function Expenses({ path }) {
     } catch {}
   }
 
-  const start = total === 0 ? 0 : (page - 1) * limit + 1
-  const end = Math.min(page * limit, total)
 
   return (
     <Layout currentPath={path}>
@@ -186,8 +192,8 @@ export default function Expenses({ path }) {
                   <span class="badge badge-sm badge-ghost">{exp.days}</span>
                 </td>
                 <td class="px-3 py-2.5 font-medium">{exp.label}</td>
-                <td class="px-3 py-2.5 text-end font-mono font-semibold">{exp.amount.toFixed(2)}</td>
-                <td class="px-3 py-2.5 text-end font-mono text-sm text-base-content/80">{exp.daily_amount.toFixed(2)}</td>
+                <td class="px-3 py-2.5 text-end font-mono font-semibold">{fmt(exp.amount)}</td>
+                <td class="px-3 py-2.5 text-end font-mono text-sm text-base-content/80">{fmt(exp.daily_amount)}</td>
                 <td class="px-3 py-2.5 text-sm text-base-content/70 max-w-xs truncate">{exp.note || '—'}</td>
                 {(canEdit || canDelete) && (
                 <td class="px-3 py-2.5 text-end">
@@ -212,20 +218,7 @@ export default function Expenses({ path }) {
         </div>
       </div>
 
-      {/* Pagination */}
-      {total > 0 && (
-        <div class="flex items-center justify-between mt-4 text-sm">
-          <span class="text-base-content/80">{t('showing')} {start}–{end} {t('of')} {total}</span>
-          <div class="join">
-            <button class="join-item btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>«</button>
-            {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-              <button key={p} class={`join-item btn btn-sm ${p === page ? 'btn-active' : ''}`}
-                onClick={() => setPage(p)}>{p}</button>
-            ))}
-            <button class="join-item btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>»</button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} pages={pages} total={total} limit={limit} onPageChange={setPage} />
 
       {/* Add / Edit modal */}
       <Modal id="expense-modal" title={editing ? t('editExpense') : t('newExpense')}>
@@ -256,7 +249,7 @@ export default function Expenses({ path }) {
           {form.date_from && form.date_to && form.date_to >= form.date_from && (
             <p class="text-xs text-base-content/70">
               {t('expenseDays')}: {Math.floor((new Date(form.date_to) - new Date(form.date_from)) / 86400000) + 1}
-              {form.amount && ` — ${t('expenseDailyAmt')}: ${(parseFloat(form.amount) / (Math.floor((new Date(form.date_to) - new Date(form.date_from)) / 86400000) + 1)).toFixed(2)}`}
+              {form.amount && ` — ${t('expenseDailyAmt')}: ${fmt(parseFloat(form.amount) / (Math.floor((new Date(form.date_to) - new Date(form.date_from)) / 86400000) + 1))}`}
             </p>
           )}
           <label class="form-control">
