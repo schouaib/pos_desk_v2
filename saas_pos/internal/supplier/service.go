@@ -150,6 +150,22 @@ func ListPayments(tenantID, supplierID, dateFrom, dateTo string, page, limit int
 		}
 	}
 
+	// Resolve user IDs to emails for purchase_payments
+	userEmailCache := map[string]string{}
+	for _, pp := range purchasePayments {
+		if _, ok := userEmailCache[pp.CreatedBy]; !ok {
+			uid, uerr := primitive.ObjectIDFromHex(pp.CreatedBy)
+			if uerr == nil {
+				var u struct {
+					Email string `bson:"email"`
+				}
+				if err := database.Col("users").FindOne(ctx, bson.M{"_id": uid}).Decode(&u); err == nil && u.Email != "" {
+					userEmailCache[pp.CreatedBy] = u.Email
+				}
+			}
+		}
+	}
+
 	// Merge purchase_payments that don't already exist as supplier_payments
 	for _, pp := range purchasePayments {
 		ref := purchaseRefCache[pp.PurchaseID]
@@ -165,6 +181,10 @@ func ListPayments(tenantID, supplierID, dateFrom, dateTo string, page, limit int
 				note = ref
 			}
 		}
+		createdBy := pp.CreatedBy
+		if email, ok := userEmailCache[createdBy]; ok {
+			createdBy = email
+		}
 		supplierItems = append(supplierItems, SupplierPayment{
 			ID:          pp.ID,
 			TenantID:    pp.TenantID,
@@ -173,7 +193,7 @@ func ListPayments(tenantID, supplierID, dateFrom, dateTo string, page, limit int
 			PurchaseRef: ref,
 			Amount:      pp.Amount,
 			Note:        note,
-			CreatedBy:   pp.CreatedBy,
+			CreatedBy:   createdBy,
 			CreatedAt:   pp.CreatedAt,
 		})
 	}
@@ -605,12 +625,12 @@ func PayBalance(tenantID, id string, amount float64, note, createdBy string) (*S
 		return nil, errors.New("invalid id")
 	}
 
-	// Fetch unpaid validated purchases for this supplier, oldest first
+	// Fetch unpaid purchases for this supplier (any non-draft status), oldest first
 	purchases := database.Col("purchases")
 	cursor, err := purchases.Find(ctx, bson.M{
 		"tenant_id":   tid,
 		"supplier_id": oid,
-		"status":      "validated",
+		"status":      bson.M{"$in": []string{"validated", "partially_validated", "paid"}},
 	}, options.Find().SetSort(bson.M{"created_at": 1}))
 	if err != nil {
 		return nil, err
@@ -627,16 +647,7 @@ func PayBalance(tenantID, id string, amount float64, note, createdBy string) (*S
 		return nil, err
 	}
 
-	// Validate: amount must not exceed total remaining across all unpaid purchases
-	totalRemaining := 0.0
-	for _, p := range items {
-		totalRemaining += p.Total - p.PaidAmount
-	}
-	if amount > totalRemaining+0.001 { // small epsilon for float comparison
-		return nil, errors.New("amount exceeds total remaining balance of unpaid purchases")
-	}
-
-	// Distribute payment oldest first
+	// Distribute payment oldest first (cap at what's actually owed on purchases)
 	remaining := amount
 	now := time.Now()
 	for _, p := range items {

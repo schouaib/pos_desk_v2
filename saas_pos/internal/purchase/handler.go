@@ -100,7 +100,7 @@ func HandlePay(c *fiber.Ctx) error {
 	if err := c.BodyParser(&input); err != nil {
 		return response.BadRequest(c, "invalid body")
 	}
-	p, err := Pay(claims.TenantID, c.Params("id"), claims.ID, input)
+	p, err := Pay(claims.TenantID, c.Params("id"), claims.ID, claims.Email, input)
 	if err != nil {
 		return response.BadRequest(c, err.Error())
 	}

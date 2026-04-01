@@ -12,7 +12,7 @@ const PAGE_SIZE = 10
 function today() { return new Date().toISOString().slice(0, 10) }
 
 export default function Suppliers({ path }) {
-  const { t, fmt } = useI18n()
+  const { t, te, fmt } = useI18n()
   const canAdd    = hasPerm('suppliers', 'add')
   const canEdit   = hasPerm('suppliers', 'edit')
   const canDelete = hasPerm('suppliers', 'delete')
@@ -250,7 +250,7 @@ export default function Suppliers({ path }) {
       }
       closeModal('supplier-modal')
       load()
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(te(e.message)) }
   }
 
   async function handlePay() {
@@ -264,7 +264,7 @@ export default function Suppliers({ path }) {
       setStmtPage(1)
       await loadPayments(stmtTarget.id, stmtFrom, stmtTo, 1)
       load()
-    } catch (e) { setPayError(e.message) } finally { setPayLoading(false) }
+    } catch (e) { setPayError(te(e.message)) } finally { setPayLoading(false) }
   }
 
   function handleReverse(payment) {
@@ -279,7 +279,7 @@ export default function Suppliers({ path }) {
       setStmtTarget(updated)
       await loadPayments(stmtTarget.id, stmtFrom, stmtTo, stmtPage)
       load()
-    } catch (e) { setPayError(e.message) }
+    } catch (e) { setPayError(te(e.message)) }
     finally { setReverseTarget(null); closeModal('reverse-confirm-modal') }
   }
 
@@ -289,7 +289,7 @@ export default function Suppliers({ path }) {
       await api.adjustSupplierBalance(balanceTarget.id, { amount: Number(balanceAmount) })
       closeModal('balance-modal')
       load()
-    } catch (e) { setBalanceError(e.message) }
+    } catch (e) { setBalanceError(te(e.message)) }
   }
 
   async function confirmDelete() {

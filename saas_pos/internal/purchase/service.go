@@ -827,7 +827,7 @@ func PreviewValidation(tenantID, id string) ([]PricePreviewLine, error) {
 }
 
 // Pay records a payment, subtracts from supplier balance, and stores payment history.
-func Pay(tenantID, id, userID string, input PayInput) (*Purchase, error) {
+func Pay(tenantID, id, userID, userEmail string, input PayInput) (*Purchase, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -898,7 +898,11 @@ func Pay(tenantID, id, userID string, input PayInput) (*Purchase, error) {
 	} else {
 		note = p.Ref + " — " + note
 	}
-	_ = supplier.RecordPaymentWithType(tenantID, p.SupplierID.Hex(), p.SupplierName, input.Amount, note, userID, "purchase", p.Ref)
+	createdBy := userEmail
+	if createdBy == "" {
+		createdBy = userID
+	}
+	_ = supplier.RecordPaymentWithType(tenantID, p.SupplierID.Hex(), p.SupplierName, input.Amount, note, createdBy, "purchase", p.Ref)
 
 	after := options.After
 	var updated Purchase

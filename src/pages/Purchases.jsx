@@ -23,7 +23,7 @@ const KBD = ({ children }) => (
 )
 
 export default function Purchases({ path }) {
-  const { t, fmt } = useI18n()
+  const { t, te, fmt } = useI18n()
   const canAdd      = hasPerm('purchases', 'add')
   const canEdit     = hasPerm('purchases', 'edit')
   const canDelete   = hasPerm('purchases', 'delete')
@@ -562,7 +562,7 @@ export default function Purchases({ path }) {
       }
       setFormOpen(false)
       load()
-    } catch (e) { setFormError(e.message) }
+    } catch (e) { setFormError(te(e.message)) }
   }
 
   // Validate with preview
@@ -573,7 +573,7 @@ export default function Purchases({ path }) {
       setPreviewData(preview)
       setPreviewTarget(item)
       openModal('preview-modal')
-    } catch (e) { alert(e.message) }
+    } catch (e) { alert(te(e.message)) }
   }
 
   async function handleValidate(id, partial) {
@@ -583,7 +583,7 @@ export default function Purchases({ path }) {
       closeModal('preview-modal')
       setPreviewData(null)
       load()
-    } catch (e) { alert(e.message) }
+    } catch (e) { alert(te(e.message)) }
   }
 
   // Payment
@@ -598,11 +598,15 @@ export default function Purchases({ path }) {
 
   async function handlePay() {
     setPayError('')
+    const amt = Number(payAmount)
+    const remaining = Math.round((payTarget.total - payTarget.paid_amount) * 100) / 100
+    if (amt <= 0) { setPayError(te('amount must be > 0')); return }
+    if (amt > remaining + 0.001) { setPayError(t('paymentExceedsRemaining')); return }
     try {
-      await api.payPurchase(payTarget.id, { amount: Number(payAmount), note: payNote })
+      await api.payPurchase(payTarget.id, { amount: amt, note: payNote })
       closeModal('pay-modal')
       load()
-    } catch (e) { setPayError(e.message) }
+    } catch (e) { setPayError(te(e.message)) }
   }
 
   // Payment history
@@ -634,7 +638,7 @@ export default function Purchases({ path }) {
     try {
       await api.duplicatePurchase(id)
       load()
-    } catch (e) { alert(e.message) }
+    } catch (e) { alert(te(e.message)) }
   }
 
   // Return
@@ -656,7 +660,7 @@ export default function Purchases({ path }) {
       })))
       setReturnError('')
       openModal('return-modal')
-    } catch (e) { alert(e.message) }
+    } catch (e) { alert(te(e.message)) }
   }
 
   async function handleReturn() {
@@ -672,7 +676,7 @@ export default function Purchases({ path }) {
       await api.returnPurchase(returnTarget.id, { lines: toReturn })
       closeModal('return-modal')
       load()
-    } catch (e) { setReturnError(e.message) }
+    } catch (e) { setReturnError(te(e.message)) }
   }
 
   // Low stock
@@ -1396,14 +1400,14 @@ export default function Purchases({ path }) {
 
       {/* Stats cards */}
       {stats && (
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
           <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
             <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchases')}</div>
-            <div class="text-xl font-bold font-mono mt-1">{stats.total_count || 0}</div>
+            <div class="text-xl font-bold font-mono mt-1">{stats.count || 0}</div>
           </div>
           <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
             <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchaseAmount')}</div>
-            <div class="text-xl font-bold font-mono mt-1">{fmt(stats.total_ttc || stats.total_amount || 0)}</div>
+            <div class="text-xl font-bold font-mono mt-1">{fmt(stats.total_amount || 0)}</div>
           </div>
           <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
             <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchasePaid')}</div>
@@ -1412,6 +1416,10 @@ export default function Purchases({ path }) {
           <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
             <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchaseRemaining')}</div>
             <div class="text-xl font-bold font-mono text-error mt-1">{fmt(stats.total_remaining || 0)}</div>
+          </div>
+          <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
+            <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchaseExpenses')}</div>
+            <div class="text-xl font-bold font-mono text-warning mt-1">{fmt(stats.total_expenses || 0)}</div>
           </div>
         </div>
       )}
@@ -1647,7 +1655,7 @@ export default function Purchases({ path }) {
         </p>
         <label class="form-control mb-3">
           <span class="label-text">{t('paymentAmount')}</span>
-          <input type="number" min="0" step="any" class="input input-bordered input-sm"
+          <input type="number" min="0" max={payTarget ? +(payTarget.total - payTarget.paid_amount).toFixed(2) : undefined} step="any" class="input input-bordered input-sm"
             value={payAmount} onInput={(e) => setPayAmount(e.target.value)} />
         </label>
         <label class="form-control mb-3">
