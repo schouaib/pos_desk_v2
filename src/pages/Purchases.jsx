@@ -1399,15 +1399,19 @@ export default function Purchases({ path }) {
       </div>
 
       {/* Stats cards */}
-      {stats && (
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+      {stats && (() => {
+        const purchaseCount = (stats.count || 0) - (stats.return_count || 0)
+        const purchaseAmount = (stats.total_amount || 0) - (stats.return_amount || 0)
+        const remaining = stats.total_remaining || 0
+        return (
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
           <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
             <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchases')}</div>
-            <div class="text-xl font-bold font-mono mt-1">{stats.count || 0}</div>
+            <div class="text-xl font-bold font-mono mt-1">{purchaseCount}</div>
           </div>
           <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
             <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchaseAmount')}</div>
-            <div class="text-xl font-bold font-mono mt-1">{fmt(stats.total_amount || 0)}</div>
+            <div class="text-xl font-bold font-mono mt-1">{fmt(purchaseAmount)}</div>
           </div>
           <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
             <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchasePaid')}</div>
@@ -1415,14 +1419,22 @@ export default function Purchases({ path }) {
           </div>
           <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
             <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchaseRemaining')}</div>
-            <div class="text-xl font-bold font-mono text-error mt-1">{fmt(stats.total_remaining || 0)}</div>
+            <div class="text-xl font-bold font-mono text-error mt-1">{fmt(remaining > 0 ? remaining : 0)}</div>
           </div>
+          {stats.return_count > 0 && (
+            <div class="bg-base-100 rounded-xl shadow-sm border border-warning/30 p-3">
+              <div class="text-xs text-warning uppercase tracking-wide">{t('movementReturn')}</div>
+              <div class="text-xl font-bold font-mono text-warning mt-1">{fmt(Math.abs(stats.return_amount || 0))}</div>
+              <div class="text-xs text-base-content/50 mt-0.5">{stats.return_count} {t('movementReturn').toLowerCase()}</div>
+            </div>
+          )}
           <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3">
             <div class="text-xs text-base-content/60 uppercase tracking-wide">{t('totalPurchaseExpenses')}</div>
             <div class="text-xl font-bold font-mono text-warning mt-1">{fmt(stats.total_expenses || 0)}</div>
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* Filters */}
       <div class="bg-base-100 rounded-xl shadow-sm border border-base-300 p-3 mb-4 flex flex-wrap gap-3 items-center">

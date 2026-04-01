@@ -180,6 +180,8 @@ type PurchaseStats struct {
 	TotalPaid      float64 `json:"total_paid"`
 	TotalRemaining float64 `json:"total_remaining"`
 	TotalExpenses  float64 `json:"total_expenses"`
+	ReturnCount    int64   `json:"return_count"`
+	ReturnAmount   float64 `json:"return_amount"`
 	ByStatus       map[string]StatusStats `json:"by_status"`
 	TopSuppliers   []SupplierStats        `json:"top_suppliers"`
 }

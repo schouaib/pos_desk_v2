@@ -986,7 +986,9 @@ export default function Suppliers({ path }) {
                             ? <span class="badge badge-xs badge-ghost">{t('reversed')}</span>
                             : p.type === 'purchase'
                               ? <span class="badge badge-xs badge-info">{t('sourcePurchase')}{p.purchase_ref ? ` ${p.purchase_ref}` : ''}</span>
-                              : <span class="badge badge-xs badge-success">{t('stmtPayment')}</span>
+                              : p.type === 'return'
+                                ? <span class="badge badge-xs badge-warning">{t('movementReturn')}{p.purchase_ref ? ` ${p.purchase_ref}` : ''}</span>
+                                : <span class="badge badge-xs badge-success">{t('stmtPayment')}</span>
                         }
                       </td>
                       <td class="px-3 py-2.5 text-sm text-base-content/70 max-w-[200px] truncate">{p.note || '—'}</td>

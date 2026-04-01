@@ -1206,16 +1206,32 @@ func Return(tenantID, id, userID, userEmail string, returnLines []ValidateLineIn
 
 	returnTotal = math.Round(returnTotal*100) / 100
 
-	// Subtract return amount from supplier balance
-	if _, err := database.Col("suppliers").UpdateOne(ctx,
-		bson.M{"_id": original.SupplierID, "tenant_id": tid},
-		bson.M{
-			"$inc": bson.M{"balance": -returnTotal},
-			"$set": bson.M{"updated_at": time.Now()},
-		},
-	); err != nil {
-		return nil, err
+	// Only subtract from supplier balance if the original purchase has unpaid balance.
+	// If the purchase was fully paid, the return is auto-settled (no balance change).
+	unpaid := original.Total - original.PaidAmount
+	if unpaid > 0.001 {
+		// Reduce the unpaid balance by the return amount (capped at what's owed)
+		balanceReduction := returnTotal
+		if balanceReduction > unpaid {
+			balanceReduction = unpaid
+		}
+		if _, err := database.Col("suppliers").UpdateOne(ctx,
+			bson.M{"_id": original.SupplierID, "tenant_id": tid},
+			bson.M{
+				"$inc": bson.M{"balance": -balanceReduction},
+				"$set": bson.M{"updated_at": time.Now()},
+			},
+		); err != nil {
+			return nil, err
+		}
 	}
+
+	// Record return in supplier payment history
+	createdBy := userEmail
+	if createdBy == "" {
+		createdBy = userID
+	}
+	_ = supplier.RecordPaymentWithType(tenantID, original.SupplierID.Hex(), original.SupplierName, -returnTotal, fmt.Sprintf("Return for %s", original.Ref), createdBy, "return", original.Ref)
 
 	seq, _ := counter.Next(tenantID, "purchase_return")
 	ref := fmt.Sprintf("RET-%06d", seq)
@@ -1228,10 +1244,10 @@ func Return(tenantID, id, userID, userEmail string, returnLines []ValidateLineIn
 		SupplierID:       original.SupplierID,
 		SupplierName:     original.SupplierName,
 		SupplierInvoice:  original.SupplierInvoice,
-		Status:           StatusValidated,
+		Status:           StatusPaid,
 		Lines:            returnPurchaseLines,
 		Total:            -returnTotal,
-		PaidAmount:       0,
+		PaidAmount:       -returnTotal,
 		Note:             fmt.Sprintf("Return for %s", original.Ref),
 		CreatedBy:        userID,
 		CreatedByEmail:   userEmail,
@@ -1382,6 +1398,33 @@ func Stats(tenantID string, from, to time.Time) (*PurchaseStats, error) {
 	result.TotalPaid = math.Round(result.TotalPaid*100) / 100
 	result.TotalRemaining = math.Round((result.TotalAmount-result.TotalPaid)*100) / 100
 	result.TotalExpenses = math.Round(result.TotalExpenses*100) / 100
+
+	// Returns aggregate
+	retPipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{
+			"tenant_id":  tid,
+			"created_at": bson.M{"$gte": from, "$lte": to},
+			"ref":        bson.M{"$regex": "^RET-"},
+		}}},
+		{{Key: "$group", Value: bson.M{
+			"_id":    nil,
+			"count":  bson.M{"$sum": 1},
+			"amount": bson.M{"$sum": "$total"},
+		}}},
+	}
+	retCur, retErr := col().Aggregate(ctx, retPipeline)
+	if retErr == nil {
+		defer retCur.Close(ctx)
+		type retRow struct {
+			Count  int64   `bson:"count"`
+			Amount float64 `bson:"amount"`
+		}
+		var retRows []retRow
+		if retCur.All(ctx, &retRows) == nil && len(retRows) > 0 {
+			result.ReturnCount = retRows[0].Count
+			result.ReturnAmount = math.Round(retRows[0].Amount*100) / 100
+		}
+	}
 
 	// Top suppliers
 	topPipeline := mongo.Pipeline{
