@@ -1245,4 +1245,5 @@ export default {
   err_qty_must_be_0: 'Quantity must be greater than 0',
   err_amount_exceeds_total_remaining_balance_of_unpaid_purchases: 'Amount exceeds total remaining balance of unpaid purchases',
   paymentExceedsRemaining: 'Payment amount exceeds remaining balance',
+  returnCredit: 'Return Credit',
 }

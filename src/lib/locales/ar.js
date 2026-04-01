@@ -1220,4 +1220,5 @@ export default {
   err_qty_must_be_0: 'الكمية يجب أن تكون أكبر من 0',
   err_amount_exceeds_total_remaining_balance_of_unpaid_purchases: 'المبلغ يتجاوز الرصيد المتبقي للمشتريات غير المدفوعة',
   paymentExceedsRemaining: 'مبلغ الدفعة يتجاوز المبلغ المتبقي',
+  returnCredit: 'رصيد مرتجع',
 }

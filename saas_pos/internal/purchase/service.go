@@ -1206,31 +1206,69 @@ func Return(tenantID, id, userID, userEmail string, returnLines []ValidateLineIn
 
 	returnTotal = math.Round(returnTotal*100) / 100
 
-	// Only subtract from supplier balance if the original purchase has unpaid balance.
-	// If the purchase was fully paid, the return is auto-settled (no balance change).
-	unpaid := original.Total - original.PaidAmount
+	createdBy := userEmail
+	if createdBy == "" {
+		createdBy = userID
+	}
+
+	// If the original purchase has unpaid balance, apply return as a payment (versement)
+	unpaid := math.Round((original.Total - original.PaidAmount) * 100) / 100
 	if unpaid > 0.001 {
-		// Reduce the unpaid balance by the return amount (capped at what's owed)
-		balanceReduction := returnTotal
-		if balanceReduction > unpaid {
-			balanceReduction = unpaid
+		// Apply return amount as payment on the original purchase (capped at what's owed)
+		creditAmount := returnTotal
+		if creditAmount > unpaid {
+			creditAmount = unpaid
 		}
+		creditAmount = math.Round(creditAmount * 100) / 100
+
+		newPaid := math.Round((original.PaidAmount + creditAmount) * 100) / 100
+		newStatus := original.Status
+		if newPaid >= original.Total - 0.001 {
+			newStatus = StatusPaid
+		}
+
+		// Update the original purchase paid_amount
+		if _, err := col().UpdateOne(ctx,
+			bson.M{"_id": oid, "tenant_id": tid},
+			bson.M{"$set": bson.M{
+				"paid_amount": newPaid,
+				"status":      newStatus,
+				"updated_at":  time.Now(),
+			}},
+		); err != nil {
+			return nil, err
+		}
+
+		// Record as payment on the original purchase
+		payment := PurchasePayment{
+			ID:         primitive.NewObjectID(),
+			TenantID:   tid,
+			PurchaseID: oid,
+			SupplierID: original.SupplierID,
+			Amount:     creditAmount,
+			Note:       fmt.Sprintf("Return credit from RET"),
+			CreatedBy:  userID,
+			CreatedAt:  time.Now(),
+		}
+		_, _ = paymentCol().InsertOne(ctx, payment)
+
+		// Reduce supplier balance
 		if _, err := database.Col("suppliers").UpdateOne(ctx,
 			bson.M{"_id": original.SupplierID, "tenant_id": tid},
 			bson.M{
-				"$inc": bson.M{"balance": -balanceReduction},
+				"$inc": bson.M{"balance": -creditAmount},
 				"$set": bson.M{"updated_at": time.Now()},
 			},
 		); err != nil {
 			return nil, err
 		}
+
+		// Record in supplier payment history
+		_ = supplier.RecordPaymentWithType(tenantID, original.SupplierID.Hex(), original.SupplierName, creditAmount,
+			fmt.Sprintf("Return credit for %s", original.Ref), createdBy, "return_credit", original.Ref)
 	}
 
 	// Record return in supplier payment history
-	createdBy := userEmail
-	if createdBy == "" {
-		createdBy = userID
-	}
 	_ = supplier.RecordPaymentWithType(tenantID, original.SupplierID.Hex(), original.SupplierName, -returnTotal, fmt.Sprintf("Return for %s", original.Ref), createdBy, "return", original.Ref)
 
 	seq, _ := counter.Next(tenantID, "purchase_return")

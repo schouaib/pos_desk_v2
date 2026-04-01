@@ -1219,4 +1219,5 @@ export default {
   err_qty_must_be_0: 'La quantité doit être supérieure à 0',
   err_amount_exceeds_total_remaining_balance_of_unpaid_purchases: 'Le montant dépasse le solde restant des achats impayés',
   paymentExceedsRemaining: 'Le montant dépasse le solde restant',
+  returnCredit: 'Avoir retour',
 }

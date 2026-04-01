@@ -988,6 +988,8 @@ export default function Suppliers({ path }) {
                               ? <span class="badge badge-xs badge-info">{t('sourcePurchase')}{p.purchase_ref ? ` ${p.purchase_ref}` : ''}</span>
                               : p.type === 'return'
                                 ? <span class="badge badge-xs badge-warning">{t('movementReturn')}{p.purchase_ref ? ` ${p.purchase_ref}` : ''}</span>
+                                : p.type === 'return_credit'
+                                  ? <span class="badge badge-xs badge-accent">{t('returnCredit')}{p.purchase_ref ? ` ${p.purchase_ref}` : ''}</span>
                                 : <span class="badge badge-xs badge-success">{t('stmtPayment')}</span>
                         }
                       </td>
